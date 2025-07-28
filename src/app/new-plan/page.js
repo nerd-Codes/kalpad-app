@@ -11,8 +11,7 @@ import { useLoading } from '@/context/LoadingContext';
 
 import { Container, Title, Text, TextInput, Textarea, Button, Paper, Group, FileInput, Checkbox, Alert, Badge } from '@mantine/core';
 import { IconCalendar, IconFileText, IconBooks, IconPdf } from '@tabler/icons-react';
-import * as pdfjsLib from 'pdfjs-dist';
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
 
 export default function NewPlanPage() {
     const { setIsLoading } = useLoading();
@@ -144,9 +143,17 @@ export default function NewPlanPage() {
     const handleProcessFile = async () => {
         if (!studyMaterialFile || !session) return;
         setIsProcessing(true);
-        setProcessMessage('Step 1/3: Parsing PDF...');
+        setProcessMessage('Step 1/4: Loading PDF Engine...');
         setError('');
+
         try {
+            // --- THE FIX: Dynamically import the library only when needed ---
+            const pdfjsLib = await import('pdfjs-dist');
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+            // Now the rest of the function can proceed as before
+            setProcessMessage('Step 2/4: Reading PDF in your browser...');
+            
             const { textChunks, pageImages } = await new Promise((resolve, reject) => {
                 const fileReader = new FileReader();
                 fileReader.onload = async (event) => {
@@ -171,42 +178,39 @@ export default function NewPlanPage() {
                         }
                         const sanitizedText = sanitizeText(fullText);
                         const chunks = chunkText(sanitizedText, 1000, 200);
-                        resolve({ textChunks: chunks, pageImages: images });
+                        resolve({ textChunks, pageImages });
                     } catch (error) { reject(error); }
                 };
                 fileReader.onerror = (error) => reject(error);
                 fileReader.readAsArrayBuffer(studyMaterialFile);
             });
-            
-            setProcessMessage(`Step 2/3: Uploading ${pageImages.length} page images...`);
-            const uploadedUrls = [];
-            for (const [index, imageBlob] of pageImages.entries()) {
-                const fileName = `page_${index + 1}_${new Date().getTime()}.jpeg`;
-                const filePath = `${session.user.id}/${studyMaterialFile.name}/${fileName}`;
-                const { data, error: uploadError } = await supabase.storage.from('study-materials').upload(filePath, imageBlob, { contentType: 'image/jpeg' });
-                if (uploadError) throw uploadError;
-                const { data: { publicUrl } } = supabase.storage.from('study-materials').getPublicUrl(filePath);
-                uploadedUrls.push(publicUrl);
-            }
-            setPageImageUrls(uploadedUrls);
 
-            setProcessMessage(`Step 3/3: Indexing ${textChunks.length} text chunks...`);
+            setProcessMessage(`Step 3/4: Uploading content...`);
+            
+            const formData = new FormData();
+            formData.append('text_chunks', JSON.stringify(textChunks));
+            formData.append('file_name', studyMaterialFile.name); 
+            pageImages.forEach((blob, index) => {
+                formData.append('page_images', blob, `page_${index + 1}.jpeg`);
+            });
             const response = await fetch('/api/vectorize-content', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chunks: textChunks, file_name: studyMaterialFile.name }),
+                body: formData,
             });
-            if (!response.ok) throw new Error((await response.json()).error);
-            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Failed to process content.");
+            }
             const result = await response.json();
-            setProcessMessage(`✅ Success! ${result.message} and ${uploadedUrls.length} pages are ready.`);
+            setProcessMessage(`✅ Success! ${result.message}`);
         } catch (err) {
             console.error("File processing pipeline error:", err);
-            setProcessMessage(`Error: ${err.message}`);
+            setProcessMessage(`Error: Could not process PDF. ${err.message}`);
         } finally {
             setIsProcessing(false);
         }
     };
+    
 
     return (
         <AppLayout session={session}>
