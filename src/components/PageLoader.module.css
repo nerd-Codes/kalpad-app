@@ -1,0 +1,51 @@
+/* src/components/PageLoader.module.css */
+
+.loaderOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(10, 10, 15, 0.5); /* Darker, more focused bg */
+    backdrop-filter: blur(10px);
+    z-index: 9999;
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.logo {
+    font-family: var(--font-lexend);
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: white;
+    /* The Glow Effect */
+    /* text-shadow: 
+        0 0 5px #fff,
+        0 0 10px #fff,
+        0 0 20px var(--mantine-color-brandPurple-4),
+        0 0 30px var(--mantine-color-brandPurple-4),
+        0 0 40px var(--mantine-color-brandPurple-4); */
+    
+    /* The subtle float animation */
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+	0% {
+		transform: translateY(0px);
+	}
+	50% {
+		transform: translateY(-8px);
+	}
+	100% {
+		transform: translateY(0px);
+	}
+}

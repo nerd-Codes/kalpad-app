@@ -1,0 +1,55 @@
+/* src/components/QuestTimeline.module.css */
+
+.bullet {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: white;
+    border-radius: 50%;
+}
+
+.waveWrapper {
+    /* This class combines the bullet styles and the animation anchor */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: white;
+    border-radius: 50%;
+    position: relative;
+}
+
+.waveWrapper::after {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    /* Use the CSS variable for color */
+    background-color: var(--wave-color);
+    z-index: -1;
+    animation: wave 1.8s infinite cubic-bezier(0.36, 0.11, 0.89, 0.32);
+    opacity: 0;
+}
+
+@keyframes wave {
+    0% {
+        transform: scale(0.5);
+        opacity: 0.6;
+    }
+    100% {
+        transform: scale(3);
+        opacity: 0;
+    }
+}
+
+
+@keyframes pulse-line-color {
+  0% { background-color: var(--mantine-color-dark-4); }
+  50% { background-color: var(--mantine-color-brandPurple-4); }
+  100% { background-color: var(--mantine-color-dark-4); }
+}
+
