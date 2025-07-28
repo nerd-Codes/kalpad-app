@@ -8,13 +8,11 @@
     "start": "next start",
     "lint": "next lint"
   },
-
   "overrides": {
     "magic-ui": {
       "odbc": "npm:empty-npm-package@1.0.0"
     }
   },
-  
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@mantine/core": "^8.2.1",
@@ -25,10 +23,8 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/supabase-js": "^2.52.0",
     "@tabler/icons-react": "^3.34.1",
-    "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.9",
-    "magic-ui": "^0.1.0",
     "next": "15.4.3",
     "pdfjs-dist": "^5.3.93",
     "react": "19.1.0",
@@ -37,8 +33,7 @@
     "rehype-katex": "^7.0.1",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0",
-    "tailwind-merge": "^3.3.1"
+    "remark-math": "^6.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
