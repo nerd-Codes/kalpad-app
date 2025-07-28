@@ -40,7 +40,7 @@ export async function POST(request) {
         }
     }
     
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
     // --- UPGRADED PROMPT with Full Context ---
     const outlinePrompt = `

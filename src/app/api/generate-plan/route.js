@@ -97,23 +97,36 @@ export async function POST(request) {
     // Step 4: Second AI Call - Generate the Plan using the Strategy
     console.log("Generating detailed plan...");
     const planPrompt = `
-      ${KalPad_Constitution}
+  ${KalPad_Constitution}
 
-      **Your Task:**
-      Execute the provided strategy and create a detailed, day-by-day plan in a strict JSON array format.
+  **Your Task:**
+  Execute the provided strategy and create a detailed, day-by-day plan in a strict JSON array format. Your primary goal is to provide thoughtful, actionable sub-topics.
 
-      **Strategy to Execute:**
-      - Overall Approach: ${strategy.overall_approach}
-      - Topics to Emphasize: ${strategy.emphasized_topics.join(', ')}
-      - Topics to Skip: ${strategy.skipped_topics.map(t => t.topic).join(', ') || 'None'}
+  **Strategy to Execute:**
+  - Overall Approach: ${strategy.overall_approach}
+  - Topics to Emphasize: ${strategy.emphasized_topics.join(', ')}
+  - Topics to Skip: ${strategy.skipped_topics.map(t => t.topic).join(', ') || 'None'}
 
-      **Plan Details:**
-      - Days Remaining: ${daysLeft}
-      - Start Date: ${startDate}
-      
-      **CRITICAL JSON SCHEMA (Return ONLY a valid JSON array):**
-      Each object must have ALL keys: "day"(number), "date"(string "YYYY-MM-DD"), "topic_name"(string), "study_hours"(number), "importance"(number 1-10), and "sub_topics"([{"text": string, "completed": boolean}]).
-    `;
+  **Plan Details:**
+  - Days Remaining: ${daysLeft}
+  - Start Date: ${startDate}
+  
+  **CRITICAL INSTRUCTIONS for "sub_topics":**
+  The "sub_topics" array is the most important part of your output. It MUST contain small, concrete, and actionable tasks that a student can complete in a single session (e.g., 15-45 minutes).
+  - BAD Sub-Topic (too broad): "Understand the chapter on Transformers."
+  - GOOD Sub-Topic (actionable): "Read pages 45-51 of the textbook about transformer principles."
+  - GOOD Sub-Topic (actionable): "Solve 5 practice problems on the transformer EMF equation."
+  - GOOD Sub-Topic (actionable): "Create a summary flashcard for the different types of transformer losses."
+  
+  **CRITICAL INSTRUCTIONS for JSON SCHEMA (Return ONLY a valid JSON array):**
+  Each object must have ALL keys:
+  - "day": MUST be a whole number (integer).
+  - "date": MUST be a string in "YYYY-MM-DD" format.
+  - "topic_name": MUST be a string.
+  - "study_hours": MUST be a whole number (integer). DO NOT use decimals like 4.5.
+  - "importance": MUST be a whole number (integer) from 1 to 10. DO NOT use words like "High".
+  - "sub_topics": MUST be an array of objects, each with "text"(string) and "completed"(boolean: false).
+`;
 
     const plannerModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
     const planResult = await plannerModel.generateContent(planPrompt);

@@ -83,21 +83,38 @@ export async function POST(request) {
     const newStrategy = JSON.parse(strategyResult.response.text());
 
     // AI Call #2: Generate the new PLAN Topics
-     const planPrompt = `
-      ${KalPad_Constitution}
-      **Your Task:** Execute the provided NEW strategy and create a detailed, day-by-day plan in a strict JSON array format.
-      
-      **New Strategy to Execute:**
-      - New Approach: ${newStrategy.overall_approach}
-      - Incomplete Topics to Reschedule: ${incompleteSubTopics.join(', ') || 'None'}
+     // This is the final, polished planPrompt for /api/regenerate-plan/route.js
 
-      **Plan Details:**
-      - Days Remaining: ${daysLeft}
-      - Start Date: ${startDate}
-      
-      **CRITICAL JSON SCHEMA (Return ONLY a valid JSON array):**
-      Each object must have ALL keys: "day"(number), "date"(string), "topic_name"(string), "study_hours"(number), "importance"(number), and "sub_topics"([{"text": string, "completed": boolean}]).
-    `;
+const planPrompt = `
+  ${KalPad_Constitution}
+
+  **Your Task:**
+  Execute the provided NEW strategy and create a detailed, day-by-day plan in a strict JSON array format. Your primary goal is to provide thoughtful, actionable sub-topics.
+
+  **New Strategy to Execute:**
+  - New Approach: ${newStrategy.overall_approach}
+  - Incomplete Topics that MUST be Rescheduled: ${incompleteSubTopics.join(', ') || 'None'}
+
+  **Plan Details:**
+  - Days Remaining: ${daysLeft}
+  - Start Date: ${startDate}
+  
+  **CRITICAL INSTRUCTIONS for "sub_topics":**
+  The "sub_topics" array is the most important part of your output. It MUST contain small, concrete, and actionable tasks that a student can complete in a single session (e.g., 15-45 minutes).
+  - BAD Sub-Topic (too broad): "Understand the chapter on Transformers."
+  - GOOD Sub-Topic (actionable): "Read pages 45-51 of the textbook about transformer principles."
+  - GOOD Sub-Topic (actionable): "Solve 5 practice problems on the transformer EMF equation."
+  - GOOD Sub-Topic (actionable): "Create a summary flashcard for the different types of transformer losses."
+  
+  **CRITICAL INSTRUCTIONS for JSON SCHEMA (Return ONLY a valid JSON array):**
+  Each object must have ALL keys:
+  - "day": MUST be a whole number (integer).
+  - "date": MUST be a string in "YYYY-MM-DD" format.
+  - "topic_name": MUST be a string.
+  - "study_hours": MUST be a whole number (integer). DO NOT use decimals like 4.5.
+  - "importance": MUST be a whole number (integer) from 1 to 10. DO NOT use words like "High".
+  - "sub_topics": MUST be an array of objects, each with "text"(string) and "completed"(boolean: false).
+`;
 
     const plannerModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
     const planResult = await plannerModel.generateContent(planPrompt);

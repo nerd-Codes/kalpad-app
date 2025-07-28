@@ -18,44 +18,40 @@ export async function POST(request) {
     }
 
     const { data: planData, error: planError } = await supabase.from('study_plans').insert({
-        user_id: session.user.id,
-        exam_name, exam_date, generation_context, syllabus,
+        user_id: session.user.id, exam_name, exam_date, generation_context, syllabus,
     }).select().single();
     if (planError) throw new Error(`DB error (study_plans): ${planError.message}`);
 
     const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
     
-    // Use Promise.all to run image matching in parallel for efficiency
-    const enrichedTopics = await Promise.all(plan_topics.map(async (topic) => {
+    // --- THIS IS THE DEFINITIVE FIX: Sanitize the data before insertion ---
+    const topicsToInsert = await Promise.all(plan_topics.map(async (topic) => {
         let relevantImages = [];
         if (page_image_urls && page_image_urls.length > 0) {
             const embeddingResult = await embeddingModel.embedContent(topic.topic_name);
-            
-            // --- THIS IS THE DEFINITIVE FIX ---
             const { data: images, error } = await supabase.rpc('match_images', {
                 query_embedding: embeddingResult.embedding.values,
-                match_threshold: 0.7,
-                match_count: 2,
-                target_user_id: session.user.id // <-- THE CRITICAL MISSING PARAMETER
+                match_threshold: 0.7, match_count: 2, target_user_id: session.user.id
             });
-
             if (error) {
-                console.error(`Error matching images for topic "${topic.topic_name}":`, error);
+                console.error(`Error matching images for "${topic.topic_name}":`, error);
             } else {
-                relevantImages = images.map(img => 
-                    supabase.storage.from('study-materials').getPublicUrl(img.file_path).data.publicUrl
-                );
+                relevantImages = images.map(img => supabase.storage.from('study-materials').getPublicUrl(img.file_path).data.publicUrl);
             }
         }
         
+        // Sanitize numeric fields to prevent crashes
         return {
             ...topic,
+            day: Math.round(topic.day || 0),
+            study_hours: Math.round(topic.study_hours || 0),
+            importance: Math.round(topic.importance || 5),
             plan_id: planData.id,
             relevant_page_images: relevantImages,
         };
     }));
 
-    const { error: topicsError } = await supabase.from('plan_topics').insert(enrichedTopics);
+    const { error: topicsError } = await supabase.from('plan_topics').insert(topicsToInsert);
     if (topicsError) throw new Error(`DB error (plan_topics): ${topicsError.message}`);
 
     return new Response(JSON.stringify({ message: 'Plan saved successfully' }), { status: 200 });
