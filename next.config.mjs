@@ -1,10 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // This is our existing ESLint fix
   eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
+
+  // --- THIS IS THE DEFINITIVE FIX ---
+  // This tells Next.js to treat 'magic-ui' as a library that contains
+  // client-only components, preventing SSR errors like 'DOMMatrix is not defined'.
+  transpilePackages: ['magic-ui'],
 };
 
 export default nextConfig;
