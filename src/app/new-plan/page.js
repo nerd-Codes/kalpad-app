@@ -11,9 +11,11 @@ import { useLoading } from '@/context/LoadingContext';
 
 import { Container, Title, Text, TextInput, Textarea, Button, Paper, Group, FileInput, Checkbox, Alert, Badge } from '@mantine/core';
 import { IconCalendar, IconFileText, IconBooks, IconPdf } from '@tabler/icons-react';
+import { useRef } from 'react';
 
 
 export default function NewPlanPage() {
+    const strategyReportRef = useRef(null);
     const { setIsLoading } = useLoading();
     const router = useRouter();
 
@@ -34,11 +36,21 @@ export default function NewPlanPage() {
     const [strategy, setStrategy] = useState(null);
     const [pageImageUrls, setPageImageUrls] = useState([]);
 
+    
+
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
         });
     }, []);
+
+    useEffect(() => {
+        // If the strategy object exists and the ref is attached to the element...
+        if (strategy && strategyReportRef.current) {
+            // ...then scroll to it smoothly.
+            strategyReportRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, [strategy]);
 
     const sanitizeText = (text) => {
         if (!text) return '';
@@ -87,6 +99,7 @@ export default function NewPlanPage() {
         setStrategy(null);
         setSaveSuccess(false);
         setSaveError('');
+        setStrategy(null);
         try {
             const response = await fetch('/api/generate-plan', {
                 method: 'POST',
@@ -245,7 +258,7 @@ export default function NewPlanPage() {
                 {error && <Alert color="red" title="Error" mt="xl" withCloseButton onClose={() => setError('')}>{error}</Alert>}
                 
                 {strategy && (
-                    <GlassCard mt="xl">
+                    <GlassCard mt="xl" >
                         <Title order={3}>AI Strategy Report</Title>
                         <Text mt="md" fw={500}>Overall Approach:</Text>
                         <Text c="dimmed">{strategy.overall_approach}</Text>
@@ -277,7 +290,7 @@ export default function NewPlanPage() {
                 )}
 
                 {plan && Array.isArray(plan) && (
-                    <GlassCard mt="xl">
+                    <GlassCard mt="xl" ref={strategyReportRef}>
                         <Group justify="space-between" mb="lg">
                             <Title order={2}>Your Generated Plan</Title>
                             <Button onClick={handleSavePlan} loading={isSaving} color="brandGreen" disabled={saveSuccess}>

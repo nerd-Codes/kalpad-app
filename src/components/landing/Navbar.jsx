@@ -5,16 +5,28 @@ import Link from 'next/link';
 import { ShimmerButton } from './ShimmerButton';
 import { useRouter } from 'next/navigation'; // <-- Import the router
 import { useLoading } from '@/context/LoadingContext'; 
+import { useState, useEffect } from 'react'; // <-- Import hooks
+import supabase from '@/lib/supabaseClient';   // <-- Import Supabase client
 
 export function Navbar() {
 
   const router = useRouter();
-    const { setIsLoading } = useLoading();
+  const [session, setSession] = useState(null);
+  const { setIsLoading } = useLoading();
   
     const handleNavigation = (path) => {
       setIsLoading(true);
       router.push(path);
     };
+
+    const handleGetStarted = () => {
+    // --- THIS IS THE FIX ---
+    if (session) {
+      handleNavigation('/dashboard');
+    } else {
+      handleNavigation('/sign-up');
+    }
+  };
 
   return (
     <header style={{ 
@@ -28,7 +40,7 @@ export function Navbar() {
           <Group>
             <Button component={Link} href="/sign-up" variant="subtle" color="gray">Sign In</Button>
             <ShimmerButton 
-          onClick={() => handleNavigation('/dashboard')}
+          onClick={handleGetStarted}
           size="sm" 
           color="brandPurple" 
           radius="xl"
