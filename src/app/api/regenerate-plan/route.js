@@ -153,7 +153,7 @@ const planPrompt = `
         new_exam_name: existingPlan.exam_name,
         new_exam_date: existingPlan.exam_date,
         new_context: JSON.stringify(newStrategy),
-        new_topics: newPlanTopics
+        new_topics: newPlanTopics.map(topic => ({ ...topic, relevant_page_images: [] }))
     });
     if (rpcError) throw new Error(`Database error during regeneration: ${rpcError.message}`);
     

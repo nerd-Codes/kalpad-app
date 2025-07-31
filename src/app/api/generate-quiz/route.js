@@ -50,7 +50,7 @@ export async function POST(request) {
     `;
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest", // Flash is perfect for this structured task
+      model: "gemini-2.5-flash", // Flash is perfect for this structured task
       generationConfig: { responseMimeType: "application/json" },
     });
 
