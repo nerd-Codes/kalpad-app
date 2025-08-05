@@ -8,9 +8,31 @@ export async function POST(request) {
   try {
     console.log("--- CHECK-DOCUMENT API (FINAL VERSION) INITIATED ---");
     
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+          // At the top of the POST function
+      const supabase = createRouteHandlerClient({ cookies });
+      let session;
+
+      // First, try to get user from the mobile app's JWT in the Authorization header
+      const authHeader = request.headers.get('Authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+          const jwt = authHeader.replace('Bearer ', '');
+          const { data: { user } } = await supabase.auth.getUser(jwt);
+          // If the JWT is valid, we create a session object
+          if (user) {
+              session = { user }; 
+          }
+      }
+
+      // If there was no valid mobile session, fall back to the web app's cookie method
+      if (!session) {
+          const { data } = await supabase.auth.getSession();
+          session = data.session;
+      }
+
+      // If we still don't have a session after checking both methods, deny access
+      if (!session) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      }
 
     const { file_name, page_count } = await request.json();
     console.log(`Received check for file: "${file_name}" with expected page count: ${page_count}`);

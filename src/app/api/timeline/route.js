@@ -8,9 +8,30 @@ export const dynamic = 'force-dynamic';
 export async function GET(request) {
   try {
     // 1. Authorize the user
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+          const supabase = createRouteHandlerClient({ cookies });
+      let session;
+
+      // First, try to get user from the mobile app's JWT in the Authorization header
+      const authHeader = request.headers.get('Authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+          const jwt = authHeader.replace('Bearer ', '');
+          const { data: { user } } = await supabase.auth.getUser(jwt);
+          // If the JWT is valid, we create a session object
+          if (user) {
+              session = { user }; 
+          }
+      }
+
+      // If there was no valid mobile session, fall back to the web app's cookie method
+      if (!session) {
+          const { data } = await supabase.auth.getSession();
+          session = data.session;
+      }
+
+      // If we still don't have a session after checking both methods, deny access
+      if (!session) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      }
 
     // 2. Get the target date from the query parameters (e.g., /api/timeline?date=2024-07-28)
     const { searchParams } = new URL(request.url);
