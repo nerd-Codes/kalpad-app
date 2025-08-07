@@ -94,7 +94,7 @@ export default function AppLayout({ children, session }) {
                     root: { 
                         borderRadius: theme.radius.md,
                         // Override the default active/filled styles
-                        '&[data-active]': {
+                        '&[dataActive': {
                            backgroundColor: 'white',
                            color: 'black',
                            '&:hover': {

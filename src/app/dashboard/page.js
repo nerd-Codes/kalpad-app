@@ -5,10 +5,13 @@ import { useState, useEffect } from 'react';
 import supabase from '@/lib/supabaseClient';
 import AppLayout from '@/components/AppLayout';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useLoading } from '@/context/LoadingContext';
 
 // Mantine component imports
-import { Container, Title, Text, SimpleGrid, Grid, GridCol, Group, Badge, Button, Paper, Alert, Loader } from '@mantine/core';
-import { format } from 'date-fns';
+import { Container, Title, Text, SimpleGrid, Grid, GridCol, Group, Badge, Button, Paper, Alert, Loader, Stack } from '@mantine/core';
+import { format, isToday } from 'date-fns';
+import { ContinueStudyingCard } from '@/components/ContinueStudyingCard';
 
 // Custom component imports
 import { StatCard } from '@/components/StatCard';
@@ -22,6 +25,9 @@ import { IconCheck, IconFileText, IconCalendarEvent, IconBulb, IconFlame } from 
 import { studyTips } from '@/lib/studyTips';
 
 export default function DashboardPage() {
+
+    const router = useRouter(); // Initialize the router
+    const { setIsLoading } = useLoading(); // This should already exist
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
     const [plans, setPlans] = useState([]);
@@ -39,6 +45,11 @@ export default function DashboardPage() {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [dailyTasks, setDailyTasks] = useState([]);
     const [timelineLoading, setTimelineLoading] = useState(false);
+
+    const handleContinuePlanClick = (planId) => {
+        setIsLoading(true); // Trigger the blurry page loader
+        router.push(`/plan/${planId}`);
+    };
 
     useEffect(() => {
         // Pick a random tip on the initial load
@@ -58,7 +69,7 @@ export default function DashboardPage() {
                     .from('study_plans')
                     .select(`id, exam_name, exam_date, plan_topics ( date, sub_topics )`)
                     .eq('is_active', true)
-                    .order('exam_date', { ascending: true });
+                    .order('created_at', { ascending: false });
 
                 if (error) throw error;
                 
@@ -157,58 +168,97 @@ export default function DashboardPage() {
             .then(({ error }) => { if (error) console.error("Background update failed:", error); });
     };
 
+            const calculateProgress = (plan) => {
+            if (!plan || !plan.plan_topics) return 0;
+
+            let totalSubTopics = 0;
+            let completedSubTopics = 0;
+            
+            plan.plan_topics.forEach(day => {
+                if (day.sub_topics && Array.isArray(day.sub_topics)) {
+                    totalSubTopics += day.sub_topics.length;
+                    completedSubTopics += day.sub_topics.filter(sub => sub.completed).length;
+                }
+            });
+
+            if (totalSubTopics === 0) return 0;
+            return Math.round((completedSubTopics / totalSubTopics) * 100);
+        };
+
     const examDates = plans.map(plan => plan.exam_date);
 
-    return (
-        <AppLayout session={session}>
-            <Container size="xl">
-                <Title order={1}>Dashboard</Title>
-                <Text c="dimmed" mb="xl">Welcome back! Here's your mission control for academic success.</Text>
-                
-                {error && <Alert color="red" title="Error" mb="xl" withCloseButton onClose={() => setError('')}>{error}</Alert>}
+    const mostRecentPlan = plans.length > 0 ? plans[0] : null;
+    const mostRecentPlanProgress = mostRecentPlan ? calculateProgress(mostRecentPlan) : 0;
 
-                <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
-                    <StatCard title="Current Study Streak" value={`${stats.currentStreak} Days`} icon={IconFlame} color="var(--mantine-color-orange-5)" />
-                    <StatCard title="Topics Completed This Week" value={stats.weeklyCompleted} icon={IconCheck} color="var(--mantine-color-brandGreen-4)" />
-                    <StatCard title="Active Study Plans" value={stats.plansCreated} icon={IconFileText} color="var(--mantine-color-blue-4)" />
-                    <StatCard title="Next Exam Date" value={<Text fz="2.2rem" fw={700}>{stats.nextExamDate}</Text>} icon={IconCalendarEvent} color="var(--mantine-color-brandPurple-4)" />
-                </SimpleGrid>
-                
-                <Title order={2} mt={50} mb="md">Today's Mission</Title>
-                <GlassCard>
-                    <DatePicker selectedDate={selectedDate} setSelectedDate={setSelectedDate} examDates={examDates} />
-                    {timelineLoading && <Group justify="center" py="xl"><Loader /></Group>}
-                    {!timelineLoading && dailyTasks.length === 0 && (
-                        <Text ta="center" c="dimmed" py="md">Nothing scheduled for this day. Enjoy your break!</Text>
-                    )}
-                    {!timelineLoading && dailyTasks.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {dailyTasks.map(taskGroup => (
-                                <TimelineEntry key={taskGroup.examId} taskGroup={taskGroup} onUpdate={handleUpdateTaskGroup} />
-                            ))}
-                        </div>
-                    )}
-                </GlassCard>
-
-                <Title order={2} mt={50} mb="md">Progress & Insights</Title>
-                <Grid gutter="lg">
-                    <Grid.Col span={{ base: 12, lg: 8 }}>
-                        <GlassCard>
-                            {stats.completions && <Heatmap data={stats.completions} />}
-                        </GlassCard>
-                    </Grid.Col>
-                    <Grid.Col span={{ base: 12, lg: 4 }}>
-                        <Paper withBorder p="lg" radius="lg" style={{ height: '100%' }}>
-                            <Group>
-                                <Badge variant="filled" color="yellow" size="lg" radius="xl" leftSection={<IconBulb size={16} />}>
-                                    Study Tip of the Day
-                                </Badge>
-                            </Group>
-                            <Text mt="md" c="dimmed">{tipOfTheDay}</Text>
-                        </Paper>
-                    </Grid.Col>
-                </Grid>
-            </Container>
-        </AppLayout>
+    // Find the specific topic scheduled for today within the most recent plan
+    const todaysTopicForRecentPlan = mostRecentPlan?.plan_topics.find(topic => 
+        isToday(new Date(topic.date))
     );
+
+    // Calculate days left specifically for this plan for context
+    const daysLeftForRecentPlan = mostRecentPlan ? Math.max(0, Math.ceil((new Date(mostRecentPlan.exam_date) - new Date()) / (1000 * 60 * 60 * 24))) : 0;
+
+   return (
+    <AppLayout session={session}>
+        <Container size="xl">
+            <Title order={1} ff="Lexend, sans-serif">Dashboard</Title>
+            <Text c="dimmed" mb="xl">Welcome back! Here's your mission control for academic success.</Text>
+            
+            {loading && <Group justify="center" py="xl"><Loader /></Group>}
+            {error && <Alert color="red" title="Error" mb="xl" withCloseButton onClose={() => setError('')}>{error}</Alert>}
+
+            {!loading && (
+                <Stack gap={50}>
+                    {/* --- ACT I: IMMEDIATE FOCUS --- */}
+                    <ContinueStudyingCard 
+                        plan={mostRecentPlan} 
+                        progress={mostRecentPlanProgress} 
+                        todaysTopic={todaysTopicForRecentPlan}
+                        onJumpBackIn={handleContinuePlanClick} // Pass the handler as a prop
+                    />
+
+                    {/* --- ACT II: TODAY'S MISSION (Now full-width) --- */}
+                    <Stack gap="lg">
+                        <Title order={2} ff="Lexend, sans-serif">Today's Mission</Title>
+                        <GlassCard>
+                            <DatePicker selectedDate={selectedDate} setSelectedDate={setSelectedDate} examDates={examDates} />
+                            {timelineLoading && <Group justify="center" py="xl"><Loader /></Group>}
+                            {!timelineLoading && dailyTasks.length === 0 && (
+                                <Text ta="center" c="dimmed" py="md">Nothing scheduled for this day. Enjoy your break!</Text>
+                            )}
+                            {!timelineLoading && dailyTasks.length > 0 && (
+                                <Stack gap="md">
+                                    {dailyTasks.map(taskGroup => (
+                                        <TimelineEntry key={taskGroup.dailyTopic.id} taskGroup={taskGroup} onUpdate={handleUpdateTaskGroup} />
+                                    ))}
+                                </Stack>
+                            )}
+                        </GlassCard>
+                    </Stack>
+                    
+                    {/* --- ACT III: STATS & INSIGHTS (Now includes Heatmap) --- */}
+                    <Stack gap="lg">
+    <Title order={2} ff="Lexend, sans-serif">Stats & Insights</Title>
+
+    {/* A single SimpleGrid to arrange all 5 cards linearly */}
+    <SimpleGrid cols={{ base: 1, sm: 2, md: 3, xl: 5 }} spacing="xl">
+        
+        {/* Card 1: The Heatmap, styled to match the StatCards */}
+        <GlassCard style={{ position: 'relative', overflow: 'hidden' }}>
+                <Heatmap data={stats.completions} />
+        </GlassCard>
+        
+        {/* Cards 2-5: The StatCards */}
+        <StatCard title="Current Study Streak" value={`${stats.currentStreak} Days`} emoji="🔥" color="var(--mantine-color-orange-5)" />
+        <StatCard title="Topics This Week" value={stats.weeklyCompleted} emoji="✅" color="var(--mantine-color-brandGreen-4)" />
+        <StatCard title="Active Plans" value={stats.plansCreated} emoji="📚" color="var(--mantine-color-blue-4)" />
+        <StatCard title="Next Exam" value={mostRecentPlan ? format(new Date(mostRecentPlan.exam_date), 'MMM d') : 'N/A'} emoji="🗓️" color="var(--mantine-color-brandPurple-4)" />
+
+    </SimpleGrid>
+</Stack>
+                </Stack>
+            )}
+        </Container>
+    </AppLayout>
+);
 }

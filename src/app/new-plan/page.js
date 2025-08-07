@@ -7,17 +7,47 @@ import supabase from '@/lib/supabaseClient';
 import AppLayout from '@/components/AppLayout';
 import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
-import { useLoading } from '@/context/LoadingContext';
+import { wittyFacts } from '@/lib/loadingFacts';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Skeleton } from '@mantine/core';
 
-import { Container, Title, Text, TextInput, Textarea, Button, Paper, Group, FileInput, Checkbox, Alert, Badge, Progress } from '@mantine/core';
-import { IconCalendar, IconFileText, IconBooks, IconPdf, IconArrowDown } from '@tabler/icons-react';
+import { Container, Title, Text, TextInput, Textarea, Button, Paper, Group, FileInput, Checkbox, Alert, Badge, Progress, Loader, Stack, Grid, GridCol } from '@mantine/core';
+import { IconCalendar, IconFileText, IconBooks, IconPdf } from '@tabler/icons-react';
+
+
+const useTypingEffect = (text = '', speed = 1) => {
+    const [displayedText, setDisplayedText] = useState('');
+
+    useEffect(() => {
+        if (!text) {
+            setDisplayedText('');
+            return;
+        }
+
+        let i = 0;
+        setDisplayedText(''); // Ensure it's blank before starting
+
+        const intervalId = setInterval(() => {
+            // Use slice for a deterministic and bug-free update.
+            setDisplayedText(text.slice(0, i + 1));
+            i++;
+            if (i >= text.length) {
+                clearInterval(intervalId);
+            }
+        }, speed);
+
+        return () => clearInterval(intervalId);
+    }, [text, speed]);
+
+    return displayedText;
+};
 
 export default function NewPlanPage() {
-    const { setIsLoading } = useLoading();
     const router = useRouter();
     const strategyReportRef = useRef(null);
+    const planContainerRef = useRef(null);
 
-    // All necessary state for the component
+    // --- MODIFICATION: States updated for streaming UI ---
     const [session, setSession] = useState(null);
     const [examName, setExamName] = useState('');
     const [syllabus, setSyllabus] = useState('');
@@ -27,10 +57,10 @@ export default function NewPlanPage() {
     const [studyMaterialFile, setStudyMaterialFile] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingState, setProcessingState] = useState({ step: 'idle', message: '' });
-    const [pageImageUrls, setPageImageUrls] = useState([]);
 
-    const [generationComplete, setGenerationComplete] = useState(false);
-    const [plan, setPlan] = useState(null);
+    // New state for local loading, replacing the global loader for this action
+    const [isGenerating, setIsGenerating] = useState(false); 
+    const [plan, setPlan] = useState([]); // Initialize as empty array
     const [strategy, setStrategy] = useState(null);
     const [generationContext, setGenerationContext] = useState(null);
     const [error, setError] = useState('');
@@ -39,18 +69,92 @@ export default function NewPlanPage() {
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [saveError, setSaveError] = useState('');
 
+    const [pageImageUrls, setPageImageUrls] = useState([]);
+
+    const [currentFact, setCurrentFact] = useState(
+    (wittyFacts && wittyFacts.length > 0) ? wittyFacts[0] : 'Initializing AI mentor...'
+);
+
+     const typedApproach = useTypingEffect(strategy?.overall_approach);
+
+            // --- Start of Replacement (Fact Cycling useEffect) ---
+
+// This effect now correctly manages the fact-cycling timer.
+                useEffect(() => {
+                    let factInterval = null;
+
+                    // If we are in any loading state, start the timer.
+                    if (isGenerating) {
+                        factInterval = setInterval(() => {
+                            // Pick a new random fact from the wittyFacts array.
+                            const randomIndex = Math.floor(Math.random() * wittyFacts.length);
+                            setCurrentFact(wittyFacts[randomIndex]);
+                        }, 2500); // Change fact every 2.5 seconds
+                    } else {
+                        // If we are not loading, ensure the timer is cleared.
+                        if (factInterval) {
+                            clearInterval(factInterval);
+                        }
+                    }
+
+                    // The cleanup function is crucial. It ensures the interval is destroyed
+                    // if the component unmounts unexpectedly.
+                    return () => {
+                        if (factInterval) {
+                            clearInterval(factInterval);
+                        }
+                    };
+                }, [isGenerating]); // The timer's lifecycle depends ONLY on the master "isGenerating" state.
+
+
+            useEffect(() => {
+            // Stage 1: Scroll to "Thinking..." card when generation starts.
+            if (isGenerating && !strategy && strategyReportRef.current) {
+                setTimeout(() => {
+                    strategyReportRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+            // Stage 2: Scroll to "Building..." card when the plan starts populating.
+            // This condition is specific to the moment the plan array goes from empty to having one item.
+            if (strategy && plan.length === 1 && planContainerRef.current) {
+                setTimeout(() => {
+                    planContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+        }, [isGenerating, strategy, plan.length]); 
+
+        // Effect for STAGE 1 Autoscroll: Scroll to strategy once it's available
+        useEffect(() => {
+            if (strategy && strategyReportRef.current) {
+                // A small timeout ensures the element has fully rendered before scrolling.
+                setTimeout(() => {
+                    strategyReportRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+        }, [strategy]);
+
+        // Effect for STAGE 2 Autoscroll: Scroll to plan container when it starts populating
+        useEffect(() => {
+            // Only scroll when the VERY FIRST plan item is added.
+            if (plan.length === 1 && planContainerRef.current) {
+                setTimeout(() => {
+                    planContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+        }, [plan.length]);
+
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); });
     }, []);
 
 
-    useEffect(() => {
-        // If the strategy object exists and the ref is attached to the element...
-        if (strategy && strategyReportRef.current) {
-            // ...then scroll to it smoothly.
-            strategyReportRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }, [strategy]);
+    // useEffect(() => {
+    //     // If the strategy object exists and the ref is attached to the element...
+    //     if (strategy && strategyReportRef.current) {
+    //         // ...then scroll to it smoothly.
+    //         strategyReportRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    //     }
+    // }, [strategy]);
 
     const sanitizeText = (text) => {
         if (!text) return '';
@@ -92,61 +196,89 @@ export default function NewPlanPage() {
     };
 
     const handlePlanGeneration = async (e) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError('');
-        setPlan(null);
-        setStrategy(null);
-        setSaveSuccess(false);
-        setSaveError('');
-        setStrategy(null);
-        try {
-            const response = await fetch('/api/generate-plan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ examName, syllabus, examDate, useDocuments }),
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Something went wrong.');
-            }
-            const data = await response.json();
-            setPlan(data.plan);
-            setStrategy(data.strategy);
-            setGenerationContext(data.context);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    e.preventDefault();
+    setError(''); setPlan([]); setStrategy(null); setGenerationContext(null); setIsGenerating(true);
 
-    const handleSavePlan = async () => {
-        if (!plan || !session) return;
-        setIsSaving(true);
-        setSaveError('');
-        setSaveSuccess(false);
-        try {
-            const response = await fetch('/api/save-plan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    exam_name: examName,
-                    exam_date: examDate,
-                    plan_topics: plan,
-                    generation_context: generationContext,
-                    page_image_urls: pageImageUrls,
-                    syllabus: syllabus 
-                }),
-            });
-            if (!response.ok) throw new Error((await response.json()).error);
-            setSaveSuccess(true);
-        } catch (err) {
-            setSaveError(err.message);
-        } finally {
-            setIsSaving(false);
+    try {
+        const response = await fetch('/api/generate-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ examName, syllabus, examDate, useDocuments }), });
+        if (!response.body) { throw new Error("Streaming response not available."); }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split('\n---\n');
+            buffer = parts.pop() || ''; 
+            
+            for (const part of parts) {
+                if (part.trim() === '') continue;
+                
+                try {
+                    const message = JSON.parse(part);
+                    if (message.type === 'strategy') { setStrategy(message.data); setGenerationContext(JSON.stringify(message.data)); } 
+                    else if (message.type === 'plan_topic') {
+                        // This forces a UI update for each day
+                        setPlan(p => [...p, message.data]);
+                        await new Promise(res => setTimeout(res, 50)); 
+                    }
+                    else if (message.type === 'error') { throw new Error(message.data.message); }
+                } catch (e) { console.error("Stream parse error:", part, e); setError("A streaming error occurred."); }
+            }
         }
-    };
+    } catch (err) { setError(err.message); } finally { setIsGenerating(false); }
+};
+
+            const handleSavePlan = async () => {
+            // A simplified guard clause. We only need to check the plan here.
+            if (!plan || plan.length === 0) return;
+
+            setIsSaving(true);
+            setSaveError('');
+            setSaveSuccess(false);
+
+            try {
+                // --- DEFINITIVE FIX: Get the session directly inside the handler ---
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError || !session) {
+                    throw new Error('Authentication error. Could not save plan.');
+                }
+
+                const response = await fetch('/api/save-plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        exam_name: examName,
+                        exam_date: examDate,
+                        plan_topics: plan,
+                        generation_context: generationContext,
+                        page_image_urls: pageImageUrls,
+                        syllabus: syllabus 
+                    }),
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to save the plan.');
+                }
+
+                const data = await response.json();
+                setSaveSuccess(true);
+                router.push(`/plans`);
+
+            } catch (err) {
+                setSaveError(err.message);
+                // Also log to console for debugging
+                console.error("Save Plan Failed:", err.message);
+            } finally {
+                setIsSaving(false);
+            }
+        };
+
 
             const handleFileChange = (file) => {
             setStudyMaterialFile(file);
@@ -159,11 +291,7 @@ export default function NewPlanPage() {
             });
         };
 
-   // src/app/new-plan/page.js
-
-        // This function belongs in /src/app/new-plan/page.js
-
-// src/app/new-plan/page.js
+   
 
 const handleProcessFile = async () => {
     if (!studyMaterialFile || !session) return;
@@ -305,108 +433,214 @@ const handleProcessFile = async () => {
 };
     
 
-    return (
-        <AppLayout session={session}>
-            <Container>
-                <Title order={1} mb="xs">Create a New Study Plan</Title>
-                <Text c="dimmed" mb="xl">Fill in the details below to generate your personalized AI study schedule.</Text>
+    // --- Start of Replacement ---
+// --- Start of Replacement (Return Statement) ---
+return (
+    <AppLayout session={session}>
+        <Container>
+            <Title order={1} mb="xs">Create a New Study Plan</Title>
+            <Text c="dimmed" mb="xl">Fill in the details below to generate your AI schedule.</Text>
 
-                <GlassCard>
-                    <form onSubmit={handlePlanGeneration}>
-                        <TextInput leftSection={<IconBooks size={16} />} label="Exam Name" placeholder="e.g., Final Year Project, SATs" value={examName} onChange={(e) => setExamName(e.target.value)} required />
-                        <Textarea label="Syllabus" placeholder="Paste your full syllabus here..." value={syllabus} onChange={(e) => setSyllabus(e.target.value)} required autosize minRows={5} mt="md" leftSection={<IconFileText size={16} />} />
-                        <TextInput type="date" label="Exam Date" value={examDate} onChange={(e) => setExamDate(e.target.value)} required mt="md" leftSection={<IconCalendar size={16} />} />
-                        
-                        <Paper withBorder p="md" mt="xl" radius="md" style={{backgroundColor: 'rgba(0,0,0,0.2)'}}>
-                             <FileInput leftSection={<IconPdf size={16} />} label="Optional: Process Study Materials" placeholder="Upload a PDF" value={studyMaterialFile} onChange={handleFileChange} accept=".pdf" />
-                            <Button onClick={handleProcessFile} disabled={!studyMaterialFile || isProcessing} mt="xs" size="xs" variant="outline" color="brandGreen" loading={isProcessing}>
-                                Process File
-                            </Button>
-                            {processingState.step !== 'idle' && (
-                                <div style={{ marginTop: '0.5rem' }}>
-                                    {/* Show a progress bar during the parsing step */}
-                                    {processingState.step === 'parsing' && processingState.totalPages > 0 && (
-                                        <Progress 
-                                            value={(processingState.currentPage / processingState.totalPages) * 100} 
-                                            striped 
-                                            animated 
-                                            mb="xs"
-                                        />
-                                    )}
-                                    <Text size="xs">
-                                        {processingState.message}
-                                    </Text>
-                                </div>
-                            )}
+            <GlassCard>
+                <form onSubmit={handlePlanGeneration}>
+                    <Stack gap="xl">
+                        {/* --- SECTION 1: CORE DETAILS --- */}
+                        <Stack gap="xs">
+                            <Title order={3} ff="Lexend, sans-serif" fw={600}>
+                                Plan Details
+                            </Title>
+                            <Grid>
+                                <Grid.Col span={{ base: 12, md: 8 }}>
+                                    <TextInput
+                                        leftSection={<IconBooks size={18} />}
+                                        label="Exam Name"
+                                        placeholder="e.g., Final Year Project, SATs"
+                                        value={examName}
+                                        onChange={(e) => setExamName(e.target.value)}
+                                        required
+                                        disabled={isGenerating}
+                                        size="md"
+                                    />
+                                </Grid.Col>
+                                <Grid.Col span={{ base: 12, md: 4 }}>
+                                    <TextInput
+                                        leftSection={<IconCalendar size={18} />}
+                                        type="date"
+                                        label="Exam Date"
+                                        value={examDate}
+                                        onChange={(e) => setExamDate(e.target.value)}
+                                        required
+                                        disabled={isGenerating}
+                                        size="md"
+                                    />
+                                </Grid.Col>
+                                <Grid.Col span={12}>
+                                    <Textarea
+                                        label="Syllabus"
+                                        description="Paste your complete syllabus here. Be as detailed as possible for the best results."
+                                        placeholder="Chapter 1: Introduction to AI..."
+                                        value={syllabus}
+                                        onChange={(e) => setSyllabus(e.target.value)}
+                                        required
+                                        autosize
+                                        minRows={6}
+                                        disabled={isGenerating}
+                                        size="md"
+                                    />
+                                </Grid.Col>
+                            </Grid>
+                        </Stack>
+
+                        {/* --- SECTION 2: OPTIONAL MATERIALS --- */}
+                        <Paper withBorder p="lg" radius="md" style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                            <Stack>
+                                <Title order={4} ff="Lexend, sans-serif" fw={500}>
+                                    Optional: Add Your Materials
+                                </Title>
+                                <FileInput
+                                    leftSection={<IconPdf size={18} />}
+                                    description="Upload a PDF of your study notes or textbook for a more personalized plan."
+                                    placeholder="Upload a PDF"
+                                    value={studyMaterialFile}
+                                    onChange={handleFileChange}
+                                    accept=".pdf"
+                                    disabled={isGenerating || isProcessing}
+                                    size="md"
+                                />
+                                <Group>
+                                    <Button
+                                        onClick={handleProcessFile}
+                                        disabled={!studyMaterialFile || isProcessing || isGenerating}
+                                        variant="outline"
+                                        color="brandGreen"
+                                        loading={isProcessing}
+                                    >
+                                        {processingState.step === 'done' ? '✓ Processed' : 'Process File'}
+                                    </Button>
+                                    <Checkbox
+                                        label="Use my documents for this plan"
+                                        checked={useDocuments}
+                                        onChange={(e) => setUseDocuments(e.currentTarget.checked)}
+                                        disabled={isGenerating || !studyMaterialFile}
+                                    />
+                                </Group>
+                                {processingState.step !== 'idle' && (
+                                    <Text size="xs" c="dimmed" mt="xs">{processingState.message}</Text>
+                                )}
+                            </Stack>
                         </Paper>
 
-                        <Checkbox label="Use my uploaded documents to create a better, personalized plan" checked={useDocuments} onChange={(e) => setUseDocuments(e.currentTarget.checked)} mt="lg" />
-                        
-                        <Group justify="flex-end" mt="xl">
-                            <ShimmerButton type="submit" size="md" color="brandPurple">
-                                Generate My Plan
+                        {/* --- SECTION 3: CALL TO ACTION --- */}
+                        <Group justify="flex-end" mt="md">
+                            <ShimmerButton
+                                type="submit"
+                                size="lg"
+                                color="brandPurple"
+                                loading={isGenerating}
+                                disabled={isProcessing}
+                            >
+                                {isGenerating ? 'Generating Your Quest...' : 'Generate My Plan'}
                             </ShimmerButton>
                         </Group>
-                    </form>
+                    </Stack>
+                </form>
+            </GlassCard>
+
+            {error && <Alert color="red" title="Error" mt="xl">{error}</Alert>}
+            
+            {(isGenerating || strategy) && (
+                <GlassCard mt="xl" ref={strategyReportRef}>
+                    <Title order={3}>{strategy ? "AI Strategy Report" : "Thinking..."}</Title>
+                    {strategy ? (
+                        <>
+                            <Text mt="md" fw={500}>Overall Approach:</Text>
+                            <Text c="dimmed">{typedApproach}</Text>
+                            
+                            {/* FIX 2: Added missing heading for emphasized topics */}
+                            {strategy.emphasized_topics && strategy.emphasized_topics.length > 0 && (
+                                <>
+                                    <Text mt="md" fw={500}>Key Topics to Emphasize:</Text>
+                                    <Group mt="xs" gap="xs">{strategy.emphasized_topics.map((topic, index) => (<Badge key={index} color="brandGreen" variant="light">{topic}</Badge>))}</Group>
+                                </>
+                            )}
+                        </>
+                    ) : (
+                        <Paper p="md" mt="md" withBorder style={{backgroundColor: 'rgba(0,0,0,0.1)'}}>
+                           <Group>
+                                {/* FIX: Loader color is now white */}
+                                <Loader size="sm" color="white" />
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key={currentFact}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } }}
+                                        exit={{ opacity: 0, y: -10, transition: { duration: 0.4, ease: 'easeIn' } }}
+                                    >
+                                        <Text size="sm" c="dimmed">{currentFact}</Text>
+                                    </motion.div>
+                                </AnimatePresence>
+                            </Group>
+                        </Paper>
+                    )}
                 </GlassCard>
+            )}
 
-                {error && <Alert color="red" title="Error" mt="xl" withCloseButton onClose={() => setError('')}>{error}</Alert>}
-                
-                {strategy && (
-                    <GlassCard mt="xl" >
-                        <Title order={3}>AI Strategy Report</Title>
-                        <Text mt="md" fw={500}>Overall Approach:</Text>
-                        <Text c="dimmed">{strategy.overall_approach}</Text>
-                         {strategy.emphasized_topics && strategy.emphasized_topics.length > 0 && (
-                            <>
-                                <Text mt="md" fw={500}>Key Topics to Emphasize:</Text>
-                                <Text c="dimmed" size="sm">The AI has identified these topics as critical for success.</Text>
-                                <Group mt="xs">
-                                    {strategy.emphasized_topics.map((topic, index) => (
-                                        <Badge key={index} color="brandGreen" variant="light">{topic}</Badge>
-                                    ))}
-                                </Group>
-                            </>
-                        )}
-                        {strategy.skipped_topics && strategy.skipped_topics.length > 0 && (
-                            <>
-                                <Text mt="md" fw={500}>De-prioritized Topics:</Text>
-                                <Text c="dimmed" size="sm">These topics were skipped to maximize your score in the given time.</Text>
-                                <ul>
-                                    {strategy.skipped_topics.map((item, index) => (
-                                        <li key={index}>
-                                            <Text size="sm"><Text fw={500} span>{item.topic}:</Text> <Text c="dimmed" span>{item.reason}</Text></Text>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </>
-                        )}
-                    </GlassCard>
-                )}
-
-                {plan && Array.isArray(plan) && (
-                    <GlassCard mt="xl" ref={strategyReportRef}>
-                        <Group justify="space-between" mb="lg">
-                            <Title order={2}>Your Generated Plan</Title>
-                            <Button onClick={handleSavePlan} loading={isSaving} color="brandGreen" disabled={saveSuccess}>
-                                {saveSuccess ? '✓ Saved!' : 'Save This Plan'}
-                            </Button>
-                        </Group>
-                        {saveError && <Alert color="red" title="Save Error" withCloseButton onClose={() => setSaveError('')}>{saveError}</Alert>}
-                        
-                        <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '1rem' }}>
+            {strategy && (isGenerating || plan.length > 0) && (
+                <GlassCard mt="xl" ref={planContainerRef}>
+                    <Group justify="space-between" mb="lg">
+                        <Title order={2}>{isGenerating && plan.length === 0 ? "Building Your Quest..." : "Your Generated Plan"}</Title>
+                        {!isGenerating && plan.length > 0 && (
+                                <Button 
+                                    onClick={handleSavePlan} 
+                                    loading={isSaving} 
+                                    disabled={saveSuccess}
+                                    color="brandGreen"
+                                >
+                                    {saveSuccess ? 'Saved & Redirecting...' : 'Save & View Plan'}
+                                </Button>
+                            )}
+                    </Group>
+                    
+                    {plan.length > 0 ? (
+                        <div style={{ maxHeight: '75vh', overflowY: 'auto', paddingRight: '1rem' }}>
                             {plan.map((item, index) => (
                                 <Paper key={index} p="md" mb="md" withBorder radius="md">
                                     <Text fw={700}>Day {item.day} ({item.date}) - {item.topic_name}</Text>
-                                    <ul style={{marginTop: '0.5rem'}}>
-                                        {item.sub_topics?.map((sub, i) => <li key={i}>{sub.text}</li>)}
-                                    </ul>
+                                    <ul style={{marginTop: '0.5rem', paddingLeft: '1.2rem'}}>{item.sub_topics?.map((sub, i) => <li key={i}>{sub.text}</li>)}</ul>
                                 </Paper>
                             ))}
+
+                            {/* --- FIX: Skeleton loader for in-progress generation --- */}
+                            {isGenerating && (
+                                <Paper p="md" mb="md" withBorder radius="md" style={{opacity: 0.6}}>
+                                    <Skeleton height={20} width="70%" mb="md" />
+                                    <Skeleton height={15} mt="sm" />
+                                    <Skeleton height={15} mt="sm" />
+                                    <Skeleton height={15} mt="sm" />
+                                </Paper>
+                            )}
                         </div>
-                    </GlassCard>
-                )}
-            </Container>
-        </AppLayout>
-    );
+                    ) : (
+                        <Paper p="md" withBorder style={{backgroundColor: 'rgba(0,0,0,0.1)'}}>
+                            <Group>
+                                <Loader size="sm" color="white" />
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key={currentFact}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } }}
+                                        exit={{ opacity: 0, y: -10, transition: { duration: 0.4, ease: 'easeIn' } }}
+                                    >
+                                        <Text size="sm" c="dimmed">{currentFact}</Text>
+                                    </motion.div>
+                                </AnimatePresence>
+                            </Group>
+                        </Paper>
+                    )}
+                </GlassCard>
+            )}
+        </Container>
+    </AppLayout>
+);
+// --- End of Replacement ---
 }

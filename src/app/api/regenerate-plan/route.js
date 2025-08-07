@@ -92,7 +92,7 @@ export async function POST(request) {
       **Current Situation:**
       - Days Remaining: ${daysLeft}
       - Topics Successfully Completed So Far: ${completedTopics.join(', ') || 'None yet'}
-      - Incomplete Topics from Past Days (Must be rescheduled): ${incompleteSubTopics.join(', ') || 'None'}
+      - Incomplete Topics from Past Days (Must be rescheduled): ${incompletePastTopics.join(', ') || 'None'}
       - Student's New Feedback (Highest Priority): "${user_feedback || 'No specific feedback.'}"
 
       **CRITICAL JSON SCHEMA:**
@@ -114,7 +114,7 @@ const planPrompt = `
 
   **New Strategy to Execute:**
   - New Approach: ${newStrategy.overall_approach}
-  - Incomplete Topics that MUST be Rescheduled: ${incompleteSubTopics.join(', ') || 'None'}
+  - Incomplete Topics that MUST be Rescheduled: ${incompletePastTopics.join(', ') || 'None'}
 
   **Plan Details:**
   - Days Remaining: ${daysLeft}
@@ -151,20 +151,26 @@ const planPrompt = `
     // Re-associate images for the new plan topics using semantic search
     const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
     for (const topic of newPlanTopics) {
-        const embeddingResult = await embeddingModel.embedContent(topic.topic_name);
-        const { data: images, error } = await supabase.rpc('match_images', {
+        try{
+            const embeddingResult = await embeddingModel.embedContent(topic.topic_name);
+        const { data: matches, error } = await supabase.rpc('match_documents', {
             query_embedding: embeddingResult.embedding.values,
-            match_threshold: 0.7,
             match_count: 2,
             target_user_id: session.user.id
         });
         if (error) {
-            console.error(`Error matching images for topic "${topic.topic_name}":`, error);
+            console.error(`Error matching documents for topic "${topic.topic_name}":`, error);
             topic.relevant_page_images = [];
         } else {
-            topic.relevant_page_images = images.map(img => 
-                supabase.storage.from('study-materials').getPublicUrl(img.file_path).data.publicUrl
-            );
+                // The 'match_documents' function returns 'image_url' directly.
+                // We need to filter out duplicates.
+                const imageUrls = matches.map(m => m.image_url).filter(Boolean); // Filter out any nulls
+                const uniqueImageUrls = [...new Set(imageUrls)]; // Get only unique URLs
+                topic.relevant_page_images = uniqueImageUrls;
+            }
+        }catch (e) {
+            console.error(`Embedding or RPC failed for topic "${topic.topic_name}":`, e.message);
+            topic.relevant_page_images = [];
         }
     }
 
@@ -174,7 +180,7 @@ const planPrompt = `
         new_exam_name: existingPlan.exam_name,
         new_exam_date: existingPlan.exam_date,
         new_context: JSON.stringify(newStrategy),
-        new_topics: newPlanTopics.map(topic => ({ ...topic, relevant_page_images: [] }))
+        new_topics: newPlanTopics
     });
     if (rpcError) throw new Error(`Database error during regeneration: ${rpcError.message}`);
     

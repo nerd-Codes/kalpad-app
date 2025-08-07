@@ -5,11 +5,15 @@ import { useState, useEffect } from 'react';
 import supabase from '@/lib/supabaseClient';
 import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
-import { Container, Title, Text, Group, Button, SimpleGrid, Badge, Progress, Loader, Alert } from '@mantine/core';
+import { Container, Title, Text, Group, Button, SimpleGrid, Badge, Progress, Loader, Alert, Stack, Divider } from '@mantine/core';
 import { GlassCard } from '@/components/GlassCard';
 import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
+import { useLoading } from '@/context/LoadingContext';
 
 export default function AllPlansPage() {
+    const { setIsLoading } = useLoading(); // Get the loader function
+    const router = useRouter(); // Get the router
     const [session, setSession] = useState(null);
     const [plans, setPlans] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -40,6 +44,11 @@ export default function AllPlansPage() {
         };
         fetchData();
     }, []);
+
+    const handlePlanClick = (planId) => {
+        setIsLoading(true); // Trigger the blurry page loader
+        router.push(`/plan/${planId}`); // Navigate to the specific plan
+    };
 
     const calculateProgress = (plan) => {
         let totalSubTopics = 0;
@@ -80,55 +89,93 @@ return (
                 </GlassCard>
             )}
 
-            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
-                {plans.map((plan) => {
-                    const progress = calculateProgress(plan);
-                    const daysLeft = Math.max(0, Math.ceil((new Date(plan.exam_date) - new Date()) / (1000 * 60 * 60 * 24)));
-                    let color = 'brandGreen';
-                    if (daysLeft < 7) color = 'red';
-                    else if (daysLeft < 14) color = 'yellow';
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xl">
+    {plans.map((plan) => {
+        const progress = calculateProgress(plan);
+        const daysLeft = Math.max(0, Math.ceil((new Date(plan.exam_date) - new Date()) / (1000 * 60 * 60 * 24)));
+        
+        let color = 'brandGreen';
+        if (progress > 85) color = 'teal';
+        if (daysLeft < 7) color = 'red';
+        else if (daysLeft < 14) color = 'orange';
 
-                    return (
-                        // --- FIX #3: Added GlassCard transparency props ---
-                        <GlassCard 
-                            key={plan.id} 
-                            component={Link} 
-                            href={{ pathname: `/plan/${plan.id}` }} 
-                            style={{ 
-                                textDecoration: 'none', 
-                                display: 'flex', 
-                                flexDirection: 'column', // Make the card a flex container
-                            }}
-                        >
-                            {/* The main content of the card */}
-                            <div style={{ flexGrow: 1 }}>
-                                <Title order={4}>{plan.exam_name}</Title>
-                                
-                                {/* --- FIX #1: "Days Left" is now on its own line --- */}
-                                <Badge color={color} variant="light" mt="sm">
-                                    {daysLeft > 0 ? `${daysLeft} days left` : 'Exam Day!'}
-                                </Badge>
-                                
-                                {/* --- FIX #2: Added Exam Date --- */}
-                                <Group mt="md">
-                                    <Text size="xs" c="dimmed">Exam Date:</Text>
-                                    <Text size="xs">{format(new Date(plan.exam_date), 'MMM d, yyyy')}</Text>
-                                </Group>
-                                <Group>
-                                    <Text size="xs" c="dimmed">Created:</Text>
-                                    <Text size="xs">{format(new Date(plan.created_at), 'MMM d, yyyy')}</Text>
-                                </Group>
-                            </div>
+        const coolEmojis = [
+            '🤯', '😤', '😭', '🤓', '😅', '😵‍💫', '🫠', '😎', '😇', '🥲',
+            '🤔', '🫡', '🙃', '😴', '🧘‍♂️', '🫥', '😬', '😈', '😌', '🤠',
+            '🤑', '😶‍🌫️', '🥹', '😵', '🫢', '😑', '😳', '🤡', '🤫', '🤭',
+            '🫨', '😮‍💨', '🫣', '🫶', '💀', '👀', '😕', '😧', '😨', '😰',
+            '😩', '😫', '😖', '😟', '😢', '😥', '😠', '😡', '🤬', '😇',
+            '😌', '😈', '🥴', '🤕', '🤒', '🤧', '🤤', '🥳', '😛', '😜',
+            '🤪', '😝', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿',
+            '😾', '🫨', '😲', '🤯', '😵‍💫', '🫣', '🫢', '🫥', '🙄', '🤥',
+            '🤐', '😶', '😬', '😑', '😮‍💨', '😴', '🫠', '🧠'
+            ];
+        const emojiIndex = String(plan.id).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % coolEmojis.length;
+        const backgroundEmoji = coolEmojis[emojiIndex];
 
-                            {/* The progress bar, pushed to the bottom */}
-                            <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
-                                <Text size="xs">Progress:</Text>
-                                <Progress value={progress} color={color} mt={4} />
-                            </div>
-                        </GlassCard>
-                    );
-                })}
-            </SimpleGrid>
+        return (
+            // --- FIX #2: The card is no longer a Link component. It now has an onClick handler. ---
+            <GlassCard
+                key={plan.id}
+                onClick={() => handlePlanClick(plan.id)}
+                style={{ 
+                    position: 'relative',
+                    overflow: 'hidden',
+                    cursor: 'pointer', // Add cursor to indicate it's clickable
+                }}
+                p="lg"
+            >
+                {/* --- FIX #1: The background emoji is moved to the top right. --- */}
+                <Text
+                    style={{
+                        position: 'absolute',
+                        top: -20,   // Changed from 'bottom'
+                        right: -15,
+                        fontSize: '6rem',
+                        color: 'white',
+                        opacity: 0.08,
+                        zIndex: 0,
+                        userSelect: 'none',
+                    }}
+                >
+                    {backgroundEmoji}
+                </Text>
+
+                <Stack justify="space-between" h="100%" style={{ zIndex: 1, position: 'relative' }}>
+                    {/* The rest of the card content is unchanged. */}
+                    <Stack gap="xs">
+                        <Title order={3} ff="Lexend, sans-serif" fw={600} lineClamp={2}>
+                            {plan.exam_name}
+                        </Title>
+                        <Text size="xs" c="dimmed">
+                            Created {format(new Date(plan.created_at), 'MMM d, yyyy')}
+                        </Text>
+                        <Badge color={color} variant="light" size="sm" style={{ alignSelf: 'flex-start' }}>
+                            {daysLeft > 0 ? `${daysLeft} days left` : 'Exam Day!'}
+                        </Badge>
+                    </Stack>
+
+                    <Stack gap="md" mt="md">
+                        <Stack gap={4}>
+                           <Group justify="space-between">
+                                <Text size="sm" fw={500}>Progress</Text>
+                                <Text size="sm" fw={700} c={color}>{progress}%</Text>
+                           </Group>
+                           <Progress value={progress} color={color} size="md" radius="sm" />
+                        </Stack>
+                        <Divider my="xs" />
+                        <Group justify="space-between" c="dimmed">
+                            <Text size="xs">Exam Date</Text>
+                            <Text size="sm" fw={500} c="white">
+                                {format(new Date(plan.exam_date), 'MMMM do, yyyy')}
+                            </Text>
+                        </Group>
+                    </Stack>
+                </Stack>
+            </GlassCard>
+        );
+    })}
+</SimpleGrid>
         </Container>
     </AppLayout>
 );

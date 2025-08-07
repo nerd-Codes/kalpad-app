@@ -78,10 +78,28 @@ const handleGenerateNotes = async (subTopicText) => {
                 
                 <Box mt="md" component="ul" style={{ listStyle: 'none', padding: 0 }}>
                     {dailyTopic.sub_topics?.map((subTopic, index) => (
-                        <Group key={index} wrap="nowrap" align="center" mb="sm" component="li">
-                            <Checkbox checked={subTopic.completed || false} onChange={() => handleToggleSubTopic(index)} />
-                            <Text style={{ flexGrow: 1 }}>{subTopic.text}</Text>
-                            <Button onClick={() => handleGenerateNotes(subTopic.text)} disabled={generatingNotesFor === dailyTopic.id} variant="light" color="grape" size="xs" title={`Generate notes for "${subTopic.text}"`}>
+                        <Group key={index} justify="space-between" wrap="nowrap" align="flex-start" mb="sm" component="li">
+                            {/* This is the "Task Zone" that can grow */}
+                            <Group gap="sm" wrap="nowrap" align="flex-start">
+                                <Checkbox 
+                                    checked={subTopic.completed || false} 
+                                    onChange={() => handleToggleSubTopic(index)}
+                                    mt={4} // Adds a slight top margin to align better with the text
+                                />
+                                {/* The Text component will now wrap naturally within this group */}
+                                <Text>{subTopic.text}</Text>
+                            </Group>
+
+                            {/* This is the "Button Zone" which is now protected */}
+                            <Button 
+                                onClick={() => handleGenerateNotes(subTopic.text)} 
+                                disabled={generatingNotesFor === dailyTopic.id} 
+                                variant="light" 
+                                color="grape" 
+                                size="xs" 
+                                title={`Generate notes for "${subTopic.text}"`}
+                                style={{ flexShrink: 0 }} // Prevents the button from ever shrinking
+                            >
                                 {generatingNotesFor === dailyTopic.id ? '...' : <IconPencilPlus size={16} />}
                             </Button>
                         </Group>

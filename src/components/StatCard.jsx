@@ -1,32 +1,52 @@
 // src/components/StatCard.jsx
 "use client";
-import { Paper, Text } from '@mantine/core';
-import { GlassCard } from './GlassCard'; // We'll reuse our glowing border card
 
-export function StatCard({ icon: Icon, title, value, color }) {
+import { Text, Stack, Title } from '@mantine/core';
+import { GlassCard } from './GlassCard';
+
+export function StatCard({ emoji, title, value, color }) {
   return (
-    <GlassCard style={{ position: 'relative', overflow: 'hidden' }}>
-      {/* The Big Faded Icon in the Background */}
-      <Icon
-        size={100}
-        color={color || 'gray'}
+    <GlassCard 
+      p="lg"
+      style={{ 
+        position: 'relative', 
+        overflow: 'hidden', 
+        height: '100%',
+      }}
+    >
+      {/* --- FIX #1: Emoji moved further into the corner --- */}
+      <Text
         style={{
           position: 'absolute',
-          top: '-20px',
-          right: '-20px',
-          opacity: 0.1,
+          top: '-15px',
+          right: '-15px',
+          fontSize: '5rem', // Slightly larger to compensate for clipping
+          opacity: 0.15,
           zIndex: 1,
+          userSelect: 'none',
         }}
-        strokeWidth={1.5}
-      />
+      >
+        {emoji}
+      </Text>
       
-      {/* The actual content, with a higher z-index to appear on top */}
-      <div style={{ position: 'relative', zIndex: 2 }}>
-        <Text size="sm" c="dimmed">{title}</Text>
-        <Text component="div" fw={700} fz="2.25rem" c={color || 'white'} mt="xs">
+      {/* --- FIX #2: The inner Stack now justifies to the end, placing the text block at the bottom --- */}
+      <Stack 
+        gap={0} // Tight gap between the value and title
+        style={{ 
+          position: 'relative', 
+          zIndex: 2, 
+          height: '100%' 
+        }} 
+        justify="flex-end"
+      >
+        {/* --- FIX #2: The order is now reversed --- */}
+        <Title order={2} ff="Lexend, sans-serif" fz="2.75rem" c={color || 'white'}>
           {value}
+        </Title>
+        <Text size="sm" c="dimmed" fw={500}> 
+          {title}
         </Text>
-      </div>
+      </Stack>
     </GlassCard>
   );
 }

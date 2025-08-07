@@ -82,6 +82,7 @@ export default function PlanDetailPage() {
         if (!planId) return;
         setIsRegenerating(true);
         setRegenerateError('');
+        setIsLoading(true);
         try {
             const response = await fetch('/api/regenerate-plan', {
                 method: 'POST',
@@ -99,6 +100,7 @@ export default function PlanDetailPage() {
             setRegenerateError(err.message);
         } finally {
             setIsRegenerating(false);
+            setIsLoading(false);
         }
     };
     
@@ -172,9 +174,45 @@ export default function PlanDetailPage() {
                         <>
                             <Title order={3}>✅ Success!</Title>
                             <Text c="dimmed" size="sm" mt="xs" mb="lg">Your new plan is ready. Here is the AI's new strategy report:</Text>
-                            <Paper withBorder p="md" radius="md" bg="dark.8">
-                                <Text fw={500}>New Approach:</Text>
-                                <Text c="dimmed" size="sm">{regenerationSuccess.newStrategy.overall_approach}</Text>
+                            <Paper withBorder p="md" radius="md" style={{backgroundColor: 'rgba(0,0,0,0.1)'}}>
+                                <Text mt="sm" fw={500}>New Approach:</Text>
+                                <Text c="dimmed">{regenerationSuccess.newStrategy.overall_approach}</Text>
+                                
+                                {/* --- START OF FIX --- */}
+                                {regenerationSuccess.newStrategy.emphasized_topics && regenerationSuccess.newStrategy.emphasized_topics.length > 0 && (
+                                    <>
+                                        <Text mt="md" fw={500}>Key Topics to Emphasize:</Text>
+                                        <Group mt="xs" gap="xs">
+                                            {regenerationSuccess.newStrategy.emphasized_topics.map((item, index) => {
+                                                // Robustly handle if item is a string OR an object with a 'topic' key
+                                                const topicText = typeof item === 'string' ? item : item.topic;
+                                                return <Badge key={index} color="brandGreen" variant="light">{topicText}</Badge>;
+                                            })}
+                                        </Group>
+                                    </>
+                                )}
+
+                                {regenerationSuccess.newStrategy.skipped_topics && regenerationSuccess.newStrategy.skipped_topics.length > 0 && (
+                                    <>
+                                        <Text mt="md" fw={500}>De-prioritized Topics:</Text>
+                                        <ul style={{ paddingLeft: '20px', marginTop: '8px', marginBottom: '0' }}>
+                                            {regenerationSuccess.newStrategy.skipped_topics.map((item, index) => (
+                                                <li key={index}>
+                                                    <Text size="sm">
+                                                        {/* Conditionally render based on available keys */}
+                                                        {item.topic && <Text fw={500} span>{item.topic}:</Text>}
+                                                        {item.week && <Text fw={500} span>{item.week}:</Text>}
+                                                        
+                                                        {/* Also handle reason/reasoning keys */}
+                                                        {item.reason && <Text c="dimmed" span> {item.reason}</Text>}
+                                                        {item.reasoning && <Text c="dimmed" span> {item.reasoning}</Text>}
+                                                    </Text>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </>
+                                )}
+                                {/* --- END OF FIX --- */}
                             </Paper>
                             <Group justify="flex-end" mt="xl">
                                 <ShimmerButton color="brandPurple" onClick={() => handleGoToNewPlan(regenerationSuccess.newPlanId)}>

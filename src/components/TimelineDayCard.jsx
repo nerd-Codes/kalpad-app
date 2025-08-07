@@ -69,14 +69,26 @@ export function TimelineDayCard({ dayTopic, onUpdate, isInitiallyCollapsed }) {
                 <GlassCard>
                     <Box component="ul" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                         {dayTopic.sub_topics?.map((subTopic, index) => (
-                            <Group key={index} wrap="nowrap" align="center" mb="sm" component="li">
-                                <Checkbox checked={subTopic.completed || false} onChange={() => handleToggleSubTopic(index)} />
-                                <Text style={{ flexGrow: 1 }}>{subTopic.text}</Text>
+                            <Group key={index} justify="space-between" wrap="nowrap" align="flex-start" mb="sm" component="li">
+                                {/* This is the "Task Zone" that can grow and wrap */}
+                                <Group gap="sm" wrap="nowrap" align="flex-start">
+                                    <Checkbox 
+                                        checked={subTopic.completed || false} 
+                                        onChange={() => handleToggleSubTopic(index)}
+                                        mt={4} // Align checkbox with the first line of text
+                                    />
+                                    <Text>{subTopic.text}</Text>
+                                </Group>
+
+                                {/* This is the protected "Button Zone" */}
                                 <Button 
                                     onClick={() => handleGenerateNotes(subTopic.text)} 
                                     disabled={generatingNotesFor === dayTopic.id} 
-                                    variant="light" color="grape" size="xs" 
+                                    variant="light" 
+                                    color="grape" 
+                                    size="xs" 
                                     title={`Generate notes for "${subTopic.text}"`}
+                                    style={{ flexShrink: 0 }} // Explicitly prevent the button from shrinking
                                 >
                                     {generatingNotesFor === dayTopic.id ? '...' : <IconPencilPlus size={16} />}
                                 </Button>
