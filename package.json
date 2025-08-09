@@ -17,14 +17,17 @@
     "@google/generative-ai": "^0.24.1",
     "@mantine/core": "^8.2.1",
     "@mantine/hooks": "^8.2.1",
+    "@mantine/notifications": "^8.2.4",
     "@react-pdf/renderer": "^4.3.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/auth-ui-react": "^0.4.7",
     "@supabase/auth-ui-shared": "^0.1.8",
+    "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.52.0",
     "@tabler/icons-react": "^3.34.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.9",
+    "inngest": "^3.40.1",
     "next": "15.4.3",
     "pdfjs-dist": "^5.3.93",
     "react": "19.1.0",
@@ -33,7 +36,8 @@
     "rehype-katex": "^7.0.1",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0"
+    "remark-math": "^6.0.0",
+    "youtubei.js": "^15.0.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

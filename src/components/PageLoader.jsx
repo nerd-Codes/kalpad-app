@@ -21,7 +21,7 @@ export function PageLoader({ isLoading }) {
       intervalRef.current = setInterval(() => {
         // Just update the index. The text will be derived from this.
         setFactIndex(prevIndex => (prevIndex + 1) % wittyFacts.length);
-      }, 2500); // Change fact every 2.5 seconds
+      }, 5000); // Change fact every 5 seconds
     } else {
       // If the loader is hidden, clear the interval
       if (intervalRef.current) {

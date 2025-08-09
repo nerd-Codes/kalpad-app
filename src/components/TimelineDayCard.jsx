@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { Paper, Box, Group, Checkbox, Button, Collapse, Text, Alert } from '@mantine/core';
-import { IconPencilPlus, IconBrain } from '@tabler/icons-react';
+import { IconPencilPlus, IconBrain, IconPlayerPlay } from '@tabler/icons-react';
 import { PDFButton } from './PDFButton';
 import { QuizModal } from './QuizModal';
 import { SummaryModal } from './SummaryModal';
@@ -81,17 +81,48 @@ export function TimelineDayCard({ dayTopic, onUpdate, isInitiallyCollapsed }) {
                                 </Group>
 
                                 {/* This is the protected "Button Zone" */}
-                                <Button 
-                                    onClick={() => handleGenerateNotes(subTopic.text)} 
-                                    disabled={generatingNotesFor === dayTopic.id} 
-                                    variant="light" 
-                                    color="grape" 
-                                    size="xs" 
-                                    title={`Generate notes for "${subTopic.text}"`}
-                                    style={{ flexShrink: 0 }} // Explicitly prevent the button from shrinking
-                                >
-                                    {generatingNotesFor === dayTopic.id ? '...' : <IconPencilPlus size={16} />}
-                                </Button>
+                                <Group gap="xs" wrap="nowrap">
+                                    {/* The existing "Generate Notes" button */}
+                                    <Button 
+                                        onClick={() => handleGenerateNotes(subTopic.text)} 
+                                        disabled={generatingNotesFor === dayTopic.id} 
+                                        variant="light" 
+                                        color="grape" 
+                                        size="xs" 
+                                        title={`Generate notes for "${subTopic.text}"`}
+                                        style={{ flexShrink: 0 }}
+                                    >
+                                        {generatingNotesFor === dayTopic.id ? '...' : <IconPencilPlus size={16} />}
+                                    </Button>
+
+                                    {/* --- THIS IS THE DEFINITIVE FIX --- */}
+                                    {/* We now correctly find the specific lecture for THIS sub-topic from the parent's data */}
+                                    {(() => {
+                                        // The dayTopic prop contains an array of all lectures for this entire day.
+                                        // We find the specific one that matches the current sub-topic's text.
+                                        const lecture = dayTopic.curated_lectures?.find(l => l.sub_topic_text === subTopic.text);
+                                        
+                                        // If a match is found, render the button.
+                                        if (lecture) {
+                                            return (
+                                                <Button
+                                                    component="a"
+                                                    href={lecture.video_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    variant="filled"
+                                                    color="red"
+                                                    size="xs"
+                                                    title={`Watch lecture for "${subTopic.text}"`}
+                                                    style={{ flexShrink: 0 }}
+                                                >
+                                                    <IconPlayerPlay size={16} />
+                                                </Button>
+                                            );
+                                        }
+                                        return null; // Otherwise, render nothing.
+                                    })()}
+                                </Group>
                             </Group>
                         ))}
                     </Box>

@@ -2,15 +2,15 @@
 "use client";
 
 import { MantineProvider, createTheme } from '@mantine/core';
-import { Inter, Lexend } from "next/font/google";
+// --- FIX: Import the Notifications component and its required CSS ---
+import { Notifications } from '@mantine/notifications';
+import '@mantine/notifications/styles.css';
+
 import { BackgroundBlobs } from "@/components/BackgroundBlobs";
 import { PageLoader } from "@/components/PageLoader";
 import { LoadingProvider, useLoading } from "@/context/LoadingContext";
 
-// We move all font and theme definitions here
-const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
-const lexend = Lexend({ subsets: ["latin"], variable: '--font-lexend' });
-
+// The theme definition is unchanged
 const theme = createTheme({
     fontFamily: 'var(--font-inter)',
     headings: { fontFamily: 'var(--font-lexend)' },
@@ -28,7 +28,7 @@ const theme = createTheme({
   },
 });
 
-// A small wrapper to use the loading hook
+// AppContent wrapper is unchanged
 function AppContent({ children }) {
     const { isLoading } = useLoading();
     return (
@@ -43,6 +43,11 @@ export function Providers({ children }) {
   return (
     <LoadingProvider>
       <MantineProvider theme={theme} defaultColorScheme="dark">
+        {/* --- FIX: The Notifications component is added here --- */}
+        {/* It sits inside MantineProvider but outside your main content. */}
+        {/* The `position` prop ensures it appears in the bottom right corner. */}
+        <Notifications position="bottom-right" zIndex={1000} />
+        
         <BackgroundBlobs />
         <AppContent>{children}</AppContent>
       </MantineProvider>

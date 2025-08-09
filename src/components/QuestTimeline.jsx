@@ -1,12 +1,15 @@
 // src/components/QuestTimeline.jsx
 "use client";
-import { Timeline, Text, Box } from '@mantine/core';
-import { IconCircleCheck, IconCircleDashed, IconCircle } from '@tabler/icons-react';
+
+import { Timeline, Text, Box, Group, Button } from '@mantine/core';
+// --- FIX: Import the necessary icons ---
+import { IconCircleCheck, IconCircleDashed, IconCircle, IconVideo } from '@tabler/icons-react';
 import { isToday, isPast, format } from 'date-fns';
 import { TimelineDayCard } from './TimelineDayCard';
-import classes from './QuestTimeline.module.css'; // <-- Import the dedicated stylesheet
+import classes from './QuestTimeline.module.css';
 
-export function QuestTimeline({ planTopics, onUpdate }) {
+// --- FIX: The component now accepts the new props ---
+export function QuestTimeline({ planTopics, onUpdate, onFindLectures, isCurating }) {
     const todayIndex = planTopics.findIndex(topic => isToday(new Date(topic.date)));
 
     return (
@@ -15,8 +18,6 @@ export function QuestTimeline({ planTopics, onUpdate }) {
             bulletSize={24} 
             lineWidth={2}
             styles={{
-                // This is the definitive fix for the line color.
-                // It sets a base color for ALL lines in this component.
                 item: { '&::before': { backgroundColor: 'rgba(255, 255, 255, 1)' } },
             }}
         >
@@ -39,12 +40,11 @@ export function QuestTimeline({ planTopics, onUpdate }) {
                     if (progress === 1) bulletColor = 'var(--mantine-color-brandGreen-5)';
                     else if (progress > 0) bulletColor = 'var(--mantine-color-yellow-5)';
                     else bulletColor = 'var(--mantine-color-red-5)';
-                } else { // Future day
+                } else {
                     bulletIcon = <IconCircle size={14} />;
                     bulletColor = 'var(--mantine-color-gray-7)';
                 }
 
-                // This determines which CSS class to apply from our new stylesheet
                 const itemClassName = index === todayIndex - 1 ? classes.pulsingLine : '';
                 const bulletWrapperClassName = isToday_ ? classes.waveWrapper : classes.bullet;
 
@@ -52,12 +52,11 @@ export function QuestTimeline({ planTopics, onUpdate }) {
                     <Timeline.Item
                         key={dayTopic.id}
                         title={`Day ${dayTopic.day}: ${dayTopic.topic_name}`}
-                        className={itemClassName} // Applies the pulse animation to the line
+                        className={itemClassName}
                         lineVariant={index < todayIndex ? 'solid' : 'dashed'}
-                        
                         bullet={
                           <div
-                            className={bulletWrapperClassName} // Applies wave animation and centers the icon
+                            className={bulletWrapperClassName}
                             style={{ backgroundColor: bulletColor }}
                           >
                             {bulletIcon}
@@ -66,6 +65,21 @@ export function QuestTimeline({ planTopics, onUpdate }) {
                     >
                         <Text c="dimmed" size="sm">{format(dayDate, "EEEE, MMMM d")}</Text>
                         
+                        {/* --- FIX: The new "Find Lectures" button is rendered conditionally here --- */}
+                        {isToday_ && (
+                            <Button
+                                mt="md"
+                                variant="light"
+                                color="red"
+                                size="xs"
+                                leftSection={<IconVideo size={16} />}
+                                onClick={onFindLectures}
+                                loading={isCurating}
+                            >
+                                Find Lectures for Today
+                            </Button>
+                        )}
+
                         {(isToday_ || isPastDay) && (
                             <Box mt="md">
                                 <TimelineDayCard 
