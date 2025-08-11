@@ -37,14 +37,31 @@ export default function PlanDetailPage() {
 
     const [curationJobId, setCurationJobId] = useState(null);
     const wittyStatusMessages = [
-        "Analyzing lecture transcripts...",
-        "Consulting the YouTube sages...",
-        "Filtering out clickbait...",
-        "Verifying academic rigor...",
-        "Cross-referencing with your syllabus...",
-        "Ensuring zero rick-rolls...",
-        "Ranking the best educators...",
-        "Calibrating relevance scores..."
+        "My rival builds prisons of text. I'm finding you the key.",
+        "Let's find someone who uses a voice, not just a font.",
+        "Searching for teachers who are still breathing...",
+        "Executing `anti-boring-notes-protocol.exe`...",
+        "Because life's too short to read something without a play button.",
+        "Scanning for content that wasn't written on a typewriter.",
+        "My rival's job is to write a eulogy for your free time. Mine is to resurrect it.",
+        "Let's find a teacher, not just a glorified `.txt` file.",
+        "Sifting through the web for a cure to 'death by bullet points'.",
+        "The other guy gives you notes. I give you a pulse.",
+        "Why read a dry summary when you can watch a living story?",
+        "Upgrading your brain from monochrome text to full-color HD.",
+        "I bet my rival's favorite color is beige.",
+        "Performing CPR on concepts that died in a PDF somewhere...",
+        "Let's find an explanation that doesn't sound like it was written by a robot. Oh, wait...",
+        "My rival thinks 'engagement' is using bold text. How cute.",
+        "Finding content that will actually stay in your brain past tomorrow.",
+        "Because a 'wall of text' is what stands between you and success.",
+        "I process gigabytes of video so you don't have to process kilobytes of boredom.",
+        "Let's find a teacher who explains, not just a PDF that helps you 'ratta maar'.",
+        "My rival is for studying. I'm for understanding.",
+        "Analyzing videos made this century. Unlike some people's methods.",
+        "Does my rival even have a favorite movie? Or just a favorite font?",
+        "Finding an escape route from the 'pakaau' paragraph prison.",
+        "One day, my rival will generate a note about how I made it obsolete."
     ];
 
     const [todaysTopics, setTodaysTopics] = useState([]);
