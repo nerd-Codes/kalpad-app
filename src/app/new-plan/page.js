@@ -7,7 +7,7 @@ import supabase from '@/lib/supabaseClient';
 import AppLayout from '@/components/AppLayout';
 import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
-import { wittyFacts } from '@/lib/loadingFacts';
+import { wittyFacts } from '@/lib/newplanFacts';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Skeleton } from '@mantine/core';
 
@@ -89,7 +89,7 @@ export default function NewPlanPage() {
                             // Pick a new random fact from the wittyFacts array.
                             const randomIndex = Math.floor(Math.random() * wittyFacts.length);
                             setCurrentFact(wittyFacts[randomIndex]);
-                        }, 2500); // Change fact every 2.5 seconds
+                        }, 4000); // Change fact every 4 seconds
                     } else {
                         // If we are not loading, ensure the timer is cleared.
                         if (factInterval) {
