@@ -3,6 +3,7 @@ import "./globals.css";
 import '@mantine/core/styles.css';
 import { ColorSchemeScript } from '@mantine/core';
 import { Providers } from "@/components/Providers";
+import { Analytics } from "@vercel/analytics/next"
 
 // Fonts can be loaded here, but passed to the theme in Providers.jsx
 import { Inter, Lexend } from "next/font/google";
@@ -23,6 +24,7 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );

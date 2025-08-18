@@ -25,6 +25,7 @@
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.52.0",
     "@tabler/icons-react": "^3.34.1",
+    "@vercel/analytics": "^1.5.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.9",
     "inngest": "^3.40.1",
