@@ -30,6 +30,7 @@
     "inngest": "^3.40.1",
     "next": "15.4.3",
     "pdfjs-dist": "^5.3.93",
+    "posthog-js": "^1.260.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-markdown": "^10.1.0",

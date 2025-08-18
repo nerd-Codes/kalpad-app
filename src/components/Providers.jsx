@@ -10,6 +10,8 @@ import { BackgroundBlobs } from "@/components/BackgroundBlobs";
 import { PageLoader } from "@/components/PageLoader";
 import { LoadingProvider, useLoading } from "@/context/LoadingContext";
 
+import { PostHogProvider } from './PostHogProvider';
+
 // The theme definition is unchanged
 const theme = createTheme({
     fontFamily: 'var(--font-inter)',
@@ -36,7 +38,7 @@ const theme = createTheme({
       },
     },
   },
-  
+
 });
 
 // AppContent wrapper is unchanged
@@ -57,10 +59,12 @@ export function Providers({ children }) {
         {/* --- FIX: The Notifications component is added here --- */}
         {/* It sits inside MantineProvider but outside your main content. */}
         {/* The `position` prop ensures it appears in the bottom right corner. */}
+        <PostHogProvider>
         <Notifications position="bottom-right" zIndex={1000} />
         
         <BackgroundBlobs />
         <AppContent>{children}</AppContent>
+        </PostHogProvider>
       </MantineProvider>
     </LoadingProvider>
   );
