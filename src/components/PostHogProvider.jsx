@@ -1,67 +1,54 @@
 // src/components/PostHogProvider.jsx
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react'; // --- MODIFICATION: ADD `Suspense`
 import posthog from 'posthog-js';
-import { usePathname, useSearchParams } from 'next/navigation';
+// --- MODIFICATION: REMOVE `usePathname` and `useSearchParams` as they are no longer needed here ---
 import supabase from '@/lib/supabaseClient';
+// --- MODIFICATION: IMPORT THE NEW PAGEVIEW TRACKER ---
+import { PostHogPageviewTracker } from './PostHogPageviewTracker';
 
-// This is the main provider component
 export function PostHogProvider({ children }) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  // --- MODIFICATION: The `pathname` and `searchParams` hooks are removed ---
 
-  // Initialize PostHog once on component mount
+  // This initialization effect remains unchanged.
   useEffect(() => {
     if (typeof window !== 'undefined') {
       posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
         api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-        // This ensures page views are captured on route changes
+        // We set capture_pageview to false because we are handling it manually in our new component.
         capture_pageview: false 
       });
     }
 
-    // This is the CRITICAL part: linking PostHog to our Supabase auth.
-    // It listens for any change in the user's login state.
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (session && session.user) {
-          // If a user logs in, we identify them to PostHog.
-          // This connects all their future actions to their user ID.
           posthog.identify(
             session.user.id, {
               email: session.user.email,
             }
           );
         } else if (event === 'SIGNED_OUT') {
-          // If a user logs out, we reset the PostHog identity.
           posthog.reset();
         }
       }
     );
 
-    // Cleanup the listener when the component unmounts
     return () => {
       authListener.subscription.unsubscribe();
     };
   }, []);
 
-  // This effect captures page views whenever the URL changes.
-  useEffect(() => {
-    if (pathname) {
-      let url = window.origin + pathname;
-      if (searchParams.toString()) {
-        url = url + `?${searchParams.toString()}`;
-      }
-      posthog.capture(
-        '$pageview',
-        {
-          '$current_url': url,
-        }
-      );
-    }
-  }, [pathname, searchParams]);
+  // --- MODIFICATION: The problematic pageview useEffect has been DELETED from this file ---
 
-
-  return children;
+  // --- MODIFICATION: We now return the children AND the new tracker wrapped in Suspense ---
+  return (
+    <>
+      {children}
+      <Suspense fallback={null}>
+        <PostHogPageviewTracker />
+      </Suspense>
+    </>
+  );
 }
