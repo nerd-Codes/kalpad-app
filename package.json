@@ -37,6 +37,7 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "sass": "^1.90.0",
     "youtubei.js": "^15.0.1"
   },
   "devDependencies": {

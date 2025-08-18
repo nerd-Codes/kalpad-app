@@ -1,11 +1,12 @@
 // src/components/landing/personality/Hero.jsx
 "use client";
 
-import { Container, Title, Text, Box } from '@mantine/core';
+import { Container, Title, Text, Box, Group, Button } from '@mantine/core';
 import { ShimmerButton } from '../ShimmerButton';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { motion, AnimatePresence } from 'framer-motion'; // Import motion and AnimatePresence
 import { useState, useEffect } from 'react'; // Import hooks
+import { IconBrandDiscord, IconBrandWhatsapp } from '@tabler/icons-react';
 
 export function Hero() {
     const handleGetStarted = useAuthRedirect();
@@ -105,6 +106,33 @@ export function Hero() {
                 >
                     Build My Escape Plan →
                 </ShimmerButton>
+
+                <Group justify="center" mt="xl">
+                    <Button
+                        component="a"
+                        href="https://discord.gg/KmTCWwsD5u"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="light"
+                        color="grape" // A color close to Discord's blurple
+                        radius="xl"
+                        leftSection={<IconBrandDiscord size={18} />}
+                    >
+                        Discord Channel
+                    </Button>
+                    <Button
+                        component="a"
+                        href="https://chat.whatsapp.com/EMN3fzJCBWNFwDT25qWxq2?mode=ac_t"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="light"
+                        color="teal" // A color close to WhatsApp's green
+                        radius="xl"
+                        leftSection={<IconBrandWhatsapp size={18} />}
+                    >
+                        WhatsApp Community
+                    </Button>
+                </Group>
             </Container>
         </Box>
     );

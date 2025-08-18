@@ -10,9 +10,11 @@ const markdownComponents = {
 };
 
 export function Devlog() {
-    const latestUpdateText = "**Latest Update:** The AI Lecture Scout is LIVE! Our AI crew now does your YouTube homework. Also, I had to delete the entire project last week because I broke something important. But like a good Bollywood hero, we are back, stronger and with a better backstory.";
+    // --- MODIFICATION: The new story of the "Mentor Engine" ---
+    const latestUpdateText = "Our AI just got a personality transplant. It now runs on a **'Brutal Honesty First'** constitution. Tell it you can study 12 hours a day, and it will gently tell you to get some sleep and build a realistic plan that won't lead to burnout. It now gives you a **daily 'Mission Briefing'** with difficulty ratings, so you're never flying blind. Most importantly, we built a zero-tolerance **'Integrity Filter'**— a layer of code that guarantees with 100% certainty that the AI's words and its actions are one. It keeps its promises.";
     
-    const upNextText = "**Up Next:** A fully integrated chat assistant that knows your plan inside and out. Plus, the full \"Doodle in the Margin\" redesign is coming to kill the corporate vibe for good. And yes, the mobile app is being forged in the fires of Mount Doom. It will be ready when it's ready.";
+    // --- MODIFICATION: Setting the stage for the Notes V2 overhaul ---
+    const upNextText = "**The Professor is getting a promotion.** We're doing a full overhaul of the Notes Generation engine, with a beautiful full-screen experience and properly formatted PDF exports. After that, the full **'Doodle in the Margin'** redesign will kill the corporate vibe for good. And yes, the mobile app is still being forged in the fires of Mount Doom.";
 
     return (
         <div style={{
@@ -28,11 +30,12 @@ export function Devlog() {
                     <Stack mt={60} gap={50} w="100%">
                         {/* --- LATEST UPDATE SECTION --- */}
                         <Stack align="center" ta="center">
-                            <Text fz={60}>🚀</Text>
-                            <Title order={3} ff="Lexend, sans-serif">Now Live: The AI Lecture Scout</Title>
+                            <Text fz={60}>🧠</Text>
+                            {/* --- MODIFICATION: New headline for the update --- */}
+                            <Title order={3} ff="Lexend, sans-serif">Now Live: The Mentor Engine Upgrade</Title>
                             <Text c="dimmed" size="lg" lh={1.7}>
                                 <ReactMarkdown components={markdownComponents}>
-                                    {latestUpdateText.replace('**Latest Update:** ', '')}
+                                    {latestUpdateText}
                                 </ReactMarkdown>
                             </Text>
                         </Stack>
@@ -52,7 +55,7 @@ export function Devlog() {
                             <Title order={3} ff="Lexend, sans-serif">Being Forged in the Fires of Mount Doom</Title>
                              <Text c="dimmed" size="lg" lh={1.7}>
                                 <ReactMarkdown components={markdownComponents}>
-                                    {upNextText.replace('**Up Next:** ', '')}
+                                    {upNextText}
                                 </ReactMarkdown>
                             </Text>
                         </Stack>

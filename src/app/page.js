@@ -13,6 +13,7 @@ import { Hacks } from "@/components/landing/personality/Hacks";
 import { Devlog } from "@/components/landing/personality/Devlog";
 import { RealQuestion } from "@/components/landing/personality/RealQuestion";
 import { Battle } from "@/components/landing/personality/Battle";
+import { Community } from "@/components/landing/personality/Community";
 
 export default function LandingPage() {
   return (
@@ -27,6 +28,7 @@ export default function LandingPage() {
         <Playground />
         <Hacks />
         <Devlog />
+        <Community />
         <RealQuestion />
       </main>
       <Footer />

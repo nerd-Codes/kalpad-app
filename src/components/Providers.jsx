@@ -26,6 +26,17 @@ const theme = createTheme({
       "#3fca41", "#2ca331", "#218227", "#19681f", "#125118"
     ],
   },
+
+  components: {
+    Title: {
+      styles: {
+        root: {
+          color: 'var(--mantine-color-white)',
+        },
+      },
+    },
+  },
+  
 });
 
 // AppContent wrapper is unchanged

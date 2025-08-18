@@ -44,21 +44,32 @@ export async function POST(request) {
     }).select().single();
     if (planError) throw new Error(`DB error (study_plans): ${planError.message}`);
 
-    // 2. Prepare the topics for insertion. This is now a simple formatting step.
+    // 2. Prepare the topics for insertion, now including all V2.2 metadata.
     const topicsToInsert = plan_topics.map((topic, index) => {
-        // Simple proportional distribution of images
+        // The image distribution logic remains unchanged.
         const totalDays = plan_topics.length;
         const totalImages = page_image_urls?.length || 0;
         const startIdx = Math.floor(index * (totalImages / totalDays));
         const endIdx = Math.floor((index + 1) * (totalImages / totalDays));
         const relevantImages = page_image_urls?.slice(startIdx, endIdx) || [];
 
+        // The returned object now explicitly includes the new fields for persistence.
+        // The `...topic` spread ensures that the enriched `sub_topics` JSONB data is also passed through.
         return {
-            ...topic,
+            ...topic, // Spreads topic_name, sub_topics, etc.
+            plan_id: planData.id,
+            
+            // --- MODIFICATION START: ADDING NEW FIELDS FOR DB INSERTION ---
+            day_difficulty: topic.day_difficulty, // Persist the daily difficulty rating.
+            day_summary: topic.day_summary,       // Persist the daily summary.
+            // --- MODIFICATION END ---
+            
+            // Data sanitization for numeric types.
             day: Math.round(topic.day || 0),
             study_hours: Math.round(topic.study_hours || 0),
             importance: Math.round(topic.importance || 5),
-            plan_id: planData.id,
+
+            // Image association.
             relevant_page_images: relevantImages,
         };
     });

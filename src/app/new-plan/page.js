@@ -9,11 +9,10 @@ import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { wittyFacts } from '@/lib/newplanFacts';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Skeleton } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 
-import { Container, Title, Text, TextInput, Textarea, Button, Paper, Group, FileInput, Checkbox, Alert, Badge, Progress, Loader, Stack, Grid, GridCol } from '@mantine/core';
-import { IconCalendar, IconFileText, IconBooks, IconPdf } from '@tabler/icons-react';
-
+import { Skeleton, Container, Title, Text, TextInput, Textarea, Button, Paper, Group, FileInput, Checkbox, Alert, Badge, Progress, Loader, Stack, Grid, GridCol, NumberInput, Collapse, List, ThemeIcon } from '@mantine/core';
+import { IconCalendar, IconFileText, IconBooks, IconPdf, IconClock, IconTargetArrow, IconX, IconListDetails, IconInfoCircle } from '@tabler/icons-react';
 
 const useTypingEffect = (text = '', speed = 1) => {
     const [displayedText, setDisplayedText] = useState('');
@@ -42,16 +41,39 @@ const useTypingEffect = (text = '', speed = 1) => {
     return displayedText;
 };
 
+const getDayDifficultyColor = (difficulty) => {
+    switch (difficulty?.toLowerCase()) {
+        case 'easy': return 'green';
+        case 'medium': return 'yellow';
+        case 'hard': return 'orange';
+        case 'intense': return 'red';
+        default: return 'gray';
+    }
+};
+
+const getSubTopicTypeColor = (type) => {
+    switch (type?.toLowerCase()) {
+        case 'concept': return 'blue';
+        case 'problem-solving': return 'grape';
+        case 'derivation': return 'cyan';
+        case 'review': return 'teal';
+        default: return 'gray';
+    }
+};
+
+
 export default function NewPlanPage() {
     const router = useRouter();
     const strategyReportRef = useRef(null);
     const planContainerRef = useRef(null);
+    const [opened, { toggle }] = useDisclosure(false);
 
     // --- MODIFICATION: States updated for streaming UI ---
     const [session, setSession] = useState(null);
     const [examName, setExamName] = useState('');
     const [syllabus, setSyllabus] = useState('');
     const [examDate, setExamDate] = useState('');
+    const [studyHoursPerDay, setStudyHoursPerDay] = useState(4);
     const [useDocuments, setUseDocuments] = useState(true);
     
     const [studyMaterialFile, setStudyMaterialFile] = useState(null);
@@ -71,41 +93,21 @@ export default function NewPlanPage() {
 
     const [pageImageUrls, setPageImageUrls] = useState([]);
 
-    const [currentFact, setCurrentFact] = useState(
-    (wittyFacts && wittyFacts.length > 0) ? wittyFacts[0] : 'Initializing AI mentor...'
-);
+    const [currentFact, setCurrentFact] = useState(wittyFacts[0]);
+    const typedApproach = useTypingEffect(strategy?.overall_approach);
 
-     const typedApproach = useTypingEffect(strategy?.overall_approach);
-
-            // --- Start of Replacement (Fact Cycling useEffect) ---
-
-// This effect now correctly manages the fact-cycling timer.
-                useEffect(() => {
-                    let factInterval = null;
-
-                    // If we are in any loading state, start the timer.
-                    if (isGenerating) {
-                        factInterval = setInterval(() => {
-                            // Pick a new random fact from the wittyFacts array.
-                            const randomIndex = Math.floor(Math.random() * wittyFacts.length);
-                            setCurrentFact(wittyFacts[randomIndex]);
-                        }, 4000); // Change fact every 4 seconds
-                    } else {
-                        // If we are not loading, ensure the timer is cleared.
-                        if (factInterval) {
-                            clearInterval(factInterval);
-                        }
-                    }
-
-                    // The cleanup function is crucial. It ensures the interval is destroyed
-                    // if the component unmounts unexpectedly.
-                    return () => {
-                        if (factInterval) {
-                            clearInterval(factInterval);
-                        }
-                    };
-                }, [isGenerating]); // The timer's lifecycle depends ONLY on the master "isGenerating" state.
-
+    useEffect(() => {
+        let factInterval = null;
+        if (isGenerating) {
+            factInterval = setInterval(() => {
+                const randomIndex = Math.floor(Math.random() * wittyFacts.length);
+                setCurrentFact(wittyFacts[randomIndex]);
+            }, 4000);
+        } else {
+            if (factInterval) { clearInterval(factInterval); }
+        }
+        return () => { if (factInterval) { clearInterval(factInterval); } };
+    }, [isGenerating]);
 
             useEffect(() => {
             // Stage 1: Scroll to "Thinking..." card when generation starts.
@@ -147,14 +149,6 @@ export default function NewPlanPage() {
         supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); });
     }, []);
 
-
-    // useEffect(() => {
-    //     // If the strategy object exists and the ref is attached to the element...
-    //     if (strategy && strategyReportRef.current) {
-    //         // ...then scroll to it smoothly.
-    //         strategyReportRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    //     }
-    // }, [strategy]);
 
     const sanitizeText = (text) => {
         if (!text) return '';
@@ -200,7 +194,12 @@ export default function NewPlanPage() {
     setError(''); setPlan([]); setStrategy(null); setGenerationContext(null); setIsGenerating(true);
 
     try {
-        const response = await fetch('/api/generate-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ examName, syllabus, examDate, useDocuments }), });
+        const response = await fetch('/api/generate-plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ examName, syllabus, examDate, useDocuments, studyHoursPerDay }),
+            });
+
         if (!response.body) { throw new Error("Streaming response not available."); }
         
         const reader = response.body.getReader();
@@ -443,131 +442,197 @@ return (
 
             <GlassCard>
                 <form onSubmit={handlePlanGeneration}>
-                    <Stack gap="xl">
-                        {/* --- SECTION 1: CORE DETAILS --- */}
-                        <Stack gap="xs">
-                            <Title order={3} ff="Lexend, sans-serif" fw={600}>
-                                Plan Details
-                            </Title>
-                            <Grid>
-                                <Grid.Col span={{ base: 12, md: 8 }}>
-                                    <TextInput
-                                        leftSection={<IconBooks size={18} />}
-                                        label="Exam Name"
-                                        placeholder="e.g., Final Year Project, SATs"
-                                        value={examName}
-                                        onChange={(e) => setExamName(e.target.value)}
-                                        required
-                                        disabled={isGenerating}
-                                        size="md"
-                                    />
-                                </Grid.Col>
-                                <Grid.Col span={{ base: 12, md: 4 }}>
-                                    <TextInput
-                                        leftSection={<IconCalendar size={18} />}
-                                        type="date"
-                                        label="Exam Date"
-                                        value={examDate}
-                                        onChange={(e) => setExamDate(e.target.value)}
-                                        required
-                                        disabled={isGenerating}
-                                        size="md"
-                                    />
-                                </Grid.Col>
-                                <Grid.Col span={12}>
-                                    <Textarea
-                                        label="Syllabus"
-                                        description="Paste your complete syllabus here. Be as detailed as possible for the best results."
-                                        placeholder="Chapter 1: Introduction to AI..."
-                                        value={syllabus}
-                                        onChange={(e) => setSyllabus(e.target.value)}
-                                        required
-                                        autosize
-                                        minRows={6}
-                                        disabled={isGenerating}
-                                        size="md"
-                                    />
-                                </Grid.Col>
-                            </Grid>
-                        </Stack>
+    <Stack gap="xl">
+        {/* --- SECTION 1: CORE DETAILS (RE-ARCHITECTED FOR NARRATIVE FLOW) --- */}
+        <Stack gap="lg">
+            <Title order={3} ff="Lexend, sans-serif" fw={600}>
+                Plan Details
+            </Title>
+            
+            {/* The Goal */}
+            <TextInput
+                leftSection={<IconBooks size={18} />}
+                label="Exam or Project Name"
+                placeholder="e.g., Final Year Project, SATs, Hackathon Build"
+                value={examName}
+                onChange={(e) => setExamName(e.target.value)}
+                required
+                disabled={isGenerating}
+                size="md"
+            />
+            
+            {/* The Constraints (Grouped) */}
+            <Grid gutter="lg">
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                     <TextInput
+                        leftSection={<IconCalendar size={18} />}
+                        type="date"
+                        label="Final Deadline"
+                        placeholder="dd-mm-yyyy"
+                        value={examDate}
+                        onChange={(e) => setExamDate(e.target.value)}
+                        required
+                        disabled={isGenerating}
+                        size="md"
+                    />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                    <NumberInput
+                        leftSection={<IconClock size={18} />}
+                        label="Daily Study Hours"
+                        placeholder="Your realistic daily goal"
+                        value={studyHoursPerDay}
+                        onChange={setStudyHoursPerDay}
+                        min={1}
+                        max={12}
+                        required
+                        disabled={isGenerating}
+                        size="md"
+                    />
+                </Grid.Col>
+            </Grid>
 
-                        {/* --- SECTION 2: OPTIONAL MATERIALS --- */}
-                        <Paper withBorder p="lg" radius="md" style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
-                            <Stack>
-                                <Title order={4} ff="Lexend, sans-serif" fw={500}>
-                                    Optional: Add Your Materials
-                                </Title>
-                                <FileInput
-                                    leftSection={<IconPdf size={18} />}
-                                    description="Upload a PDF of your study notes or textbook for a more personalized plan."
-                                    placeholder="Upload a PDF"
-                                    value={studyMaterialFile}
-                                    onChange={handleFileChange}
-                                    accept=".pdf"
-                                    disabled={isGenerating || isProcessing}
-                                    size="md"
-                                />
-                                <Group>
-                                    <Button
-                                        onClick={handleProcessFile}
-                                        disabled={!studyMaterialFile || isProcessing || isGenerating}
-                                        variant="outline"
-                                        color="brandGreen"
-                                        loading={isProcessing}
-                                    >
-                                        {processingState.step === 'done' ? '✓ Processed' : 'Process File'}
-                                    </Button>
-                                    <Checkbox
-                                        label="Use my documents for this plan"
-                                        checked={useDocuments}
-                                        onChange={(e) => setUseDocuments(e.currentTarget.checked)}
-                                        disabled={isGenerating || !studyMaterialFile}
-                                    />
-                                </Group>
-                                {processingState.step !== 'idle' && (
-                                    <Text size="xs" c="dimmed" mt="xs">{processingState.message}</Text>
-                                )}
-                            </Stack>
-                        </Paper>
+            {/* The Material */}
+            <Textarea
+                label="Syllabus or Topics"
+                description="Paste everything here. Topics, chapters, job descriptions—don't worry if it's messy, the AI will make sense of it."
+                placeholder="Chapter 1: Introduction to AI..."
+                value={syllabus}
+                onChange={(e) => setSyllabus(e.target.value)}
+                required
+                autosize
+                minRows={6}
+                disabled={isGenerating}
+                size="md"
+            />
+        </Stack>
 
-                        {/* --- SECTION 3: CALL TO ACTION --- */}
-                        <Group justify="flex-end" mt="md">
-                            <ShimmerButton
-                                type="submit"
-                                size="lg"
-                                color="brandPurple"
-                                loading={isGenerating}
-                                disabled={isProcessing}
-                            >
-                                {isGenerating ? 'Generating Your Quest...' : 'Generate My Plan'}
-                            </ShimmerButton>
-                        </Group>
-                    </Stack>
-                </form>
+        {/* --- SECTION 2: OPTIONAL MATERIALS (REFINED) --- */}
+        <Stack gap="lg">
+            <Title order={4} ff="Lexend, sans-serif" fw={500}>
+                Optional: Add Your Materials
+            </Title>
+            <Paper withBorder p="lg" radius="md" style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                <Stack>
+                    <FileInput
+                        leftSection={<IconPdf size={18} />}
+                        label="Personal Notes or Textbook (PDF)"
+                        description="Upload your own materials for a plan that is hyper-personalized to your exact course."
+                        placeholder="Upload a PDF"
+                        value={studyMaterialFile}
+                        onChange={handleFileChange}
+                        accept=".pdf"
+                        disabled={isGenerating || isProcessing}
+                        size="md"
+                    />
+                    <Group>
+                        <Button
+                            onClick={handleProcessFile}
+                            disabled={!studyMaterialFile || isProcessing || isGenerating}
+                            variant="outline"
+                            color="brandGreen"
+                            loading={isProcessing}
+                        >
+                            {processingState.step === 'done' ? '✓ Processed' : 'Process File'}
+                        </Button>
+                        <Checkbox
+                            label="Use my documents for this plan"
+                            checked={useDocuments}
+                            onChange={(e) => setUseDocuments(e.currentTarget.checked)}
+                            disabled={isGenerating || !studyMaterialFile}
+                        />
+                    </Group>
+                    {processingState.step !== 'idle' && (
+                        <Text size="xs" c="dimmed" mt="xs">{processingState.message}</Text>
+                    )}
+                </Stack>
+            </Paper>
+        </Stack>
+
+        {/* --- SECTION 3: CALL TO ACTION --- */}
+        <Group justify="flex-end" mt="md">
+            <ShimmerButton
+                type="submit"
+                size="lg"
+                loading={isGenerating}
+                disabled={isProcessing}
+            >
+                Generate My Plan
+            </ShimmerButton>
+        </Group>
+    </Stack>
+</form>
             </GlassCard>
 
             {error && <Alert color="red" title="Error" mt="xl">{error}</Alert>}
             
+            {/* --- THE UPGRADED "DEEP DIVE" STRATEGY REPORT --- */}
             {(isGenerating || strategy) && (
                 <GlassCard mt="xl" ref={strategyReportRef}>
                     <Title order={3}>{strategy ? "AI Strategy Report" : "Thinking..."}</Title>
                     {strategy ? (
-                        <>
-                            <Text mt="md" fw={500}>Overall Approach:</Text>
-                            <Text c="dimmed">{typedApproach}</Text>
-                            
-                            {/* FIX 2: Added missing heading for emphasized topics */}
-                            {strategy.emphasized_topics && strategy.emphasized_topics.length > 0 && (
-                                <>
-                                    <Text mt="md" fw={500}>Key Topics to Emphasize:</Text>
-                                    <Group mt="xs" gap="xs">{strategy.emphasized_topics.map((topic, index) => (<Badge key={index} color="brandGreen" variant="light">{topic}</Badge>))}</Group>
-                                </>
+                        <Stack gap="md" mt="md">
+                            {strategy.estimated_coverage && (
+                                <Paper withBorder p="sm" radius="md" style={{backgroundColor: 'rgba(0,0,0,0.2)'}}>
+                                    <Group>
+                                        <Progress.Root size="xl" style={{ flex: 1 }}>
+                                            <Progress.Section value={strategy.estimated_coverage} color="teal">
+                                                <Progress.Label>{strategy.estimated_coverage}% Coverage</Progress.Label>
+                                            </Progress.Section>
+                                        </Progress.Root>
+                                    </Group>
+                                </Paper>
                             )}
-                        </>
+                            <div>
+                                <Text fw={500}>Overall Approach:</Text>
+                                <Text c="dimmed">{typedApproach}</Text>
+                            </div>
+                            <div>
+                                <Text mt="sm" fw={500}>Key Topics to Emphasize:</Text>
+                                <Group mt="xs" gap="xs">{strategy.emphasized_topics?.map((item, index) => (<Badge key={index} color="brandGreen" variant="light">{item.topic}</Badge>))}</Group>
+                            </div>
+
+                             {/* --- ADD THIS NEW BLOCK FOR DE-PRIORITIZED TOPICS --- */}
+                                    {strategy.deprioritized_topics && strategy.deprioritized_topics.length > 0 && (
+                                        <div>
+                                        <Text mt="sm" fw={500}>Deprioritized Topics:</Text>
+                                        <List spacing="xs" size="sm" center icon={<ThemeIcon color="blue" size={16} radius="xl"><IconInfoCircle size={12} /></ThemeIcon>}>
+                                        {strategy.deprioritized_topics.map((item, index) => (
+                                            <List.Item key={index}><Text><strong>{item.topic}:</strong> {item.justification}</Text></List.Item>
+                                        ))}
+                                        </List>
+                                        </div>
+                                    )}
+
+                            {strategy.skipped_topics && strategy.skipped_topics.length > 0 && (
+                                 <div>
+                                    <Text mt="sm" fw={500}>Topics We'll Strategically Skip:</Text>
+                                    <Group mt="xs" gap="xs">{strategy.skipped_topics.map((item, index) => (<Badge key={index} color="yellow" variant="light">{item.topic}</Badge>))}</Group>
+                                </div>
+                            )}
+                            <Button leftSection={<IconListDetails size={16}/>} variant="subtle" size="xs" onClick={toggle} mt="xs">
+                                {opened ? 'Hide Detailed Analysis' : 'Show Detailed Analysis'}
+                            </Button>
+                            <Collapse in={opened}>
+                                <Stack gap="sm" mt="sm">
+                                    <List spacing="xs" size="sm" center icon={<ThemeIcon color="green" size={16} radius="xl"><IconTargetArrow size={12} /></ThemeIcon>}>
+                                        {strategy.emphasized_topics?.map((item, index) => (
+                                            <List.Item key={index}><Text><strong>{item.topic}:</strong> {item.justification}</Text></List.Item>
+                                        ))}
+                                    </List>
+                                    {strategy.skipped_topics && strategy.skipped_topics.length > 0 && (
+                                        <List spacing="xs" size="sm" center icon={<ThemeIcon color="yellow" size={16} radius="xl"><IconX size={12} /></ThemeIcon>}>
+                                        {strategy.skipped_topics.map((item, index) => (
+                                            <List.Item key={index}><Text><strong>{item.topic}:</strong> {item.justification}</Text></List.Item>
+                                        ))}
+                                        </List>
+                                    )}
+                                </Stack>
+                            </Collapse>
+                        </Stack>
                     ) : (
                         <Paper p="md" mt="md" withBorder style={{backgroundColor: 'rgba(0,0,0,0.1)'}}>
                            <Group>
-                                {/* FIX: Loader color is now white */}
                                 <Loader size="sm" color="white" />
                                 <AnimatePresence mode="wait">
                                     <motion.div
@@ -585,32 +650,46 @@ return (
                 </GlassCard>
             )}
 
+            {/* --- THE UPGRADED "MISSION BRIEFING" PLAN DISPLAY --- */}
             {strategy && (isGenerating || plan.length > 0) && (
                 <GlassCard mt="xl" ref={planContainerRef}>
                     <Group justify="space-between" mb="lg">
                         <Title order={2}>{isGenerating && plan.length === 0 ? "Building Your Quest..." : "Your Generated Plan"}</Title>
-                        {!isGenerating && plan.length > 0 && (
-                                <Button 
-                                    onClick={handleSavePlan} 
-                                    loading={isSaving} 
-                                    disabled={saveSuccess}
-                                    color="brandGreen"
-                                >
-                                    {saveSuccess ? 'Saved & Redirecting...' : 'Save & View Plan'}
-                                </Button>
-                            )}
+                        {!isGenerating && plan.length > 0 && (<Button onClick={handleSavePlan} loading={isSaving} disabled={saveSuccess} color="brandGreen"> {saveSuccess ? 'Saved!' : 'Save & View Plan'} </Button>)}
                     </Group>
                     
                     {plan.length > 0 ? (
-                        <div style={{ maxHeight: '75vh', overflowY: 'auto', paddingRight: '1rem' }}>
+                        <div style={{ maxHeight: '80vh', overflowY: 'auto', paddingRight: '1rem' }}>
                             {plan.map((item, index) => (
-                                <Paper key={index} p="md" mb="md" withBorder radius="md">
-                                    <Text fw={700}>Day {item.day} ({item.date}) - {item.topic_name}</Text>
-                                    <ul style={{marginTop: '0.5rem', paddingLeft: '1.2rem'}}>{item.sub_topics?.map((sub, i) => <li key={i}>{sub.text}</li>)}</ul>
+                                <Paper key={index} p="lg" mb="md" withBorder radius="md" style={{ borderLeft: `5px solid ${getDayDifficultyColor(item.day_difficulty)}`}}>
+                                    <Group justify="space-between">
+                                        <Title order={4}>{`Day ${item.day} (${item.date})`}</Title>
+                                        <Group gap="xs">
+                                            <Badge
+                                                color="gray"
+                                                variant="light"
+                                                leftSection={<IconClock size={14} style={{ marginRight: '-0.2rem' }} />}
+                                            >
+                                                {item.study_hours} hrs
+                                            </Badge>
+                                            <Badge color={getDayDifficultyColor(item.day_difficulty)} variant="light">{item.day_difficulty}</Badge>
+                                        </Group>
+                                    </Group>
+                                    <Title order={5} fw={500} mt={2}>{item.topic_name}</Title>
+                                    <Text c="dimmed" size="sm" mt={4}>{item.day_summary}</Text>
+                                    <List spacing="sm" size="sm" mt="md">
+                                        {item.sub_topics?.map((sub, i) => (
+                                            <List.Item key={i}>
+                                                {sub.text}
+                                                <Group gap="xs" mt={4}>
+                                                    <Badge size="xs" variant="light" color={getSubTopicTypeColor(sub.type)}>{sub.type}</Badge>
+                                                    <Badge size="xs" variant="light" color={getDayDifficultyColor(sub.difficulty)}>{sub.difficulty}</Badge>
+                                                </Group>
+                                            </List.Item>
+                                        ))}
+                                    </List>
                                 </Paper>
                             ))}
-
-                            {/* --- FIX: Skeleton loader for in-progress generation --- */}
                             {isGenerating && (
                                 <Paper p="md" mb="md" withBorder radius="md" style={{opacity: 0.6}}>
                                     <Skeleton height={20} width="70%" mb="md" />
@@ -642,5 +721,4 @@ return (
         </Container>
     </AppLayout>
 );
-// --- End of Replacement ---
 }

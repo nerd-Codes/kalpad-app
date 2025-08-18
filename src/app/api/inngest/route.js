@@ -42,8 +42,6 @@ export async function getTranscript(videoId) {
         // Step 3a: Try the built-in transcript method first
         const transcriptData = await info.getTranscript();
 
-        // youtubei.js already returns best available, but if you 
-        // want manual selection for more control:
         if (transcriptData?.transcript?.content?.body?.initial_segments) {
             return transcriptData.transcript.content.body.initial_segments
                 .map(segment => segment.snippet.text)
