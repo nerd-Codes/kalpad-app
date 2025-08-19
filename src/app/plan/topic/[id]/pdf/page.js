@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import supabase from "@/lib/supabaseClient";
-import { PDFViewer } from '@react-pdf/renderer';
-import { NotesPDF } from "@/components/NotesPDF";
 import { Loader, Text, Center } from "@mantine/core";
 
 export default function PDFExportPage() {
