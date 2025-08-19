@@ -3,16 +3,12 @@
 
 import { useState } from 'react';
 // --- MODIFICATION: ADDED NEW MANTINE COMPONENTS & ICONS ---
-import { Paper, Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, List, Stack, Title } from '@mantine/core';
-import { IconPencilPlus, IconBrain, IconPlayerPlay, IconClock } from '@tabler/icons-react';
-import { PDFButton } from './PDFButton';
+import { Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, Stack, Title, ActionIcon, Tooltip, Menu } from '@mantine/core';
+import { IconPencilPlus, IconBrain, IconPlayerPlay, IconClock, IconChevronDown, IconEye } from '@tabler/icons-react';
+import { FullscreenNoteViewer } from './FullscreenNoteViewer';
 import { QuizModal } from './QuizModal';
 import { SummaryModal } from './SummaryModal';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeRaw from 'rehype-raw';
-import rehypeKatex from 'rehype-katex';
+import { notifications } from '@mantine/notifications';
 import 'katex/dist/katex.min.css';
 import { useDisclosure } from '@mantine/hooks';
 import { GlassCard } from './GlassCard';
@@ -40,7 +36,7 @@ const getSubTopicTypeColor = (type) => {
 };
 
 
-export function TimelineDayCard({ dayTopic, onUpdate, isInitiallyCollapsed }) {
+export function TimelineDayCard({plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, onUpdateCompletion }) {
      const { setIsLoading } = useLoading();
 
     const [generatingNotesFor, setGeneratingNotesFor] = useState(null);
@@ -50,7 +46,10 @@ export function TimelineDayCard({ dayTopic, onUpdate, isInitiallyCollapsed }) {
     
     // --- MODIFICATION: RENAMED `opened` to avoid conflict, simplified state ---
     const [detailsOpened, { toggle: toggleDetails }] = useDisclosure(!isInitiallyCollapsed);
-    const [notesOpened, { toggle: toggleNotes }] = useDisclosure(false);
+    // --- NEW STATE & LOGIC FOR THE FULLSCREEN VIEWER (PREPARATION FOR PHASE 3) ---
+    const [noteToView, setNoteToView] = useState(null); 
+    // This will eventually open the FullscreenNoteViewer.jsx modal.
+    // For now, setting this state is the goal.
 
     const allTopicsCompleted = dayTopic.sub_topics?.every(sub => sub.completed) && dayTopic.sub_topics?.length > 0;
 
@@ -64,27 +63,52 @@ export function TimelineDayCard({ dayTopic, onUpdate, isInitiallyCollapsed }) {
         onUpdate(dayTopic.id, { sub_topics: newSubTopics });
     };
     
-    const handleGenerateNotes = async (subTopicText) => {
-        setIsLoading(true);
-        setGeneratingNotesFor(dayTopic.id);
+      const handleGenerateNotes = async (subTopicText) => {
+        // --- RESTORED: ENGAGE THE GLOBAL PAGE LOADER ---
+        setIsLoading(true); 
+        setGeneratingNotesFor(subTopicText); // Keep per-button loader
         setNoteError('');
         try {
             const response = await fetch('/api/generate-notes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan_topic_id: dayTopic.id, sub_topic_text: subTopicText }),
+                body: JSON.stringify({
+                    plan_topic_id: dayTopic.id,
+                    sub_topic_text: subTopicText,
+                    exam_name: dayTopic.exam_name, 
+                    day_topic: dayTopic.topic_name,
+                }),
             });
-            if (!response.ok) throw new Error((await response.json()).error || 'Failed to generate notes.');
-            const { notes } = await response.json();
-            onUpdate(dayTopic.id, { generated_notes: notes });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to generate notes.');
+            }
+            
+            // This is now guaranteed to work because the prop is received.
+            if (onNoteGenerated) {
+                await onNoteGenerated();
+            }
+
+            notifications.show({
+                title: 'Note Generated & Synced!',
+                message: 'Your new study note is ready and has been added to your timeline.',
+                color: 'teal',
+            });
+
         } catch (err) {
+            notifications.show({
+                title: 'Note Generation Failed',
+                message: err.message,
+                color: 'red',
+            });
             setNoteError(err.message);
         } finally {
+            // --- RESTORED: DISENGAGE ALL LOADERS ---
             setIsLoading(false);
             setGeneratingNotesFor(null);
         }
     };
-
 
 return (
     <>
@@ -122,64 +146,88 @@ return (
                     
                     {/* --- UPGRADED SUB-TOPICS LIST (NO BULLETS) --- */}
                     <Stack gap="sm" mt="xs">
-                        {dayTopic.sub_topics?.map((subTopic, index) => (
-                            <Box key={index}>
-                                <Group justify="space-between" wrap="nowrap" align="flex-start">
-                                    {/* Task Zone */}
-                                    <Checkbox
-                                        checked={subTopic.completed}
-                                        onChange={(event) => handleCheckboxChange(index, event.currentTarget.checked)}
-                                        label={
-                                            <Text strikethrough={subTopic.completed} c={subTopic.completed ? 'dimmed' : 'inherit'}>
-                                                {subTopic.text}
-                                            </Text>
-                                        }
-                                    />
-                                    {/* Button Zone (RESTORED) */}
-                                    <Group gap="xs" wrap="nowrap">
-                                        <Button 
-                                            onClick={() => handleGenerateNotes(subTopic.text)} 
-                                            disabled={generatingNotesFor === dayTopic.id} 
-                                            variant="light" 
-                                            color="grape" 
-                                            size="xs" 
-                                            title={`Generate notes for "${subTopic.text}"`}
-                                            style={{ flexShrink: 0 }}
-                                        >
-                                            {generatingNotesFor === dayTopic.id ? '...' : <IconPencilPlus size={16} />}
-                                        </Button>
+                        {dayTopic.sub_topics?.map((subTopic, index) => {
+                            // --- CRITICAL LOGIC: CHECK FOR EXISTING NOTES (V1 & V2) ---
+                            const v2_note = dayTopic.new_notes?.find(n => n.sub_topic_text === subTopic.text);
+                            const v1_note = (index === 0 && dayTopic.generated_notes) ? { notes_markdown: dayTopic.generated_notes, sub_topic_text: subTopic.text } : null;
+                            const existingNote = v2_note || v1_note;
 
-                                        {(() => {
-                                            const lecture = dayTopic.curated_lectures?.find(l => l.sub_topic_text === subTopic.text);
-                                            if (lecture) {
-                                                return (
-                                                    <Button
-                                                        component="a"
-                                                        href={lecture.video_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        variant="filled"
-                                                        color="red"
-                                                        size="xs"
-                                                        title={`Watch lecture for "${subTopic.text}"`}
-                                                        style={{ flexShrink: 0 }}
-                                                    >
-                                                        <IconPlayerPlay size={16} />
-                                                    </Button>
-                                                );
+                            return (
+                                <Box key={index}>
+                                    <Group justify="space-between" wrap="nowrap" align="flex-start">
+                                        <Checkbox
+                                            checked={subTopic.completed}
+                                            onChange={(event) => handleCheckboxChange(index, event.currentTarget.checked)}
+                                            label={
+                                                <Text
+                                                td={subTopic.completed ? 'line-through' : 'none'}
+                                                c={subTopic.completed ? 'dimmed' : 'inherit'}
+                                            >
+                                                    {subTopic.text}
+                                                </Text>
                                             }
-                                            return null;
-                                        })()}
+                                        />
+                                        <Group gap="xs" wrap="nowrap">
+                                            {existingNote ? (
+                                                <Tooltip label="View Note" withArrow>
+                                                    <ActionIcon 
+                                                        variant="light" 
+                                                        color="blue" 
+                                                        size="lg"
+                                                         onClick={() => setNoteToView({ 
+                                                                ...existingNote, 
+                                                                sub_topic: subTopic, 
+                                                                day_topic: dayTopic, 
+                                                                exam_name: plan.exam_name // Use the prop from the parent plan object
+                                                            })}
+                                                    >
+                                                        <IconEye size={18} />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                            ) : (
+                                                <Tooltip label="Generate Note" withArrow>
+                                                    <ActionIcon 
+                                                        variant="light" 
+                                                        color="grape" 
+                                                        size="lg"
+                                                        onClick={() => handleGenerateNotes(subTopic.text)}
+                                                        loading={generatingNotesFor === subTopic.text}
+                                                    >
+                                                        <IconPencilPlus size={18} />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                            )}
+                                             {(() => {
+                                                const lecture = dayTopic.curated_lectures?.find(l => l.sub_topic_text === subTopic.text);
+                                                if (lecture) {
+                                                    return (
+                                                        <ActionIcon
+                                                            component="a"
+                                                            href={lecture.video_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            variant="filled"
+                                                            color="red"
+                                                            size="lg"
+                                                            title={`Watch lecture for "${subTopic.text}"`}
+                                                        >
+                                                            <IconPlayerPlay size={18} />
+                                                        </ActionIcon>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
+                                        </Group>
                                     </Group>
-                                </Group>
-                                <Group gap="xs" mt={4} ml={30}>
-                                    <Badge size="xs" variant="light" color={getSubTopicTypeColor(subTopic.type)}>{subTopic.type}</Badge>
-                                    <Badge size="xs" variant="light" color={getDayDifficultyColor(subTopic.difficulty)}>{subTopic.difficulty}</Badge>
-                                </Group>
-                            </Box>
-                        ))}
+                                    <Group gap="xs" mt={4} ml={30}>
+                                        <Badge size="xs" variant="light" color={getSubTopicTypeColor(subTopic.type)}>{subTopic.type}</Badge>
+                                        <Badge size="xs" variant="light" color={getDayDifficultyColor(subTopic.difficulty)}>{subTopic.difficulty}</Badge>
+                                    </Group>
+                                </Box>
+                            )
+                        })}
                     </Stack>
-
+                    
                     {allTopicsCompleted && (
                         <GlassCard mt="md">
                             <Text fw={500} mb="sm">Daily Mission Complete!</Text>
@@ -190,24 +238,6 @@ return (
                         </GlassCard>
                     )}
                     
-                    {dayTopic.generated_notes && (
-                       <Box mt="md">
-                           <Button variant="subtle" size="xs" color="gray" onClick={toggleNotes}>
-                               {notesOpened ? 'Hide Notes' : 'Show Notes'}
-                           </Button>
-                           <Collapse in={notesOpened}>
-                               <GlassCard mt="xs">
-                                   <Group justify="space-between" mb="xs">
-                                       <Text fw={500} size="sm">Study Notes:</Text>
-                                       <PDFButton dayTopic={dayTopic} />
-                                   </Group>
-                                   <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, rehypeKatex]}>
-                                       {dayTopic.generated_notes}
-                                   </ReactMarkdown>
-                               </GlassCard>
-                           </Collapse>
-                       </Box>
-                    )}
                     {noteError && <Alert color="red" title="Note Generation Error" mt="md">{noteError}</Alert>}
                 </Stack>
             </GlassCard>
@@ -215,6 +245,12 @@ return (
 
         <QuizModal opened={quizModalOpened} onClose={() => setQuizModalOpened(false)} planTopicId={dayTopic.id} />
         <SummaryModal opened={summaryModalOpened} onClose={() => setSummaryModalOpened(false)} planTopicId={dayTopic.id} />
-    </>
+
+        <FullscreenNoteViewer 
+                noteData={noteToView} 
+                onClose={() => setNoteToView(null)} 
+                onUpdate={onUpdate} // Pass the function down
+            />
+        </>
 );
 }

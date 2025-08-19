@@ -1,0 +1,45 @@
+/* src/styles/print.css */
+
+@media print {
+    /* Hide everything that is NOT the note content by default */
+    body * {
+        visibility: hidden;
+    }
+    
+    /* Make the printable area and its children visible */
+    .printable-note-area, .printable-note-area * {
+        visibility: visible;
+    }
+    
+    /* Position the printable area at the top of the page */
+    .printable-note-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+
+    /* Hide the non-essential UI elements within the printable area */
+    .modal-header, .action-bar {
+        display: none !important;
+    }
+    
+    /* Ensure markdown body uses a print-friendly color scheme */
+    .markdown-body {
+        background-color: white !important;
+        color: black !important;
+    }
+    
+    /* Ensure links are visible when printed */
+    .markdown-body a {
+        color: #0000EE !important;
+        text-decoration: underline !important;
+    }
+
+    /* Override any component-specific styles that might interfere */
+    .mantine-Modal-root, .mantine-Modal-content, .mantine-Modal-body {
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+    }
+}

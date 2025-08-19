@@ -9,7 +9,7 @@ import { TimelineDayCard } from './TimelineDayCard';
 import classes from './QuestTimeline.module.css';
 
 // --- FIX: The component now accepts the new props ---
-export function QuestTimeline({ planTopics, onUpdate, onFindLectures, isCurating }) {
+export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCurating, onNoteGenerated }) {
     const todayIndex = planTopics.findIndex(topic => isToday(new Date(topic.date)));
 
     return (
@@ -83,9 +83,12 @@ export function QuestTimeline({ planTopics, onUpdate, onFindLectures, isCurating
                         {(isToday_ || isPastDay) && (
                             <Box mt="md">
                                 <TimelineDayCard 
+                                    plan={plan}
                                     dayTopic={dayTopic} 
                                     onUpdate={onUpdate} 
+                                     onUpdateCompletion={onUpdate}
                                     isInitiallyCollapsed={isPastDay}
+                                    onNoteGenerated={onNoteGenerated}
                                 />
                             </Box>
                         )}

@@ -156,16 +156,28 @@ export default function DashboardPage() {
     };
     
     const handleUpdateTaskGroup = (planTopicId, updates) => {
+        // Optimistically update the local state for a snappy UX
         setDailyTasks(currentTasks => 
-            currentTasks.map(group => {
-                if (group.dailyTopic.id === planTopicId) {
-                    return { ...group, dailyTopic: { ...group.dailyTopic, ...updates } };
+            currentTasks.map(planWithTopic => {
+                // Check if the topic to update is within this plan object
+                if (planWithTopic.plan_topics[0]?.id === planTopicId) {
+                    // Create a new, updated topic object
+                    const updatedTopic = { ...planWithTopic.plan_topics[0], ...updates };
+                    // Return a new plan object with the updated topic inside
+                    return { ...planWithTopic, plan_topics: [updatedTopic] };
                 }
-                return group;
+                return planWithTopic;
             })
         );
+        
+        // Send the update to the database in the background
         supabase.from('plan_topics').update(updates).eq('id', planTopicId)
-            .then(({ error }) => { if (error) console.error("Background update failed:", error); });
+            .then(({ error }) => { 
+                if (error) {
+                    console.error("Background update failed:", error);
+                    // Optionally, add a notification to the user that the save failed
+                }
+            });
     };
 
             const calculateProgress = (plan) => {
@@ -228,8 +240,16 @@ export default function DashboardPage() {
                             )}
                             {!timelineLoading && dailyTasks.length > 0 && (
                                 <Stack gap="md">
-                                    {dailyTasks.map(taskGroup => (
-                                        <TimelineEntry key={taskGroup.dailyTopic.id} taskGroup={taskGroup} onUpdate={handleUpdateTaskGroup} />
+                                    {dailyTasks.map(planWithTopic => (
+                                        <TimelineEntry 
+                                            key={planWithTopic.plan_topics[0].id} 
+                                            taskGroup={{
+                                                plan: planWithTopic, 
+                                                dailyTopic: planWithTopic.plan_topics[0]
+                                            }} 
+                                            onUpdate={handleUpdateTaskGroup}
+                                            onNoteGenerated={() => fetchTimelineData()}
+                                        />
                                     ))}
                                 </Stack>
                             )}

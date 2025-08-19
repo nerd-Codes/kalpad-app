@@ -102,7 +102,7 @@ function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
                                 borderRadius: theme.radius.md,
                                 padding: rem(12),
                                 justifyContent: desktopOpened ? 'flex-start' : 'center',
-                                '&[data-active]': {
+                                '&[dataActive': {
                                    backgroundColor: theme.colors.brandPurple[6],
                                    color: 'white',
                                    '&:hover': { backgroundColor: theme.colors.brandPurple[6] }

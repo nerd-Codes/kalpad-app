@@ -1,6 +1,6 @@
-// src/api/generate-notes/route.js
+// src/app/api/generate-notes/route.js
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { createClient } from '@supabase/supabase-js'; // This import is necessary for the fix
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -12,26 +12,18 @@ export async function POST(request) {
     let supabase;
     let session;
 
-    // --- START OF THE SURGICAL FIX ---
-    // This block correctly creates a user-scoped Supabase client regardless of
-    // whether the request comes from the web (cookie) or mobile (JWT).
-
+    // --- AUTHENTICATION ---
     const authHeader = request.headers.get('Authorization');
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const jwt = authHeader.replace('Bearer ', '');
-        // Create a NEW, temporary client scoped to the mobile user's JWT
         supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
             { global: { headers: { Authorization: `Bearer ${jwt}` } } }
         );
-        // Get the session from this new, scoped client
         const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          session = { user };
-        }
+        if (user) { session = { user }; }
     } else {
-        // This is the original, unchanged path for the web app. It works as before.
         supabase = createRouteHandlerClient({ cookies });
         const { data } = await supabase.auth.getSession();
         session = data.session;
@@ -40,21 +32,14 @@ export async function POST(request) {
     if (!session) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
     }
-    // --- END OF THE SURGICAL FIX ---
-
-    // =======================================================================
-    // ALL CODE BELOW THIS LINE IS THE ORIGINAL, UNTOUCHED, AND FUNCTIONAL
-    // LOGIC FROM THE FILE YOU PROVIDED. IT USES THE `supabase` CLIENT
-    // THAT WAS CORRECTLY SCOPED IN THE BLOCK ABOVE.
-    // =======================================================================
 
     const { plan_topic_id, sub_topic_text, exam_name, day_topic } = await request.json();
     
+    // --- CONTEXT RETRIEVAL (RAG) ---
     const { data: topicData, error: topicError } = await supabase
       .from('plan_topics').select('relevant_page_images').eq('id', plan_topic_id).single();
       
     if (topicError) {
-      // The error you were seeing originated here. It will now be resolved.
       throw new Error(`Failed to fetch topic images: ${topicError.message}`);
     }
 
@@ -81,6 +66,9 @@ export async function POST(request) {
     
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
+    // --- ARCHITECTURAL UPGRADE: THE VALIDATED TWO-SHOT CHAIN ---
+
+    // --- STAGE 1: THE OUTLINER AGENT ---
     const outlinePrompt = `
       You are an academic author creating an outline for a study chapter. Be precise and logical.
       
@@ -91,35 +79,72 @@ export async function POST(request) {
       
       Reference Material: Provided as multimodal input (text and images).
       
-      Based on ALL of this context, create a detailed outline. Output ONLY the outline.`;
+      Based on ALL of this context, create a detailed, structured outline for a comprehensive chapter on the specific sub-topic. Output ONLY the outline.`;
     const outlineResult = await model.generateContent([outlinePrompt, ...imageParts]);
     const chapterOutline = outlineResult.response.text();
 
-    const authorPrompt = `
-      You are an expert academic author. Write a comprehensive, self-contained chapter.
+    // --- STAGE 2: THE VALIDATION GATE ---
+    if (!chapterOutline || chapterOutline.trim().length < 50) {
+      throw new Error("The AI could not build a valid outline for this topic. It may be too abstract or lack sufficient context in your documents. Please try rephrasing.");
+    }
+
+    // --- STAGE 3: THE AUTHOR AGENT ---
+     const authorPrompt = `
+      You are an expert academic author. Your task is to write a comprehensive, self-contained study chapter.
       
       **Full Context:**
       - Exam: "${exam_name}"
       - Main Chapter Topic: "${day_topic}"
       - Specific Sub-Topic to Write About: "${sub_topic_text}"
       
-      **Chapter Outline You MUST Follow:**
+      **Chapter Outline You MUST Follow Exactly:**
       ---
       ${chapterOutline}
       ---
       
       Reference Material & Images: Provided as multimodal input.
       
-      CRITICAL INSTRUCTIONS: Write the full chapter following the outline precisely. Format in beautiful Markdown with LaTeX ($...$$...$$) and simple HTML (<sub>). End with a "Key Takeaways" summary.`;
-    
+      **CRITICAL INSTRUCTIONS:**
+      1.  Write the full chapter by meticulously following the provided outline. Do not deviate.
+      2.  Format the output in beautiful, clean Markdown.
+      3.  Use LaTeX for all mathematical equations. Use single dollar signs ($...$) for inline math and double dollar signs ($$...$$) for block-level math.
+      4.  Conclude the chapter with a "Key Takeaways" summary section.
+      5.  **UNBREAKABLE RULE: No Redundant Titles.** The user is already seeing the "Main Chapter Topic" and the "Specific Sub-Topic" in the application's UI. Your response must NOT repeat them as a title or subtitle. Begin the note directly with the first point of the outline (e.g., start with "### I. Introduction to...").
+
+      **LATEX STYLE GUIDE (UNBREAKABLE RULES FOR KATEX COMPATIBILITY):**
+      - **For Matrices:** NEVER use the \`\\begin{vmatrix}\` environment. ALWAYS use the capitalized version: \`\\begin{Vmatrix}\` ... \`\\end{Vmatrix}\`. This is a non-negotiable compatibility requirement.
+      - **Special Characters:** Inside any math block, you MUST escape standalone percentage signs like this: \`\\%\`.
+      - **Clarity:** Ensure all brackets and delimiters are correctly matched (e.g., \`\\left( ... \\right)\`).
+    `;
+
     const authorResult = await model.generateContent([authorPrompt, ...imageParts]);
     const notesText = authorResult.response.text();
 
-    await supabase.from('plan_topics').update({ generated_notes: notesText }).eq('id', plan_topic_id);
-    return new Response(JSON.stringify({ notes: notesText }), { status: 200 });
+    // --- STAGE 4: FINAL CONTENT VALIDATION ---
+    if (!notesText || notesText.trim().length < 50) {
+        throw new Error("The AI failed to generate a sufficiently detailed note from the outline. Please try again.");
+    }
+    
+    // --- DATABASE WRITE ---
+    const { data: savedNote, error: saveError } = await supabase
+      .from('generated_notes')
+      .upsert({
+        user_id: session.user.id,
+        plan_topic_id: plan_topic_id,
+        sub_topic_text: sub_topic_text,
+        notes_markdown: notesText,
+      }, { onConflict: 'plan_topic_id, sub_topic_text' })
+      .select()
+      .single();
+
+    if (saveError) {
+      throw new Error(`Failed to save note: ${saveError.message}`);
+    }
+
+    return new Response(JSON.stringify({ note: savedNote }), { status: 200 });
 
   } catch (error) {
     console.error('Full error in generate-notes API:', error);
-    return new Response(JSON.stringify({ error: message || 'An internal error occurred.' }), { status: 500 });
+    return new Response(JSON.stringify({ error: error.message || 'An internal error occurred.' }), { status: 500 });
   }
 }

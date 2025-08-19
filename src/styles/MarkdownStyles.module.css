@@ -1,0 +1,56 @@
+/* src/styles/MarkdownStyles.module.css */
+
+.markdown {
+  font-size: var(--mantine-font-size-md);
+  line-height: 1.7;
+  color: var(--mantine-color-gray-4);
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  font-family: var(--mantine-font-family-headings);
+  color: var(--mantine-color-white);
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+.markdown p {
+  margin-bottom: 1em;
+}
+
+.markdown strong {
+  color: var(--mantine-color-gray-2);
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 2em;
+  margin-bottom: 1em;
+}
+
+.markdown blockquote {
+  margin-left: 0;
+  padding-left: 1.5em;
+  border-left: 4px solid var(--mantine-color-brandPurple-8);
+  color: var(--mantine-color-gray-5);
+  font-style: italic;
+}
+
+.markdown pre {
+  background-color: #0d0d0d !important; /* Override inline styles from highlighter */
+  padding: 1em !important;
+  border-radius: var(--mantine-radius-md);
+  font-size: 0.9em;
+  border: 1px solid var(--mantine-color-dark-4);
+}
+
+.markdown code:not(pre > code) {
+  background-color: var(--mantine-color-dark-5);
+  padding: 0.2em 0.4em;
+  border-radius: var(--mantine-radius-sm);
+  font-size: 0.9em;
+  color: var(--mantine-color-brandGreen-3);
+}

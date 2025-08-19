@@ -79,7 +79,8 @@ export default function PlanDetailPage() {
 
             try {
                 setLoading(true);
-                // This select statement is now the corrected, deep-fetching version.
+                // --- ARCHITECTURAL UPGRADE: THE NEW DATA FETCHING QUERY ---
+                // This query now fetches everything: the plan, its topics, and joins all V2 notes.
                 const { data, error } = await supabase
                     .from('study_plans')
                     .select(`
@@ -89,7 +90,8 @@ export default function PlanDetailPage() {
                         plan_topics ( 
                             *, 
                             curated_lectures ( plan_topic_id, sub_topic_text, video_url ), 
-                            topic_confidence ( score, activity_type ) 
+                            topic_confidence ( score, activity_type ),
+                            new_notes:generated_notes ( * )
                         )
                     `)
                     .eq('id', planId)
@@ -352,11 +354,13 @@ const handleSelectAllTopics = () => {
                     </Group>
                     
                     {/* The QuestTimeline now receives the handler and loading state */}
-                    <QuestTimeline 
+                     <QuestTimeline 
+                        plan={plan} // Pass the entire plan object
                         planTopics={plan.plan_topics} 
                         onUpdate={handleUpdateTopic}
                         onFindLectures={handleStartCuration}
                         isCurating={isCurating}
+                        onNoteGenerated={() => fetchPlanData(session)}
                     />
                 </>
             )}
