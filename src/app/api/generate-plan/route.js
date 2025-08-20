@@ -106,27 +106,43 @@ export async function POST(request) {
         // This agent makes the hard decisions and outputs pure, structured data. This is our immutable source of truth.
         streamUpdate('status', 'Performing strategic triage...');
         const triagePrompt = `
-            You are a ruthless, hyper-logical academic strategist. Your only job is to analyze the provided data and make the optimal strategic decisions. Output ONLY a single, valid JSON object. Do not include any explanation.
+        You are a ruthless, hyper-logical academic strategist. Your only job is to analyze the provided data and make the optimal strategic decisions. You do not write prose or explanations; you output ONLY a single, valid JSON object containing your final, data-driven conclusions.
 
-            **INPUT DATA:**
-            - Total Days Remaining: ${daysLeft}
-            - User's Requested Study Hours Per Day: ${studyHoursPerDay}
-            - Full Syllabus: """${syllabus}"""
-            - Exam name: """${examName}"""
+        **INPUT DATA:**
+        - Exam Name: "${examName}"
+        - Total Days Remaining: ${daysLeft}
+        - User's Requested Study Hours Per Day: ${studyHoursPerDay}
+        - Full Syllabus: """${syllabus}"""
+        
+        **UNBREAKABLE ANALYSIS DIRECTIVE:**
+        Your analysis is a two-part process: Contextual Thinking and Literal Reporting.
 
-            **CRITICAL INSTRUCTIONS:**
-            - **Pacing:** If user's hours > 7, calculate a more sustainable 'recommended_study_hours_per_day' (5-7). Otherwise, use their requested hours.
-            - **Triage:** Analyze the syllabus and categorize every major topic into one of three buckets: 'emphasized_topics', 'deprioritized_topics', or 'skipped_topics'.
-            - **Coverage:** Calculate 'estimated_coverage' based on YOUR recommended hours and triage decisions.
+        1.  **Contextual Thinking (Think Globally):** You MUST use your deep, internal knowledge of the broader subject (e.g., 'Electromagnetics', 'Quantum Physics') to understand the *context*, *importance*, and *interdependencies* of the topics listed in the user's provided "Full Syllabus". This global knowledge is essential and MUST inform the quality, structure, and strategic decisions of your entire plan.
 
-            **CRITICAL JSON SCHEMA (Return ONLY this object):**
+        2.  **Literal Reporting (Report Locally):** While your thinking is global, your reporting must be local. The final **'estimated_coverage' percentage** that you output MUST be a direct and literal measure of how much of the user-provided "Full Syllabus" text will be covered by the plan. **Do not** calculate coverage against the entire subject in your knowledge base; calculate it ONLY against the specific text the user has given you. This is a non-negotiable reporting requirement.
+                **CRITICAL JSON SCHEMA (Return ONLY this object and nothing else):**
+        {
+          "estimated_coverage": <A brutally honest integer based on your calculation in Step 3>,
+          "recommended_study_hours_per_day": <A realistic integer based on your decision in Step 2>,
+          "emphasized_topics": [
             {
-                "estimated_coverage": <integer>,
-                "recommended_study_hours_per_day": <integer>,
-                "emphasized_topics": [ { "topic": "...", "justification": "..." } ],
-                "deprioritized_topics": [ { "topic": "...", "justification": "..." } ],
-                "skipped_topics": [ { "topic": "...", "justification": "..." } ]
+              "topic": "Topic Name",
+              "justification": "A concise, strategic reason why this topic is critical (e.g., 'Forms the foundational prerequisite for 50% of the syllabus.')."
             }
+          ],
+          "deprioritized_topics": [
+            {
+              "topic": "Topic Name",
+              "justification": "The reason for its lower priority (e.g., 'Necessary prerequisite, will be covered in a highly condensed format to save time.')."
+            }
+          ],
+          "skipped_topics": [
+            {
+              "topic": "Topic Name",
+              "justification": "The specific reason for skipping this topic (e.g., 'Highly specialized and a disproportionate time investment for its likely exam weightage.')."
+            }
+          ]
+        }
         `;
         const triageResult = await plannerModel.generateContent(triagePrompt);
         const triageData = JSON.parse(triageResult.response.text());
