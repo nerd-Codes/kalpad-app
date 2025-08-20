@@ -6,6 +6,7 @@ import '../styles/print.css';
 import { ColorSchemeScript } from '@mantine/core';
 import { Providers } from "@/components/Providers";
 import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 // Fonts can be loaded here, but passed to the theme in Providers.jsx
 import { Inter, Lexend } from "next/font/google";
@@ -27,6 +28,7 @@ export default function RootLayout({ children }) {
       <body>
         <Providers>{children}</Providers>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
