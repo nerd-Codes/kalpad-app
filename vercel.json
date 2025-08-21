@@ -1,13 +1,8 @@
 {
-  "functions": {
-    "api/**/*.py": {
-      "runtime": "vercel-python@4.0.0"
-    }
-  },
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/static-build",
+      "use": "@vercel/node",
       "config": {
         "installCommand": "bash ./install_tools.sh"
       }
