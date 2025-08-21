@@ -92,6 +92,34 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
         onClose(); // Close the modal
     };
 
+     const customRenderers = {
+        img: ({ node, ...props }) => {
+            // --- DEFINITIVE FIX: CONDITIONAL STYLING ---
+            // Check if the image source is an SVG.
+            const isSvg = props.src.endsWith('.svg');
+
+            // Define the base style for all images.
+            const baseStyle = {
+                maxWidth: '100%',
+                maxHeight: '1500px',
+                borderRadius: '8px',
+            };
+
+            // Conditionally add the background and padding only for SVGs.
+            const finalStyle = isSvg 
+                ? { ...baseStyle, background: 'black', padding: '0.5rem' } 
+                : baseStyle;
+
+            return (
+                <span style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}>
+                    <img {...props} style={finalStyle} />
+                </span>
+            );
+        },
+    };
+
+
+
     return (
         <Modal
             opened={!!noteData}
@@ -145,6 +173,7 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm, remarkMath]}
                                 rehypePlugins={[rehypeRaw, rehypeKatex]}
+                                components={customRenderers}
                             >
                                 {notes_markdown}
                             </ReactMarkdown>

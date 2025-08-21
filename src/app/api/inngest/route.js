@@ -6,6 +6,11 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Innertube } from 'youtubei.js';
 import fetch from 'node-fetch';
+import { execSync } from 'child_process';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
+import which from 'which'; 
 
 const preferredLangs = ['en-IN', 'hi-IN', 'en-US'];
 
@@ -267,7 +272,281 @@ const curationPipeline = inngest.createFunction(
     }
 );
 
+// --- AGENT 2: THE SCRIPTER ---
+const scripterAgent = inngest.createFunction(
+    { id: "illustrator-agent-scripter" },
+    { event: "notes/illustration.requested" },
+    async ({ event, step }) => {
+        const { note_id, user_id } = event.data;
+
+        const note = await step.run("fetch-raw-markdown-for-scripting", async () => {
+            const { data, error } = await supabaseAdmin
+                .from('generated_notes')
+                .select('notes_markdown')
+                .eq('id', note_id)
+                .single();
+            if (error) throw new Error(`DB Error fetching note ${note_id}: ${error.message}`);
+            if (!data) throw new Error(`Note with ID ${note_id} not found.`);
+            return data;
+        });
+
+        const rawMarkdown = note.notes_markdown;
+        const placeholders = rawMarkdown.match(/```kalpad-illustration([\s\S]*?)```/g) || [];
+        
+        if (placeholders.length === 0) {
+            return { message: `Note ${note_id} has no illustrations to process.` };
+        }
+
+        let updatedMarkdown = rawMarkdown;
+        let svgJobsDispatched = 0;
+
+        // Use a standard for...of loop for async operations inside
+        for (const placeholder of placeholders) {
+            const jsonString = placeholder.replace('```kalpad-illustration', '').replace('```', '');
+            let placeholderData;
+            try {
+                placeholderData = JSON.parse(jsonString);
+            } catch (e) {
+                console.warn(`Skipping malformed illustration placeholder in note ${note_id}`);
+                continue; // Skip this iteration if the JSON is invalid
+            }
+
+            if (placeholderData.engine === 'matplotlib') {
+                const imageUrl = await step.run(`generate-quickchart-url-for-${placeholderData.description.slice(0, 20)}`, async () => {
+                    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
+
+                    const prompt = `You are an expert data visualization designer creating a chart for QuickChart.io. Your sole task is to convert a natural language description into a valid, aesthetically pleasing, and polished QuickChart JSON configuration.
+
+                        Description: "${placeholderData.description}"
+
+                        **DESIGN & BRAND GUIDELINES (UNBREAKABLE RULES):**
+                        1.  **Theme:** The chart MUST be dark-themed to match the app. All text (titles, labels, ticks) must be white or light gray.
+                        2.  **Brand Color:** The primary dataset's line color MUST be our brand purple: 'rgb(138, 86, 248)'.
+                        3.  **Data:** Generate a plausible dataset of 20-40 points for the description.
+                        4.  **Polish:** The line must be smooth (tension: 0.4). Grid lines should be subtle, semi-transparent gray lines. The axes must start from the origin (beginAtZero: true). Points on the line should be invisible (pointRadius: 0).
+                        
+                        CRITICAL JSON SCHEMA (Return ONLY a valid JSON object, without any markdown wrappers):
+                        {
+                          "type": "line",
+                          "data": {
+                            "labels": [/* x-axis labels */],
+                            "datasets": [{
+                              "label": "y_label",
+                              "data": [/* y-axis data */],
+                              "fill": false,
+                              "borderColor": "rgb(138, 86, 248)",
+                              "borderWidth": 2,
+                              "pointRadius": 0,
+                              "tension": 0.4
+                            }]
+                          },
+                          "options": {
+                            "title": { "display": true, "text": "title", "fontColor": "white", "fontSize": 16 },
+                            "legend": { "display": false },
+                            "scales": {
+                               "xAxes": [{ 
+                                   "scaleLabel": { "display": true, "labelString": "x_label", "fontColor": "white", "fontSize": 12 }, 
+                                   "ticks": { "fontColor": "rgb(200, 200, 200)", "beginAtZero": true },
+                                   "gridLines": { "color": "rgba(255, 255, 255, 0.1)" }
+                               }],
+                               "yAxes": [{ 
+                                   "scaleLabel": { "display": true, "labelString": "y_label", "fontColor": "white", "fontSize": 12 }, 
+                                   "ticks": { "fontColor": "rgb(200, 200, 200)", "beginAtZero": true },
+                                   "gridLines": { "color": "rgba(255, 255, 255, 0.1)" }
+                               }]
+                            }
+                          }
+                        }
+                           UNBREAKABLE RULE: Your entire response must be ONLY the raw JSON object, starting with '{' and ending with '}'. Do not wrap it in \`\`\`json or any other text.
+                        `;
+                    const result = await model.generateContent(prompt);
+                    let rawResponse = result.response.text();
+                    const jsonMatch = rawResponse.match(/```json\n([\s\S]*?)\n```|({[\s\S]*})/);
+                    const jsonString = jsonMatch ? (jsonMatch[1] || jsonMatch[2]) : rawResponse;
+                    const chartConfig = JSON.parse(jsonString.trim());
+                    const encodedChart = encodeURIComponent(JSON.stringify(chartConfig));
+                    return `https://quickchart.io/chart?bkg=rgb(26,27,30)&c=${encodedChart}`;
+                });
+
+                // Immediately replace the placeholder with the final image tag for matplotlib plots
+                updatedMarkdown = updatedMarkdown.replace(placeholder, `![${placeholderData.description}](${imageUrl})`);
+
+            } else if (placeholderData.engine === 'd2' || placeholderData.engine === 'mermaid') {
+                await step.sendEvent("dispatch-svg-render-job", {
+                    name: 'notes/svg.render.requested',
+                    data: {
+                        note_id,
+                        user_id,
+                        engine: placeholderData.engine,
+                        description: placeholderData.description,
+                        placeholder_text: placeholder
+                    }
+                });
+                svgJobsDispatched++;
+            }
+        }
+        
+        // Update the markdown in the database immediately with any completed matplotlib plots
+        await step.run("update-markdown-with-plots", async () => {
+            const { error } = await supabaseAdmin
+                .from('generated_notes')
+                .update({ notes_markdown: updatedMarkdown })
+                .eq('id', note_id);
+            if (error) throw new Error(`DB Error after processing plots for note ${note_id}: ${error.message}`);
+        });
+
+        return { message: `Scripting complete for note ${note_id}. Dispatched ${svgJobsDispatched} SVG render jobs.` };
+    }
+);
+
+const svgRendererAgent = inngest.createFunction(
+    // Correct event-driven signature
+    { id: "illustrator-agent-svg-renderer", concurrency: 1 },
+    { event: 'notes/svg.render.requested' },
+    async ({ event, step }) => {
+        const { note_id, user_id, engine, description, placeholder_text } = event.data;
+
+        // Step 1: Generate the script from the description
+        const script = await step.run(`generate-script-for-${engine}`, async () => {
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            let prompt = `You are an expert script generator for diagrams. Convert the natural language description into a valid, complete script for the specified engine. Respond ONLY with the raw script code. Do not add any explanation or markdown formatting.`;
+            
+            if (engine === 'd2') {
+                prompt += `\nEngine: d2\nDescription: "${description}"\nCRITICAL FORMAT: Respond with only the raw D2 language script.`;
+            } else { // mermaid
+                prompt += `
+                    Engine: mermaid
+                    Description: "${description}"
+                    
+                    CRITICAL MERMAID SYNTAX RULES (UNBREAKABLE):
+                    1.  **Node Text:** All text inside nodes must be enclosed in double quotes. Example: \`A["This is my text"]\`
+                    2.  **Escaping Characters:** You CANNOT use special characters like \`[\`, \`]\`, \`{\`, \`}\`, \`(\`, \`)\` directly inside node text. You must replace them with their HTML entity codes. Example: To show \`arr[j]\`, you must write \`"arr&lsqb;j&rsqb;"\`.
+                    3.  **Flowchart Declaration:** Always start the script with \`graph TD;\`.
+
+                    **GOOD EXAMPLE:**
+                    graph TD;
+                        A[Start] --> B{"Is x > 5?"};
+                        B -- Yes --> C["Process 'Yes'"];
+                        B -- No --> D["Process 'No'"];
+                        C --> E[End];
+                        D --> E;
+                `;
+            }
+
+            const result = await model.generateContent(prompt);
+            return result.response.text().trim();
+        });
+
+        if (!script) {
+            throw new Error(`AI failed to generate a valid script for engine: ${engine}`);
+        }
+
+          // --- DEFINITIVE FIX: PROGRAMMATICALLY FIND EXECUTABLE PATH ---
+        const imageUrl = await step.run(`render-svg-with-${engine}`, async () => {
+            const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kalpad-svg-render-'));
+            const ext = engine === 'd2' ? '.d2' : '.mmd';
+            const inputFile = path.join(tempDir, `input${ext}`);
+            const outputFile = path.join(tempDir, 'output.svg');
+            
+            await fs.writeFile(inputFile, script);
+
+            try {
+                if (engine === 'd2') {
+                    // 1. Find the full path to the d2 executable
+                    const d2Path = which.sync('d2');
+                    // 2. Execute the command using the full, unambiguous path
+                    execSync(`"${d2Path}" --theme=dark --sketch "${inputFile}" "${outputFile}"`);
+                } else { // mermaid
+                    // `mmdc` is an npm binary, so its path is more predictable,
+                    // but finding it dynamically is still the most robust solution.
+                    const mmdcPath = which.sync('mmdc');
+                    execSync(`"${mmdcPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
+                }
+            } catch (execError) {
+                console.error(`Execution failed for ${engine}:`, execError);
+                await fs.rm(tempDir, { recursive: true, force: true });
+                throw new Error(`Failed to execute renderer for ${engine}. Is it installed and in your system PATH?`);
+            }
+            
+
+            const svgContent = await fs.readFile(outputFile, 'utf-8');
+            const storagePath = `generated-illustrations/${note_id}-${engine}-${Date.now()}.svg`;
+            
+            const { error: uploadError } = await supabaseAdmin.storage
+                .from('generated-illustrations')
+                .upload(storagePath, svgContent, { contentType: 'image/svg+xml', upsert: true });
+            
+            // Clean up the temporary directory
+            await fs.rm(tempDir, { recursive: true, force: true });
+            
+            if (uploadError) {
+                throw new Error(`Supabase upload error for ${engine} SVG: ${uploadError.message}`);
+            }
+            
+            const { data: { publicUrl } } = supabaseAdmin.storage
+                .from('generated-illustrations').getPublicUrl(storagePath);
+                
+            return publicUrl;
+        });
+
+        if (!imageUrl) {
+            throw new Error(`Failed to generate and upload image URL for ${engine}`);
+        }
+
+        // Step 3: Send the final completion event with all necessary data for the updater
+        await step.sendEvent("dispatch-final-update", {
+            name: 'notes/illustration.complete',
+            data: {
+                note_id,
+                user_id,
+                placeholder_text, // The original placeholder to be replaced
+                image_url: imageUrl,
+                description
+            }
+        });
+
+        return { success: true, imageUrl };
+    }
+);
+
+// --- AGENT 4: THE FINAL UPDATER (NEW) ---
+const finalUpdaterAgent = inngest.createFunction(
+    { id: "illustrator-agent-final-updater", concurrency: 1 },
+    { event: "notes/illustration.complete" },
+    async ({ event, step }) => {
+        const { note_id, user_id, placeholder_text, image_url, description } = event.data;
+        
+        const currentNote = await step.run("fetch-note-for-final-update", async () => {
+            const { data, error } = await supabaseAdmin.from('generated_notes').select('notes_markdown').eq('id', note_id).single();
+            if (error) throw new Error(`DB Error fetching note for final update: ${error.message}`);
+            return data;
+        });
+
+        const finalMarkdown = currentNote.notes_markdown.replace(placeholder_text, `![${description}](${image_url})`);
+
+        await step.run("perform-final-update", async () => {
+            const { error } = await supabaseAdmin.from('generated_notes').update({ notes_markdown: finalMarkdown }).eq('id', note_id);
+            if (error) throw new Error(`DB Error on final update: ${error.message}`);
+        });
+
+        // The notification logic can live here now
+        await step.run("broadcast-completion-to-user", async () => {
+            const channel = supabaseAdmin.channel(`user-notifications:${user_id}`);
+            await channel.send({ type: 'broadcast', event: 'illustration-complete', payload: { note_id } });
+        });
+
+        return { message: `Note ${note_id} successfully updated with illustration.` };
+    }
+);
+
+// --- FINAL STEP: REGISTER THE NEW FUNCTIONS ---
 export const { GET, POST, PUT } = serve({
     client: inngest,
-    functions: [curationPipeline],
+    functions: [
+        curationPipeline, 
+        scripterAgent, 
+        svgRendererAgent,
+        finalUpdaterAgent
+
+    ],
 });

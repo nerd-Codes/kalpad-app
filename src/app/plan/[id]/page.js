@@ -115,10 +115,85 @@ export default function PlanDetailPage() {
             const getSessionAndFetch = async () => {
                 const { data: { session } } = await supabase.auth.getSession();
                 setSession(session);
-                fetchPlanData(session); // Call the single, correct function
+                if(session && planId) {
+                fetchPlanData(session);
+            }
             };
             getSessionAndFetch();
         }, [planId]); // The dependency array is clean.
+
+        // --- DEFINITIVE FIX: THE NEW REAL-TIME SUBSCRIPTION EFFECT ---
+    useEffect(() => {
+        // Only set up the subscription if we have a valid plan object.
+        if (!plan) return;
+
+        // Get an array of all the plan_topic IDs for the current plan.
+        const topicIds = plan.plan_topics.map(topic => topic.id);
+
+        // Create a Supabase channel to listen for changes.
+        // We listen for any INSERT or UPDATE on the `generated_notes` table
+        // where the `plan_topic_id` is one of our current topics.
+        const channel = supabase
+            .channel(`notes-for-plan-${planId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen for INSERT or UPDATE
+                    schema: 'public',
+                    table: 'generated_notes',
+                    filter: `plan_topic_id=in.(${topicIds.join(',')})`
+                },
+                (payload) => {
+                    console.log('Realtime update received! Refetching plan data...', payload);
+                    // When a change is detected, show a notification and refetch all data
+                    // to ensure the UI is perfectly in sync.
+                    notifications.show({
+                        title: 'Illustrations Ready!',
+                        message: 'Your notes have been automatically updated with new visual aids.',
+                        color: 'teal',
+                    });
+                    fetchPlanData(session);
+                }
+            )
+            .subscribe();
+
+        // This is the cleanup function. It's critical to unsubscribe when the
+        // component unmounts to prevent memory leaks.
+        return () => {
+            supabase.removeChannel(channel);
+        };
+
+    }, [plan, session]); // This effect re-runs if the plan or session changes.
+
+     useEffect(() => {
+        // Only set up the listener if we have a valid session.
+        if (!session) return;
+
+        // Create a unique, private channel for this user.
+        const channel = supabase.channel(`user-notifications:${session.user.id}`);
+
+        // Subscribe to a custom event named 'illustration-complete'
+        channel.on('broadcast', { event: 'illustration-complete' }, (payload) => {
+            console.log('User notification received!', payload);
+            
+            // Show a notification that prompts the user to refresh.
+            notifications.show({
+                id: `note-updated-${payload.note_id}`, // Use an ID to prevent duplicate notifications
+                title: 'Illustrations Ready!',
+                message: 'Your note has been upgraded with new visual aids. Please refresh the page to see them.',
+                color: 'teal',
+                autoClose: false, // Keep the notification until the user dismisses it
+            });
+        });
+
+        channel.subscribe();
+
+        // The cleanup function is critical.
+        return () => {
+            supabase.removeChannel(channel);
+        };
+
+    }, [session]);
 
     const handleUpdateTopic = (planTopicId, updates) => {
         setPlan(currentPlan => {

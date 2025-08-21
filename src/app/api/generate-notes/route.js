@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { inngest } from '@/lib/inngest';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
@@ -115,7 +116,37 @@ export async function POST(request) {
       - **For Matrices:** NEVER use the \`\\begin{vmatrix}\` environment. ALWAYS use the capitalized version: \`\\begin{Vmatrix}\` ... \`\\end{Vmatrix}\`. This is a non-negotiable compatibility requirement.
       - **Special Characters:** Inside any math block, you MUST escape standalone percentage signs like this: \`\\%\`.
       - **Clarity:** Ensure all brackets and delimiters are correctly matched (e.g., \`\\left( ... \\right)\`).
-    `;
+    
+     **ILLUSTRATION MANDATE (WITH COMPLEXITY BUDGET):**
+      When a visual plot is critical for explaining a core concept, you MUST insert an 'Illustration Placeholder'.
+      - **Budget:** You have a very low budget of illustrations per note. Use them only for the most important visual concepts. Do not generate multiple plots for slight variations of the same function.
+      - **Placement:** Insert the placeholder immediately after the paragraph that explains the concept the plot will illustrate.
+      - **Supported Engines:** 'matplotlib' for plots, 'd2' for diagrams, 'mermaid' for flowcharts.
+      
+      Example for a Plot:
+      \`\`\`kalpad-illustration
+      {
+        "engine": "matplotlib",
+        "description": "A plot of y = sin(x) from 0 to 2*pi, demonstrating one full period of a sine wave."
+      }
+      \`\`\`
+
+      Example for a Diagram (d2):
+      \`\`\`kalpad-illustration
+      {
+        "engine": "d2",
+        "description": "A diagram showing a central server connected to two clients, client1 and client2."
+      }
+      \`\`\`
+
+      Example for a Flowchart (mermaid):
+      \`\`\`kalpad-illustration
+      {
+        "engine": "mermaid",
+        "description": "A simple flowchart that starts at A, goes to a process B, and ends at C."
+      }
+      \`\`\`
+      `;
 
     const authorResult = await model.generateContent([authorPrompt, ...imageParts]);
     const notesText = authorResult.response.text();
@@ -139,6 +170,16 @@ export async function POST(request) {
 
     if (saveError) {
       throw new Error(`Failed to save note: ${saveError.message}`);
+    }
+
+    if (notesText.includes('kalpad-illustration')) {
+      await inngest.send({
+        name: 'notes/illustration.requested',
+        data: {
+          note_id: savedNote.id,
+          user_id: session.user.id
+        }
+      });
     }
 
     return new Response(JSON.stringify({ note: savedNote }), { status: 200 });
