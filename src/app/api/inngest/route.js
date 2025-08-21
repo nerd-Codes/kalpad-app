@@ -441,8 +441,7 @@ const svgRendererAgent = inngest.createFunction(
             throw new Error(`AI failed to generate a valid script for engine: ${engine}`);
         }
 
-          // --- DEFINITIVE FIX: PROGRAMMATICALLY FIND EXECUTABLE PATH ---
-        const imageUrl = await step.run(`render-svg-with-${engine}`, async () => {
+         const imageUrl = await step.run(`render-svg-with-${engine}`, async () => {
             const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kalpad-svg-render-'));
             const ext = engine === 'd2' ? '.d2' : '.mmd';
             const inputFile = path.join(tempDir, `input${ext}`);
@@ -450,23 +449,38 @@ const svgRendererAgent = inngest.createFunction(
             
             await fs.writeFile(inputFile, script);
 
+            // --- DEFINITIVE FIX: USE ABSOLUTE PATHS FOR EXECUTABLES ---
             try {
+                // This is the absolute path where the D2 install script places the binary in Vercel's environment.
+                const d2Path = '/vercel/path0/.local/bin/d2';
+
+                // This is the absolute path where `npm install -g` places binaries in Vercel's environment.
+                const mmdcPath = '/vercel/path0/.npm-global/bin/mmdc';
+
                 if (engine === 'd2') {
-                    // 1. Find the full path to the d2 executable
-                    const d2Path = which.sync('d2');
-                    // 2. Execute the command using the full, unambiguous path
+                    // We execute the command using the full, unambiguous path.
                     execSync(`"${d2Path}" --theme=dark --sketch "${inputFile}" "${outputFile}"`);
                 } else { // mermaid
-                    // `mmdc` is an npm binary, so its path is more predictable,
-                    // but finding it dynamically is still the most robust solution.
-                    const mmdcPath = which.sync('mmdc');
                     execSync(`"${mmdcPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
                 }
             } catch (execError) {
                 console.error(`Execution failed for ${engine}:`, execError);
-                await fs.rm(tempDir, { recursive: true, force: true });
-                throw new Error(`Failed to execute renderer for ${engine}. Is it installed and in your system PATH?`);
+                // --- MODIFICATION FOR LOCAL TESTING ---
+                // If the absolute path fails (e.g., locally), try the PATH as a fallback.
+                console.log("Absolute path failed, attempting fallback to system PATH...");
+                try {
+                     if (engine === 'd2') {
+                        execSync(`d2 --theme=dark --sketch "${inputFile}" "${outputFile}"`);
+                    } else { // mermaid
+                        execSync(`mmdc -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
+                    }
+                } catch (fallbackError) {
+                    console.error(`Fallback to PATH also failed for ${engine}:`, fallbackError);
+                    await fs.rm(tempDir, { recursive: true, force: true });
+                    throw new Error(`Failed to execute renderer for ${engine} using both absolute path and system PATH.`);
+                }
             }
+            // --- END OF FIX ---
             
 
             const svgContent = await fs.readFile(outputFile, 'utf-8');
