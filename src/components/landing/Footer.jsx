@@ -19,11 +19,6 @@ export function Footer() {
                     <Title order={3} ff="Lexend, sans-serif">KalPad</Title>
                     <Text c="dimmed" size="sm">© {new Date().getFullYear()} KalPad Inc.</Text>
                 </Stack>
-                <Group gap="lg" visibleFrom="xs">
-                    <Anchor href="#" c="dimmed" size="sm">Privacy Policy</Anchor>
-                    <Anchor href="#" c="dimmed" size="sm">Terms of Service</Anchor>
-                    <Anchor href="#" c="dimmed" size="sm">Contact</Anchor>
-                </Group>
             </Group>
             
             <Divider my="xl" w="100%" />

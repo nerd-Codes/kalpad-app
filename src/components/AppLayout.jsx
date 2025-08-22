@@ -49,10 +49,10 @@ function UserButton({ user, desktopOpened, onSignOut }) {
             </Menu.Target>
             <Menu.Dropdown>
                 <Menu.Item leftSection={<IconUser style={{ width: rem(14), height: rem(14) }} />}>
-                    Profile
+                    <Text c ="dimmed">Profile</Text>
                 </Menu.Item>
                  <Menu.Item leftSection={<IconSettings style={{ width: rem(14), height: rem(14) }} />}>
-                    Settings
+                    <Text c ="dimmed">Settings</Text>
                 </Menu.Item>
                 <Menu.Divider />
                 <Menu.Item
