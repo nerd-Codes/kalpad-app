@@ -412,7 +412,22 @@ const svgRendererAgent = inngest.createFunction(
             let prompt = `You are an expert script generator for diagrams. Convert the natural language description into a valid, complete script for the specified engine. Respond ONLY with the raw script code. Do not add any explanation or markdown formatting.`;
             
             if (engine === 'd2') {
-                prompt += `\nEngine: d2\nDescription: "${description}"\nCRITICAL FORMAT: Respond with only the raw D2 language script.`;
+                prompt += `
+                Engine: d2
+                Description: "${description}"
+
+                CRITICAL D2 SYNTAX RULES (UNBREAKABLE):
+                1. All node labels MUST be wrapped in double quotes ONLY.
+                ✅ GOOD: A: "Start"
+                ❌ BAD:  A: "Start" extra text
+                ❌ BAD:  A: Start
+                2. NOTHING may appear after a double quoted string on the same line.
+                3. Do NOT add comments, markdown, explanations, or extra text. Only raw D2 code.
+                4. Always use simple identifiers (A, B, C...) for node IDs. Node IDs must not contain spaces or special characters.
+                5. Connections MUST use '-->' for arrows. Example: A --> B
+                6. If you need grouping, use 'container { ... }' blocks only.
+                7. The ENTIRE response must be ONLY the raw valid D2 script. No backticks, no JSON, no wrappers.
+                `;
             } else { // mermaid
                 prompt += `
                     Engine: mermaid
