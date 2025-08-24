@@ -421,9 +421,13 @@ const svgRendererAgent = inngest.createFunction(
                 ✅ GOOD: A: "Start"
                 ❌ BAD:  A: "Start" extra text
                 2. Use only simple node IDs like A, B, C, D (no spaces, no special chars).
-                3. Connect nodes with '-->' or '<--'. Example: A --> B
-                4. Do NOT add comments, markdown, explanations, or extra text. Only raw D2 code.
-                5. The entire output must be ONLY valid D2 code. No backticks, no JSON, no wrappers.
+                3. Connections MUST be one edge per line. DO NOT chain edges.
+                ✅ GOOD: A --> B
+                            B --> C
+                ❌ BAD:  A --> B --> C
+                4. Do NOT create "edge inside edge". Only connect nodes, never connect an edge to another edge.
+                5. Do NOT add comments, markdown, explanations, or extra text. Only raw D2 code.
+                6. The entire output must be ONLY valid D2 code. No backticks, no JSON, no wrappers.
                 `;
             } else { // mermaid
                 prompt += `
@@ -455,15 +459,23 @@ const svgRendererAgent = inngest.createFunction(
 
         let finalScript = script;
         if (engine === 'd2') {
-            finalScript = script
-                .split("\n")
-                .map(line => {
-                    // If there's a quoted label, cut off everything after the last closing quote
-                    const match = line.match(/^(.*:\s*)"(.*?)"/);
-                    if (match) return `${match[1]}"${match[2]}"`;
-                    return line;
-                })
-                .join("\n");
+        finalScript = finalScript
+            .split("\n")
+            .flatMap(line => {
+            // Expand chains like A --> B --> C into separate lines
+            if (line.includes("-->")) {
+                const parts = line.split("-->").map(s => s.trim());
+                if (parts.length > 2) {
+                const edges = [];
+                for (let i = 0; i < parts.length - 1; i++) {
+                    edges.push(`${parts[i]} --> ${parts[i+1]}`);
+                }
+                return edges;
+                }
+            }
+            return [line];
+            })
+            .join("\n");
         }
 
          const imageUrl = await step.run(`render-svg-with-${engine}`, async () => {
