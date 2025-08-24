@@ -451,23 +451,19 @@ const svgRendererAgent = inngest.createFunction(
 
             // --- DEFINITIVE FIX: USE ABSOLUTE PATHS FOR EXECUTABLES ---
             try {
-                // This is the absolute path where the D2 install script places the binary in Vercel's environment.
-                const d2Path = '/vercel/path0/.local/bin/d2';
-
-                // This is the absolute path where `npm install -g` places binaries in Vercel's environment.
-                const mmdcPath = '/vercel/path0/.npm-global/bin/mmdc';
-
                 if (engine === 'd2') {
-                    // We execute the command using the full, unambiguous path.
+                    // This path is relative to the project root. Vercel makes the project files available.
+                    // `path.resolve` creates a correct absolute path from the relative one.
+                    const d2Path = path.resolve('./bin/d2');
                     execSync(`"${d2Path}" --theme=dark --sketch "${inputFile}" "${outputFile}"`);
                 } else { // mermaid
+                    // `npm install -g` in Vercel places binaries in this predictable location.
+                    const mmdcPath = '/vercel/path0/.npm-global/bin/mmdc';
                     execSync(`"${mmdcPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
                 }
             } catch (execError) {
-                console.error(`Execution failed for ${engine}:`, execError);
-                // --- MODIFICATION FOR LOCAL TESTING ---
-                // If the absolute path fails (e.g., locally), try the PATH as a fallback.
-                console.log("Absolute path failed, attempting fallback to system PATH...");
+                // ... (Fallback logic for local Windows testing remains the same)
+                console.log("Absolute/Relative path failed, attempting fallback to system PATH...");
                 try {
                      if (engine === 'd2') {
                         execSync(`d2 --theme=dark --sketch "${inputFile}" "${outputFile}"`);
