@@ -1,8 +1,8 @@
 // postcss.config.mjs
 const config = {
   plugins: {
-    // This is the standard plugin for modern CSS features. It's stable.
-    'postcss-preset-env': {},
+    'postcss-import': {},
+    // All other plugins removed as they are not needed.
   },
 };
 

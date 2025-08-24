@@ -1,7 +1,6 @@
 // src/app/layout.js
 import "./globals.css";
-import '@mantine/core/styles.css';
-import '@mantine/core/styles.layer.css';
+// import '@mantine/core/styles.css';
 import '../styles/print.css';
 import { ColorSchemeScript } from '@mantine/core';
 import { Providers } from "@/components/Providers";
