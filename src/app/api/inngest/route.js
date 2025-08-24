@@ -417,16 +417,13 @@ const svgRendererAgent = inngest.createFunction(
                 Description: "${description}"
 
                 CRITICAL D2 SYNTAX RULES (UNBREAKABLE):
-                1. All node labels MUST be wrapped in double quotes ONLY.
+                1. Every node label MUST be wrapped in double quotes, with NOTHING after the closing quote on the same line.
                 ✅ GOOD: A: "Start"
                 ❌ BAD:  A: "Start" extra text
-                ❌ BAD:  A: Start
-                2. NOTHING may appear after a double quoted string on the same line.
-                3. Do NOT add comments, markdown, explanations, or extra text. Only raw D2 code.
-                4. Always use simple identifiers (A, B, C...) for node IDs. Node IDs must not contain spaces or special characters.
-                5. Connections MUST use '-->' for arrows. Example: A --> B
-                6. If you need grouping, use 'container { ... }' blocks only.
-                7. The ENTIRE response must be ONLY the raw valid D2 script. No backticks, no JSON, no wrappers.
+                2. Use only simple node IDs like A, B, C, D (no spaces, no special chars).
+                3. Connect nodes with '-->' or '<--'. Example: A --> B
+                4. Do NOT add comments, markdown, explanations, or extra text. Only raw D2 code.
+                5. The entire output must be ONLY valid D2 code. No backticks, no JSON, no wrappers.
                 `;
             } else { // mermaid
                 prompt += `
@@ -456,13 +453,26 @@ const svgRendererAgent = inngest.createFunction(
             throw new Error(`AI failed to generate a valid script for engine: ${engine}`);
         }
 
+        let finalScript = script;
+        if (engine === 'd2') {
+            finalScript = script
+                .split("\n")
+                .map(line => {
+                    // If there's a quoted label, cut off everything after the last closing quote
+                    const match = line.match(/^(.*:\s*)"(.*?)"/);
+                    if (match) return `${match[1]}"${match[2]}"`;
+                    return line;
+                })
+                .join("\n");
+        }
+
          const imageUrl = await step.run(`render-svg-with-${engine}`, async () => {
             const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kalpad-svg-render-'));
             const ext = engine === 'd2' ? '.d2' : '.mmd';
             const inputFile = path.join(tempDir, `input${ext}`);
             const outputFile = path.join(tempDir, 'output.svg');
             
-            await fs.writeFile(inputFile, script);
+            await fs.writeFile(inputFile, finalScript);
 
             // --- DEFINITIVE FIX: USE ABSOLUTE PATHS FOR EXECUTABLES ---
             try {
