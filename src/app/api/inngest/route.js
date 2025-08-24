@@ -455,7 +455,7 @@ const svgRendererAgent = inngest.createFunction(
                     // This path is relative to the project root. Vercel makes the project files available.
                     // `path.resolve` creates a correct absolute path from the relative one.
                     const d2Path = path.resolve('./bin/d2');
-                    execSync(`"${d2Path}" --theme=dark --sketch "${inputFile}" "${outputFile}"`);
+                    execSync(`"${d2Path}" --theme=0 --sketch "${inputFile}" "${outputFile}"`);
                 } else { // mermaid
                     // `npm install -g` in Vercel places binaries in this predictable location.
                     const mmdcPath = '/vercel/path0/.npm-global/bin/mmdc';
@@ -466,7 +466,8 @@ const svgRendererAgent = inngest.createFunction(
                 console.log("Absolute/Relative path failed, attempting fallback to system PATH...");
                 try {
                      if (engine === 'd2') {
-                        execSync(`d2 --theme=dark --sketch "${inputFile}" "${outputFile}"`);
+                        const d2Path = path.resolve('./bin/d2');
+                        execSync(`"${d2Path}" --theme=0 --sketch "${inputFile}" "${outputFile}"`);
                     } else { // mermaid
                         execSync(`mmdc -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
                     }
