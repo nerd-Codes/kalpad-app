@@ -1,6 +1,8 @@
+// postcss.config.cjs
 module.exports = {
   plugins: {
-    'postcss-preset-mantine': {},
+    'postcss-import': {},        // from your .mjs file
+    'postcss-preset-mantine': {}, 
     'postcss-simple-vars': {
       variables: {
         'mantine-breakpoint-xs': '36em',
