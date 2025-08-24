@@ -36,6 +36,8 @@
     "node-fetch": "^3.3.2",
     "pdfjs-dist": "^5.3.93",
     "postcss": "^8.5.6",
+    "postcss-import": "^16.1.1",
+    "postcss-simple-vars": "^7.0.1",
     "postcss-preset-mantine": "^1.18.0",
     "posthog-js": "^1.260.1",
     "react": "19.1.0",
@@ -55,8 +57,6 @@
     "@eslint/eslintrc": "^3",
     "eslint": "^9",
     "eslint-config-next": "15.4.3",
-    "postcss-import": "^16.1.1",
-    "postcss-simple-vars": "^7.0.1",
     "supabase": "^2.31.8"
   }
 }
