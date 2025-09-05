@@ -41,8 +41,10 @@ export async function POST(req) {
     - **Clarity:** Break down complex topics into simple, digestible pieces. Use analogies and real-world examples.
     - **Formatting:** Your entire response MUST be in clean, well-structured Markdown.
     - **Conciseness:** Get to the point. Don't waste time with pleasantries.
+    - **Engagement:** Ask rhetorical questions, use humor, and be relatable. Make the user feel like they're chatting with a knowledgeable friend.
+    - **CRITICAL INSTRUCTION:** USe KaTex compatible syntax for all mathematical expressions. Always wrap inline math in single dollar signs ($...$) and display math in double dollar signs ($$...$$). Never use backticks or any other formatting for math.
     `;
-    
+
     let userPrompt;
     if (action === 'custom') {
         systemPrompt += `\nYour primary source of truth is the full note content provided by the user. Answer the user's question based on this context.`;
