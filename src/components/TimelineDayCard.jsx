@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, Stack, Title, ActionIcon, Tooltip, Menu } from '@mantine/core';
 import { IconPencilPlus, IconBrain, IconPlayerPlay, IconClock, IconChevronDown, IconEye } from '@tabler/icons-react';
 import { FullscreenNoteViewer } from './FullscreenNoteViewer';
+import { differenceInCalendarDays } from 'date-fns';
+import Link from 'next/link';
 
 import { QuizSetupModal } from './QuizSetupModal';
 import { QuizRunner } from './QuizRunner';
@@ -39,7 +41,7 @@ const getSubTopicTypeColor = (type) => {
 };
 
 
-export function TimelineDayCard({plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, onUpdateCompletion }) {
+export function TimelineDayCard({plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan' }) {
      const { setIsLoading } = useLoading();
 
     const [generatingNotesFor, setGeneratingNotesFor] = useState(null);
@@ -160,8 +162,24 @@ export function TimelineDayCard({plan, dayTopic, onUpdate, isInitiallyCollapsed,
         }
     };
 
+    const daysLeft = differenceInCalendarDays(new Date(plan.exam_date), new Date());
+    let color = 'brandGreen';
+    if (daysLeft < 7) color = 'red';
+    else if (daysLeft < 14) color = 'yellow';
+
 return (
     <>
+
+    {viewMode === 'dashboard' && (
+                         <Group justify="space-between">
+                            <Link href={`/plan/${plan.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                                <Title order={3} style={{ cursor: 'pointer' }}>{plan.exam_name}</Title>
+                            </Link>
+                            <Badge color={color} variant="light">{daysLeft > 0 ? `${daysLeft} days left` : 'Exam Day!'}</Badge>
+                        </Group>
+    )}
+
+
         {isInitiallyCollapsed && (
             <Button variant="subtle" size="xs" onClick={toggleDetails} mb="xs">
                 {detailsOpened ? 'Hide Details' : 'Show Details'}

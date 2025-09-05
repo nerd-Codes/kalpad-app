@@ -18,7 +18,7 @@ import { StatCard } from '@/components/StatCard';
 import { GlassCard } from '@/components/GlassCard';
 import { Heatmap } from '@/components/Heatmap';
 import { DatePicker } from '@/components/DatePicker';
-import { TimelineEntry } from '@/components/TimelineEntry';
+import { TimelineDayCard } from '@/components/TimelineDayCard';
 import { IconCheck, IconFileText, IconCalendarEvent, IconBulb, IconFlame } from '@tabler/icons-react';
 
 // Import our list of tips
@@ -241,12 +241,11 @@ export default function DashboardPage() {
                             {!timelineLoading && dailyTasks.length > 0 && (
                                 <Stack gap="md">
                                     {dailyTasks.map(planWithTopic => (
-                                        <TimelineEntry 
-                                            key={planWithTopic.plan_topics[0].id} 
-                                            taskGroup={{
-                                                plan: planWithTopic, 
-                                                dailyTopic: planWithTopic.plan_topics[0]
-                                            }} 
+                                        <TimelineDayCard 
+                                            key={planWithTopic.plan_topics[0].id}
+                                            viewMode="dashboard" // Tell the card to render in dashboard mode
+                                            plan={planWithTopic}
+                                            dayTopic={planWithTopic.plan_topics[0]}
                                             onUpdate={handleUpdateTaskGroup}
                                             onNoteGenerated={() => fetchTimelineData()}
                                         />

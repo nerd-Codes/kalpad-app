@@ -1,0 +1,53 @@
+/* src/components/DatePicker.module.css */
+.day {
+    cursor: pointer;
+    text-align: center;
+    position: relative;
+    padding: 0.5rem 0;
+    flex: 1; /* Allow flexbox to handle sizing */
+    min-width: 40px; /* Prevent it from becoming too small */
+}
+
+.highlight {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--mantine-color-brandPurple-8);
+    border-radius: var(--mantine-radius-xl); /* Pill shape */
+    z-index: 1;
+}
+
+.weekday {
+    font-size: var(--mantine-font-size-xs);
+    font-weight: 500;
+    color: var(--mantine-color-gray-5);
+    position: relative;
+    z-index: 2;
+}
+
+.date {
+    font-size: 1.5rem;
+    font-family: var(--font-lexend);
+    font-weight: 700;
+    line-height: 1.2;
+    position: relative;
+    z-index: 2;
+}
+
+.isExamDay {
+    /* A subtle bottom dot instead of a border */
+    position: relative;
+}
+.isExamDay::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: var(--mantine-color-red-6);
+}
