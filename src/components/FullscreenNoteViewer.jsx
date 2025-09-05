@@ -1,19 +1,26 @@
 // src/components/FullscreenNoteViewer.jsx
 "use client";
 
-import { Modal, ScrollArea, Group, Title, Text, Stack, Badge, Button, ActionIcon, Box, Loader } from '@mantine/core';
-import { IconCircleCheck, IconPrinter } from '@tabler/icons-react';
+import React, { useState, useEffect } from 'react';
+import { Modal, ScrollArea, Group, Title, Text, Textarea, Stack, Badge, Button, ActionIcon, Box, Loader, Tooltip, Alert } from '@mantine/core';
+import { IconCircleCheck, IconMessageQuestion,IconMessageCircle, IconBook, IconBulb, IconSparkles } from '@tabler/icons-react';
+import { useDisclosure } from '@mantine/hooks';
+import { Popover } from '@mantine/core';
+import { useTextSelection } from '../hooks/useTextSelection';
+import { notifications } from '@mantine/notifications';
+
+import { ShimmerButton } from './landing/ShimmerButton';
+
+// Markdown and LaTeX imports
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { notifications } from '@mantine/notifications';
-import React, { useState, useEffect } from 'react'; 
 
-// Import our custom markdown styles
 import markdownStyles from '../styles/MarkdownStyles.module.css';
+
 
 // --- HELPER FUNCTIONS FOR DYNAMIC BADGE COLORS ---
 const getDayDifficultyColor = (difficulty) => {
@@ -39,6 +46,14 @@ const getSubTopicTypeColor = (type) => {
 export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
 
     const [renderContent, setRenderContent] = useState(false);
+    const { selection, clearSelection } = useTextSelection();
+    const [followUpModalOpened, { open: openFollowUpModal, close: closeFollowUpModal }] = useDisclosure(false);
+    const [customQuestion, setCustomQuestion] = useState('');
+
+    // --- DEFINITIVE FIX: CUSTOM STATE MANAGEMENT (REPLACES `useChat`) ---
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [aiResponse, setAiResponse] = useState(null);
 
     // This effect delays the rendering of the heavy markdown content.
     useEffect(() => {
@@ -67,6 +82,43 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
         day_topic = {},
         exam_name = "Study Plan"
     } = noteData;
+    
+    const handleDoubtRequest = async (action, questionText = '') => {
+        setIsLoading(true);
+        setError(null);
+        setAiResponse(null);
+        clearSelection();
+        closeFollowUpModal();
+
+        const bodyPayload = {
+            fullNoteContent: notes_markdown,
+            context: { examName: exam_name, dayTopic: day_topic.topic_name, subTopic: sub_topic.text },
+            action: action,
+            highlightedText: action !== 'custom' ? selection.text : undefined,
+            question: action === 'custom' ? questionText : undefined,
+        };
+
+        try {
+            const response = await fetch('/api/solve-doubt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bodyPayload) // No `data` nesting
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'The AI tutor failed to respond.');
+            }
+            
+            setAiResponse(data.response);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+            setCustomQuestion('');
+        }
+    };
+
 
     const handleMarkAsComplete = () => {
         // 1. Find the index of the sub-topic that needs to be updated.
@@ -118,13 +170,19 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
         },
     };
 
+     const handleCloseResponseModal = () => {
+        setAiResponse(null);
+        setError(null);
+    };
+
 
 
     return (
+        <>
         <Modal
             opened={!!noteData}
             onClose={onClose}
-            // fullScreen
+            fullScreen
             withCloseButton
             size="90%" // Uses 90% of the viewport width for a better reading experience
             title={
@@ -137,6 +195,21 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
 
             transitionProps={{ duration: 200 }} 
         >
+
+            <Popover opened={selection.text.length > 5} position="top" withArrow shadow="md">
+                    <Popover.Target>
+                        <div style={{ position: 'absolute', top: `${selection.position.y - 45}px`, left: `${selection.position.x}px`, transform: 'translateX(-50%)' }} />
+                    </Popover.Target>
+                    <Popover.Dropdown>
+                        <Group gap="xs">
+                            <Tooltip label="Explain this simply" withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('explain')}><IconBook size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Give a real-world analogy" withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('analogy')}><IconBulb size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Why is this important?" withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('importance')}><IconMessageCircle size={18} /></ActionIcon></Tooltip>
+                        </Group>
+                    </Popover.Dropdown>
+                </Popover>
+
+
             <ScrollArea h="100%" type="auto">
                 <Stack p="md" className="printable-note-area">
                     {/* --- THE IMMERSIVE HEADER --- */}
@@ -155,7 +228,16 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
                     
                     {/* --- THE ACTION BAR --- */}
                     <Group justify="flex-end" className="action-bar">
+                        {/* --- DEFINITIVE ADDITION: THE "ASK A FOLLOW-UP" BUTTON --- */}
                         <Button
+                            leftSection={<IconMessageQuestion size={16} />}
+                            variant="default"
+                            onClick={openFollowUpModal}
+                        >
+                            Ask a Follow-up
+                        </Button>
+
+                        <ShimmerButton
                             leftSection={<IconCircleCheck size={16} />}
                             color="green"
                             variant="light"
@@ -163,12 +245,10 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
                             disabled={sub_topic.completed}
                         >
                             {sub_topic.completed ? 'Completed' : 'Mark as Complete'}
-                        </Button>
-                    
+                        </ShimmerButton>
                     </Group>
                     
-                    {/* --- THE NOTE CONTENT --- */}
-                    <Box className={markdownStyles.markdown}>
+                   <Box className={markdownStyles.markdown}>
                         {renderContent ? (
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm, remarkMath]}
@@ -178,7 +258,6 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
                                 {notes_markdown}
                             </ReactMarkdown>
                         ) : (
-                            // Show a simple loader while waiting for the content to render
                             <Group justify="center" p="xl">
                                 <Loader />
                             </Group>
@@ -186,6 +265,53 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
                     </Box>
                 </Stack>
             </ScrollArea>
+
         </Modal>
+
+        <Modal
+                opened={isLoading || !!aiResponse || !!error}
+                onClose={handleCloseResponseModal}
+                title={ <Group> <IconSparkles size={20} /> <Title order={4}>The Professor</Title> </Group> }
+                centered size="xl"
+            >
+                <Stack>
+                    {isLoading && <Group justify="center" p="xl"><Loader /></Group>}
+                    {error && <Alert color="red" title="An error occurred">{error}</Alert>}
+                    {aiResponse && (
+                        <Box className={markdownStyles.markdown} mah="60vh" style={{ overflowY: 'auto' }}>
+                             {/* --- DEFINITIVE FIX: ADDED FULL SUITE OF PLUGINS --- */}
+                             <ReactMarkdown
+                                remarkPlugins={[remarkGfm, remarkMath]}
+                                rehypePlugins={[rehypeRaw, rehypeKatex]}
+                                components={customRenderers}
+                            >
+                                {aiResponse}
+                            </ReactMarkdown>
+                        </Box>
+                    )}
+                </Stack>
+            </Modal>
+
+            <Modal opened={followUpModalOpened} onClose={closeFollowUpModal} title="Ask a Custom Question" centered size="lg">
+                <Stack>
+                    <Textarea
+                        placeholder="Type your question..."
+                        value={customQuestion}
+                        onChange={(event) => setCustomQuestion(event.currentTarget.value)}
+                        autosize
+                        minRows={3}
+                    />
+                    <Group justify="flex-end">
+                        <Button variant="default" onClick={closeFollowUpModal}>Cancel</Button>
+                        <ShimmerButton
+                            onClick={() => handleDoubtRequest('custom', customQuestion)}
+                        >
+                            Ask KalPad
+                        </ShimmerButton>
+                    </Group>
+                </Stack>
+            </Modal>
+        </>
+
     );
 }

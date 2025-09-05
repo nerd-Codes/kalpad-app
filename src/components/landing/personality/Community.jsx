@@ -10,6 +10,7 @@ export function Community() {
     return (
         // --- MODIFICATION: ADD `position: 'relative'` TO THE WRAPPER ---
         <Box
+            id="community-section" 
              style={{
                 background: 'radial-gradient(ellipse at 50% 50%, rgba(25, 20, 40, 1) 0%, rgba(10, 10, 20, 1) 100%)',
                 position: 'relative',

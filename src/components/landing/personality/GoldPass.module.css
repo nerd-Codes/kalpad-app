@@ -1,0 +1,82 @@
+/* src/components/landing/personality/GoldPass.module.css */
+
+.goldButton {
+    padding: 1rem 1.5rem;
+    font-family: var(--font-lexend);
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #4a2c0f;
+    background: linear-gradient(145deg, #ffd700, #f0c541, #ffec80, #f0c541, #ffd700);
+    border: 2px solid #ffde7a;
+    border-radius: 50px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 20px #ffd700, 0 0 30px #f0c541, inset 0 0 10px rgba(255, 255, 255, 0.5);
+    z-index: 50;
+    transition: box-shadow 0.3s ease-in-out;
+
+    /* --- THIS IS THE DEFINITIVE FIX --- */
+    /* This command forbids the text and icon from ever wrapping to a new line. */
+    white-space: nowrap;
+}
+
+.goldButton:hover {
+    box-shadow: 0 0 30px #ffd700, 0 0 45px #f0c541, inset 0 0 15px rgba(255, 255, 255, 0.7);
+}
+
+.goldButton::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 75%;
+    height: 100%;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0) 100%);
+    transform: skewX(-25deg);
+    animation: shimmer 5s infinite linear;
+}
+
+.iconWrapper {
+    /* Aligns the icon perfectly with the text */
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Target the SVG element rendered by the IconTicket component */
+.iconWrapper svg {
+    width: 24px;  /* Default desktop size */
+    height: 24px;
+    transition: width 0.2s ease-in-out, height 0.2s ease-in-out; /* Smooth scaling */
+}
+
+@keyframes shimmer {
+    from {
+        left: -150%;
+    }
+    to {
+        left: 200%;
+    }
+}
+
+/* --- DEFINITIVE FIX: RESPONSIVE OVERRIDES FOR MOBILE SCREENS --- */
+@media (max-width: 768px) {
+    .goldButton {
+        /* Reduce padding and font size for smaller screens */
+        padding: 0.75rem 1.25rem;
+        font-size: 0.75rem;
+        
+        /* Reduce the intensity of the glow to be less overwhelming */
+        box-shadow: 0 0 10px #ffd700, 0 0 15px #f0c541, inset 0 0 5px rgba(255, 255, 255, 0.5);
+    }
+
+    .goldButton:hover {
+        /* Also tone down the hover effect on mobile */
+        box-shadow: 0 0 15px #ffd700, 0 0 25px #f0c541, inset 0 0 8px rgba(255, 255, 255, 0.7);
+    }
+
+    .iconWrapper svg {
+        width: 18px; /* Scaled-down mobile size */
+        height: 18px;
+    }
+}

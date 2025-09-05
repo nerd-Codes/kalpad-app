@@ -121,7 +121,7 @@ export async function POST(request) {
       When a visual plot is critical for explaining a core concept, you MUST insert an 'Illustration Placeholder'.
       - **Budget:** You have a very low budget of illustrations per note. Use them only for the most important visual concepts. Do not generate multiple plots for slight variations of the same function.
       - **Placement:** Insert the placeholder immediately after the paragraph that explains the concept the plot will illustrate.
-      - **Supported Engines:** 'matplotlib' for plots, 'd2' for diagrams, 'mermaid' for flowcharts.
+      - **Supported Engines:** 'matplotlib' for plots, 'mermaid' for flowcharts.
       
       Example for a Plot:
       \`\`\`kalpad-illustration
@@ -131,13 +131,6 @@ export async function POST(request) {
       }
       \`\`\`
 
-      Example for a Diagram (d2):
-      \`\`\`kalpad-illustration
-      {
-        "engine": "d2",
-        "description": "A diagram showing a central server connected to two clients, client1 and client2."
-      }
-      \`\`\`
 
       Example for a Flowchart (mermaid):
       \`\`\`kalpad-illustration
