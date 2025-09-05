@@ -8,55 +8,49 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   try {
-          const supabase = createRouteHandlerClient({ cookies });
-      let session;
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    }
 
-      // First, try to get user from the mobile app's JWT in the Authorization header
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-          const jwt = authHeader.replace('Bearer ', '');
-          const { data: { user } } = await supabase.auth.getUser(jwt);
-          // If the JWT is valid, we create a session object
-          if (user) {
-              session = { user }; 
-          }
-      }
-
-      // If there was no valid mobile session, fall back to the web app's cookie method
-      if (!session) {
-          const { data } = await supabase.auth.getSession();
-          session = data.session;
-      }
-
-      // If we still don't have a session after checking both methods, deny access
-      if (!session) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-      }
-
-    const { plan_topic_id } = await request.json();
-    if (!plan_topic_id) return new Response(JSON.stringify({ error: 'Topic ID is required' }), { status: 400 });
+    // --- DEFINITIVE UPGRADE: ACCEPT NEW PARAMETERS ---
+    const { plan_topic_id, question_count, quiz_mode } = await request.json();
+    if (!plan_topic_id || !question_count || !quiz_mode) {
+      return new Response(JSON.stringify({ error: 'Topic ID, question count, and quiz mode are required' }), { status: 400 });
+    }
 
     const { data: topicData, error: topicError } = await supabase
       .from('plan_topics')
-      .select('topic_name, sub_topics')
+      .select('topic_name, sub_topics, plan:study_plans(exam_name)') // Fetch exam_name for context
       .eq('id', plan_topic_id)
       .single();
     if (topicError) throw new Error(`Failed to fetch topic: ${topicError.message}`);
     
-    // Use the sub-topics as the basis for the quiz
     const subTopicTexts = topicData.sub_topics.map(sub => sub.text).join(', ');
 
+    // --- DEFINITIVE UPGRADE: THE NEW, SMARTER PROMPT ---
     const prompt = `
-      You are a JSON-only API that creates quizzes.
-      
-      **Topic:** ${topicData.topic_name}
-      **Specific Sub-Topics:** ${subTopicTexts}
+      You are an expert educator and AI quiz master. Your task is to generate a high-quality, engaging quiz based on a student's study topic and preferred learning mode.
+
+      **Context:**
+      - Exam: "${topicData.plan.exam_name}"
+      - Main Topic for Today: "${topicData.topic_name}"
+      - Specific Sub-Topics to be Quizzed On: "${subTopicTexts}"
+
+      **Quiz Parameters:**
+      - Number of Questions: ${question_count}
+      - Quiz Mode: "${quiz_mode}"
 
       **CRITICAL INSTRUCTIONS:**
-      1. Create a multiple-choice quiz with exactly 5 questions based on the provided sub-topics.
-      2. The questions should test for genuine understanding, not just rote memorization.
-      3. For each question, provide 4 options. One must be correct.
-      4. Your entire output MUST be a valid JSON object that adheres strictly to the following schema.
+      1.  Generate a multiple-choice quiz with exactly ${question_count} questions.
+      2.  Tailor the questions to the **Quiz Mode**:
+          - **'Rapid Fire'**: Focus on definitions, key terms, and quick-recall facts.
+          - **'Core Concepts'**: Focus on "why" and "how" questions that test deep, foundational understanding.
+          - **'Problem Solving'**: Focus on application-based questions that require calculation or scenario analysis.
+      3.  For each question, provide exactly 4 options. One must be correct.
+      4.  Ensure the options are plausible and challenging.
+      5.  Your entire output MUST be a valid JSON object that adheres strictly to the following schema.
 
       **JSON Schema:**
       {
@@ -71,7 +65,7 @@ export async function POST(request) {
     `;
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash", // Flash is perfect for this structured task
+      model: "gemini-1.5-flash", // Upgraded model for higher quality questions
       generationConfig: { responseMimeType: "application/json" },
     });
 

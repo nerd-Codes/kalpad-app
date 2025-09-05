@@ -11,6 +11,8 @@ import { notifications } from '@mantine/notifications';
 
 import { ShimmerButton } from './landing/ShimmerButton';
 
+import { FollowUpModal } from './FollowUpModal';
+
 // Markdown and LaTeX imports
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -292,25 +294,14 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
                 </Stack>
             </Modal>
 
-            <Modal opened={followUpModalOpened} onClose={closeFollowUpModal} title="Ask a Custom Question" centered size="lg">
-                <Stack>
-                    <Textarea
-                        placeholder="Type your question..."
-                        value={customQuestion}
-                        onChange={(event) => setCustomQuestion(event.currentTarget.value)}
-                        autosize
-                        minRows={3}
-                    />
-                    <Group justify="flex-end">
-                        <Button variant="default" onClick={closeFollowUpModal}>Cancel</Button>
-                        <ShimmerButton
-                            onClick={() => handleDoubtRequest('custom', customQuestion)}
-                        >
-                            Ask KalPad
-                        </ShimmerButton>
-                    </Group>
-                </Stack>
-            </Modal>
+            <FollowUpModal
+                opened={followUpModalOpened}
+                onClose={closeFollowUpModal}
+                isLoading={isLoading}
+                onSubmit={(question) => {
+                    handleDoubtRequest('custom', question);
+                }}
+            />
         </>
 
     );

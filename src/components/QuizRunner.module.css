@@ -1,0 +1,18 @@
+/* src/components/QuizRunner.module.css */
+
+.optionCard {
+    border: 1px solid var(--mantine-color-dark-4);
+    background-color: rgba(37, 38, 43, 0.5);
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+.optionCard:hover {
+    background-color: rgba(47, 49, 54, 0.7);
+    border-color: var(--mantine-color-dark-2);
+}
+
+.selected {
+    border-color: var(--mantine-color-brandPurple-5);
+    background-color: rgba(var(--mantine-color-brandPurple-raw), 0.15);
+}

@@ -6,8 +6,11 @@ import { useState } from 'react';
 import { Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, Stack, Title, ActionIcon, Tooltip, Menu } from '@mantine/core';
 import { IconPencilPlus, IconBrain, IconPlayerPlay, IconClock, IconChevronDown, IconEye } from '@tabler/icons-react';
 import { FullscreenNoteViewer } from './FullscreenNoteViewer';
-import { QuizModal } from './QuizModal';
-import { SummaryModal } from './SummaryModal';
+
+import { QuizSetupModal } from './QuizSetupModal';
+import { QuizRunner } from './QuizRunner';
+import { QuizResults } from './QuizResults';
+
 import { notifications } from '@mantine/notifications';
 import 'katex/dist/katex.min.css';
 import { useDisclosure } from '@mantine/hooks';
@@ -107,6 +110,53 @@ export function TimelineDayCard({plan, dayTopic, onUpdate, isInitiallyCollapsed,
             // --- RESTORED: DISENGAGE ALL LOADERS ---
             setIsLoading(false);
             setGeneratingNotesFor(null);
+        }
+    };
+
+     // --- DEFINITIVE UPGRADE: NEW STATE FOR THE SMART QUIZ FLOW ---
+    const [quizSetupOpened, { open: openQuizSetup, close: closeQuizSetup }] = useDisclosure(false);
+    const [quizQuestions, setQuizQuestions] = useState(null);
+    const [quizResults, setQuizResults] = useState(null);
+    const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+    const [isEvaluatingQuiz, setIsEvaluatingQuiz] = useState(false);
+    const [quizConfig, setQuizConfig] = useState(null);
+
+    const handleStartQuiz = async (config) => {
+        setIsGeneratingQuiz(true);
+        setQuizConfig(config);
+        closeQuizSetup();
+        try {
+            const response = await fetch('/api/generate-quiz', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan_topic_id: dayTopic.id, ...config }),
+            });
+            if (!response.ok) throw new Error((await response.json()).error);
+            const data = await response.json();
+            setQuizQuestions(data.questions);
+        } catch (err) {
+            notifications.show({ title: 'Failed to generate quiz', message: err.message, color: 'red' });
+        } finally {
+            setIsGeneratingQuiz(false);
+        }
+    };
+    
+    const handleSubmitQuiz = async (attempts) => {
+        setIsEvaluatingQuiz(true);
+        setQuizQuestions(null); // Close the runner
+        try {
+             const response = await fetch('/api/evaluate-quiz-submission', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan_topic_id: dayTopic.id, attempts, quiz_mode: quizConfig.quiz_mode }),
+            });
+             if (!response.ok) throw new Error((await response.json()).error);
+             const results = await response.json();
+             setQuizResults(results);
+        } catch (err) {
+             notifications.show({ title: 'Failed to evaluate quiz', message: err.message, color: 'red' });
+        } finally {
+            setIsEvaluatingQuiz(false);
         }
     };
 
@@ -232,8 +282,15 @@ return (
                         <GlassCard mt="md">
                             <Text fw={500} mb="sm">Daily Mission Complete!</Text>
                             <Group>
-                                <Button color="brandGreen" leftSection={<IconBrain size={16}/>} onClick={() => setQuizModalOpened(true)}>Take a Quiz</Button>
-                                <Button variant="default" onClick={() => setSummaryModalOpened(true)}>Write a Summary</Button>
+                                <Button 
+                                    color="brandGreen" 
+                                    leftSection={<IconBrain size={16}/>} 
+                                    onClick={openQuizSetup}
+                                    // DEFINITIVE FIX: SHOW LOADING STATE
+                                    loading={isGeneratingQuiz || isEvaluatingQuiz}
+                                >
+                                    {isGeneratingQuiz ? 'Building...' : isEvaluatingQuiz ? 'Evaluating...' : 'Take a Smart Quiz'}
+                                </Button>
                             </Group>
                         </GlassCard>
                     )}
@@ -243,8 +300,32 @@ return (
             </GlassCard>
         </Collapse>
 
-        <QuizModal opened={quizModalOpened} onClose={() => setQuizModalOpened(false)} planTopicId={dayTopic.id} />
-        <SummaryModal opened={summaryModalOpened} onClose={() => setSummaryModalOpened(false)} planTopicId={dayTopic.id} />
+        <QuizSetupModal
+                opened={quizSetupOpened}
+                onClose={closeQuizSetup}
+                onStartQuiz={handleStartQuiz}
+                isLoading={isGeneratingQuiz}
+            />
+
+            {quizQuestions && (
+                <QuizRunner 
+                    questions={quizQuestions} 
+                    onClose={() => setQuizQuestions(null)}
+                    onSubmit={handleSubmitQuiz}
+                />
+            )}
+            
+            {quizResults && (
+                <QuizResults
+                    results={quizResults}
+                    onClose={() => setQuizResults(null)}
+                    // DEFINITIVE FIX: ADD RETAKE FUNCTIONALITY
+                    onRetake={() => {
+                        setQuizResults(null);
+                        openQuizSetup();
+                    }}
+                />
+            )}
 
         <FullscreenNoteViewer 
                 noteData={noteToView} 

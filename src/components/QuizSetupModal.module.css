@@ -1,0 +1,61 @@
+/* src/components/QuizSetupModal.module.css */
+
+.modalRoot {
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(ellipse at top center, rgba(38, 26, 64, 0.5), transparent 70%);
+}
+
+.backgroundEffect {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+        radial-gradient(rgba(138, 86, 248, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+    opacity: 0;
+    animation: fadeIn 1s ease-out forwards;
+    z-index: 0;
+}
+
+@keyframes fadeIn {
+    to {
+        opacity: 1;
+    }
+}
+
+.content {
+    position: relative;
+    z-index: 1;
+}
+
+.modeCard {
+    position: relative;
+    padding: var(--mantine-spacing-lg);
+    border: 1px solid var(--mantine-color-dark-4);
+    text-align: center;
+    cursor: pointer;
+    background-color: rgba(37, 38, 43, 0.5);
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+
+    border-radius: var(--mantine-radius-lg); 
+}
+
+.modeCard:hover {
+    background-color: rgba(47, 49, 54, 0.7);
+    border-color: var(--mantine-color-dark-2);
+}
+
+.activeHighlight {
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border: 2px solid var(--mantine-color-brandPurple-5);
+    border-radius: var(--mantine-radius-lg); /* Match parent's radius */
+    box-shadow: 0 0 15px var(--mantine-color-brandPurple-5);
+    pointer-events: none; /* Allow clicks to pass through */
+}
