@@ -23,7 +23,6 @@ function UserButton({ user, desktopOpened, onSignOut }) {
     const userInitials = user?.email?.substring(0, 2).toUpperCase() || 'KP';
 
     return (
-        // --- FIX #4: Changed menu position to 'top-end' for better mobile UX ---
         <Menu shadow="md" width={220} position="top-end" withArrow>
             <Menu.Target>
                 <UnstyledButton
@@ -89,7 +88,6 @@ function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
                 
                 {navLinks.map((link) => (
                     <NavLink
-                        // --- FIX #3: Adding a key forces re-render on collapse for perfect alignment ---
                         key={link.label + (desktopOpened ? '-full' : '-mini')}
                         label={desktopOpened ? link.label : null}
                         leftSection={<link.icon size="1.25rem" stroke={1.5} />}
@@ -137,50 +135,55 @@ export default function AppLayout({ children, session }) {
   };
 
   const headerGlass = {
-    backgroundColor: 'rgba(23, 24, 28, 0.6)', // Darker, less transparent
+    backgroundColor: 'rgba(23, 24, 28, 0.6)',
     backdropFilter: 'blur(16px)',
     border: 'none',
   };
   
   const navbarGlass = {
-    // --- FIX #1: Different transparency and a subtle border for visual separation ---
     backgroundColor: 'rgba(37, 38, 43, 0.5)', 
     backdropFilter: 'blur(16px)',
     borderRight: '1px solid var(--mantine-color-dark-5)',
-    // --- FIX #3: Added transition for smooth collapse animation ---
     transition: 'width 200ms ease-in-out',
   };
+
+  // --- DEFINITIVE FIX: Conditionally define the navbar configuration ---
+  // If there is no session, the entire navbar object is null, so it will not be rendered.
+  const navbarConfig = session ? { 
+    width: desktopOpened ? 280 : 80, 
+    breakpoint: 'sm', 
+    collapsed: { mobile: !mobileOpened } 
+  } : null;
 
   return (
     <AppShell
       header={{ height: 70 }}
-      navbar={{ 
-        width: desktopOpened ? 280 : 80, 
-        breakpoint: 'sm', 
-        collapsed: { mobile: !mobileOpened } 
-      }}
+      navbar={navbarConfig} // Pass the conditional config object here
       padding="md"
     >
       <AppShell.Header style={headerGlass}>
-        {/* --- FIX #2: Increased padding on the outer Group --- */}
         <Group h="100%" px="lg">
-          <Burger opened={mobileOpened} onClick={toggleMobile} hiddenFrom="sm" size="sm" />
+          {/* The Burger is now only rendered if a session exists, preventing a useless button */}
+          {session && <Burger opened={mobileOpened} onClick={toggleMobile} hiddenFrom="sm" size="sm" />}
           <Title order={2} ff="Lexend, sans-serif">KalPad</Title>
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="md" style={navbarGlass}>
-        <MainNavbar 
-            desktopOpened={desktopOpened}
-            toggleDesktop={toggleDesktop}
-            onNavigate={handleNavigation}
-        />
-        <UserButton 
-            user={session?.user} 
-            desktopOpened={desktopOpened}
-            onSignOut={handleSignOut}
-        />
-      </AppShell.Navbar>
+      {/* Conditionally render the entire Navbar component */}
+      {session && (
+        <AppShell.Navbar p="md" style={navbarGlass}>
+          <MainNavbar 
+              desktopOpened={desktopOpened}
+              toggleDesktop={toggleDesktop}
+              onNavigate={handleNavigation}
+          />
+          <UserButton 
+              user={session?.user} 
+              desktopOpened={desktopOpened}
+              onSignOut={handleSignOut}
+          />
+        </AppShell.Navbar>
+      )}
 
       <AppShell.Main>
         {children}

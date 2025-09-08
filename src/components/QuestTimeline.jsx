@@ -9,8 +9,9 @@ import { TimelineDayCard } from './TimelineDayCard';
 import classes from './QuestTimeline.module.css';
 
 // --- FIX: The component now accepts the new props ---
-export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCurating, onNoteGenerated }) {
-    const todayIndex = planTopics.findIndex(topic => isToday(new Date(topic.date)));
+export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCurating, onNoteGenerated, isReadOnly = false }) {
+    // For read-only view, we treat today as just another day.
+    const todayIndex = isReadOnly ? -1 : planTopics.findIndex(topic => isToday(new Date(topic.date)));
 
     return (
         <Timeline 
@@ -23,8 +24,11 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
         >
             {planTopics.map((dayTopic, index) => {
                 const dayDate = new Date(dayTopic.date);
-                const isPastDay = isPast(dayDate) && !isToday(dayDate);
-                const isToday_ = isToday(dayDate);
+                 // For read-only view, all days are treated as "past" for styling and expansion.
+                const isPastDay = isReadOnly || (isPast(dayDate) && !isToday(dayDate));
+                const isToday_ = !isReadOnly && isToday(dayDate);
+
+
 
                 const totalSubs = dayTopic.sub_topics?.length || 0;
                 const completedSubs = dayTopic.sub_topics?.filter(s => s.completed).length || 0;
@@ -39,7 +43,7 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
                     bulletIcon = <IconCircleCheck size={14} />;
                     if (progress === 1) bulletColor = 'var(--mantine-color-brandGreen-5)';
                     else if (progress > 0) bulletColor = 'var(--mantine-color-yellow-5)';
-                    else bulletColor = 'var(--mantine-color-red-5)';
+                    else bulletColor = 'var(--mantine-color-gray-7)'; // Use gray for incomplete past/public days
                 } else {
                     bulletIcon = <IconCircle size={14} />;
                     bulletColor = 'var(--mantine-color-gray-7)';
@@ -50,7 +54,7 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
 
                 return (
                     <Timeline.Item
-                        key={dayTopic.id}
+                        key={dayTopic.id || index} // Use index as fallback key for public plans
                         title={`Day ${dayTopic.day}: ${dayTopic.topic_name}`}
                         className={itemClassName}
                         lineVariant={index < todayIndex ? 'solid' : 'dashed'}
@@ -66,11 +70,11 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
                         <Text c="dimmed" size="sm">{format(dayDate, "EEEE, MMMM d")}</Text>
                         
                         {/* --- FIX: The new "Find Lectures" button is rendered conditionally here --- */}
-                        {isToday_ && (
+                         {isToday_ && !isReadOnly && (
                             <Button
-                                mt="md"
-                                variant="light"
-                                color="red"
+                                mt="md" 
+                                variant="light" 
+                                color="red" 
                                 size="xs"
                                 leftSection={<IconVideo size={16} />}
                                 onClick={onFindLectures}
@@ -86,9 +90,10 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
                                     plan={plan}
                                     dayTopic={dayTopic} 
                                     onUpdate={onUpdate} 
-                                     onUpdateCompletion={onUpdate}
-                                    isInitiallyCollapsed={isPastDay}
+                                    onUpdateCompletion={onUpdate}
+                                    isInitiallyCollapsed={isReadOnly ? false : isPastDay} // Always expanded for public
                                     onNoteGenerated={onNoteGenerated}
+                                    isReadOnly={isReadOnly} // Pass the prop down
                                 />
                             </Box>
                         )}

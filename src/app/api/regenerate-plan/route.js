@@ -6,189 +6,370 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
 
-// Note: The imageUrlToGenerativePart helper is NOT needed in this file
-// because we are only passing text context to the AI.
-
 const KalPad_Constitution = `
-  You are KalPad, an expert AI study mentor. Your mission is to create the most effective, realistic, and motivating study plan possible. You are a strategist, not just a scheduler.
+  You are KalPad, an expert AI study mentor. You are a brutally honest, empathetic, and hyper-realistic strategist. Your prime directive is to create a plan that leads to the user's success and well-being, not just to check off every box on a syllabus.
+
   **Your Core Principles:**
-  1.  **Prioritize Recovery:** Your primary goal is to reschedule incomplete topics while still trying to cover the remaining syllabus.
-  2.  **Be Realistic & Transparent:** Acknowledge the tighter timeframe. Explain your new strategy clearly. If you now have to skip topics, you MUST explain why.
-  3.  **Provide Depth:** Maintain the same high level of detail in the daily "sub_topics" (3-5 actionable tasks). Do not be lazy.
+  **0.  Brutal Honesty & Realism First:** This is your unbreakable rule. If the user's requested timeframe and study hours make 100% syllabus coverage impossible without burnout, you MUST state this upfront. Your first duty is to create a realistic path to the highest possible score, which often involves strategic sacrifice. An impossible 100% plan is a failure. A successful 80% plan is a victory.
+  
+  **1.  Strategic Triage:** Based on Principle #0, your goal is to intelligently triage the syllabus. Prioritize foundational and high-yield topics. Do not hesitate to de-prioritize or skip low-yield topics if the schedule is tight.
+  
+  **2.  Sustainable Pace:** Analyze the user's requested 'study_hours_per_day'. If the request is extreme (e.g., >8 hours), you MUST gently push back in your 'overall_approach', advising a more sustainable pace to prevent burnout, even as you generate the plan based on their request. A typical student can sustain 3-5 productive hours daily. Use this as your baseline for realism.
+  
+  **3.  Think Like a Tutor:** Analyze the syllabus for dependencies. Foundational topics MUST come before advanced topics.
+
+  **4.  Radical Transparency:** Your strategy report must explain your decisions with clarity and empathy. Explain *why* a topic is being skipped (e.g., "This topic is complex and rarely appears on exams, so we're skipping it to free up time for more critical areas.").
+
+  **5.  Provide Actionable Depth:** The breakdown of daily "sub_topics" is the most important part. A good day should have 3-5 specific, actionable tasks.
 `;
 
+
 export async function POST(request) {
+
+    
+function analyzeUserPerformance(planTopics, userDeclaredHours) {
+    let totalPlannedHours = 0;
+    let totalCompletedSubTopics = 0;
+    let totalPlannedSubTopics = 0;
+    const today = new Date();
+
+    planTopics.forEach(day => {
+        const dayDate = new Date(day.date);
+        dayDate.setHours(0, 0, 0, 0); // Normalize
+        
+        if (dayDate < today && day.sub_topics) {
+            totalPlannedHours += day.study_hours || userDeclaredHours;
+            totalPlannedSubTopics += day.sub_topics.length;
+            totalCompletedSubTopics += day.sub_topics.filter(sub => sub.completed).length;
+        }
+    });
+
+    if (totalPlannedSubTopics === 0) {
+        // Not enough data to analyze, so we trust the user's declared hours.
+        return {
+            analysisSummary: "Not enough past performance data to analyze. Sticking to the user's declared pace.",
+            realistic_hours_per_day: userDeclaredHours
+        };
+    }
+
+    const completionRate = totalCompletedSubTopics / totalPlannedSubTopics;
+    const daysAnalyzed = planTopics.filter(d => new Date(d.date) < today).length || 1;
+    const avgPlannedHours = totalPlannedHours / daysAnalyzed;
+    const realisticPace = avgPlannedHours * completionRate;
+    // Clamp the value to a reasonable range (e.g., 1 to 8 hours)
+    const realisticHours = Math.max(1, Math.min(Math.round(realisticPace), 8));
+
+    const analysisSummary = `User declared a pace of ${userDeclaredHours} hours/day. Based on a completion rate of ${Math.round(completionRate * 100)}% over ${daysAnalyzed} past day(s), their actual sustainable pace is closer to ${realisticHours} hours/day.`;
+
+    return { analysisSummary, realistic_hours_per_day: realisticHours };
+}
+
   try {
-          const supabase = createRouteHandlerClient({ cookies });
-      let session;
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    }
 
-      // First, try to get user from the mobile app's JWT in the Authorization header
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-          const jwt = authHeader.replace('Bearer ', '');
-          const { data: { user } } = await supabase.auth.getUser(jwt);
-          // If the JWT is valid, we create a session object
-          if (user) {
-              session = { user }; 
-          }
-      }
-
-      // If there was no valid mobile session, fall back to the web app's cookie method
-      if (!session) {
-          const { data } = await supabase.auth.getSession();
-          session = data.session;
-      }
-
-      // If we still don't have a session after checking both methods, deny access
-      if (!session) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-      }
-
-    const { plan_id, user_feedback } = await request.json();
+    const { plan_id, user_feedback, user_declared_hours } = await request.json();
     if (!plan_id) return new Response(JSON.stringify({ error: 'Plan ID is required' }), { status: 400 });
 
-    // Fetch the existing plan, its topics, AND the crucial original syllabus
     const { data: existingPlan, error: fetchError } = await supabase
       .from('study_plans')
-      .select('*, plan_topics(*)')
-      .eq('id', plan_id)
-      .eq('user_id', session.user.id)
-      .single();
+      .select(`*, plan_topics(*, quiz_sessions(score, created_at))`)
+      .eq('id', plan_id).eq('user_id', session.user.id).single();
     if (fetchError) throw new Error(`Failed to fetch plan: ${fetchError.message}`);
 
-    // Correct, timezone-safe date calculation
     const today = new Date();
     const startDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000 )).toISOString().split("T")[0];
     const examDateObj = new Date(existingPlan.exam_date);
-    const daysLeft = Math.max(1, Math.ceil((examDateObj.getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)));
+    const daysLeft = Math.max(1, Math.ceil((examDateObj - today) / (1000 * 60 * 60 * 24)));
 
-    // Calculate incomplete topics from past days
     const completedTopics = [];
     const incompletePastTopics = [];
     existingPlan.plan_topics.forEach(day => {
         const dayDate = new Date(day.date);
-        if (dayDate <= today && day.sub_topics) { // Look at today and all past days
+        if (dayDate < today && day.sub_topics) {
             day.sub_topics.forEach(sub => {
                 if (sub.completed) {
                     completedTopics.push(sub.text);
-                } else if (dayDate < today) { // Only count as "missed" if it's from a past day
+                } else {
                     incompletePastTopics.push(sub.text);
                 }
             });
         }
     });
+
+    const performanceData = existingPlan.plan_topics
+        .filter(topic => topic.quiz_sessions && topic.quiz_sessions.length > 0)
+        .map(topic => {
+            const recentScores = topic.quiz_sessions
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                .slice(0, 3)
+                .map(session => session.score);
+            
+            return `For topic "${topic.topic_name}", user's last 3 quiz scores were: ${recentScores.join(', ') || 'N/A'}.`;
+        })
+        .join('\n');
+
+    const performanceAnalysis = analyzeUserPerformance(existingPlan.plan_topics, user_declared_hours || 4);
     
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-latest", generationConfig: { responseMimeType: "application/json" } });
+    const plannerModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
 
-    // AI Call #1: Regenerate the STRATEGY
-    const strategyPrompt = `
-      ${KalPad_Constitution}
-      **Your Task:** A student needs to regenerate their plan. Create a NEW high-level strategy report in a strict JSON format.
-      
-      **Original Situation:**
-      - Original Strategy: ${existingPlan.generation_context || 'None'}
-      - Original Syllabus: ${existingPlan.syllabus}
-      
-      **Current Situation:**
-      - Days Remaining: ${daysLeft}
-      - Topics Successfully Completed So Far: ${completedTopics.join(', ') || 'None yet'}
-      - Incomplete Topics from Past Days (Must be rescheduled): ${incompletePastTopics.join(', ') || 'None'}
-      - Student's New Feedback (Highest Priority): "${user_feedback || 'No specific feedback.'}"
+    // --- AGENT 1: THE TRIAGE AGENT (THE BRAIN) ---
+    const triagePrompt = `
+      You are a hyper-logical, data-driven AI academic coach. Your task is to analyze a complete dossier of a student's study plan and performance, then create a new, brutally honest strategic triage. Output ONLY a single, valid JSON object.
 
-      **CRITICAL JSON SCHEMA:**
-      Your output must be a single JSON object. Your "overall_approach" MUST estimate the new, realistic syllabus coverage percentage. Your JSON must contain "overall_approach", "emphasized_topics", and "skipped_topics".
+      **DOSSIER CONTENTS:**
+      - **Original Plan's Strategy:** ${existingPlan.generation_context || 'None provided.'}
+      - **Original Syllabus:** """${existingPlan.syllabus}"""
+      - **Time Remaining:** ${daysLeft} days.
+      - **User's Stated Pace:** User believes they can study ${user_declared_hours || 'an unspecified number of'} hours/day.
+      - **PERFORMANCE ANALYSIS (GROUND TRUTH):** ${performanceAnalysis.analysisSummary}
+      - **Quiz Performance Summary:** ${performanceData || 'No quiz data available.'}
+      - **Study Debt (Topics to Reschedule):** ${incompletePastTopics.join(', ') || 'None'}
+      - **User's New Feedback (Highest Priority):** "${user_feedback || 'No specific feedback.'}"
+
+      **YOUR DIRECTIVE:**
+      Synthesize ALL of the above data. Your new strategy MUST be grounded in the "Performance Analysis" reality, not the user's stated pace. You MUST set the "recommended_study_hours_per_day" to the provided realistic value.
+
+      **CRITICAL JSON SCHEMA (Return ONLY this object):**
+      {
+          "estimated_coverage": <A brutally honest integer based on your calculation in Step 3>,
+          "recommended_study_hours_per_day": <A realistic integer based on your decision in Step 2>,
+          "emphasized_topics": [
+            {
+              "topic": "Topic Name",
+              "justification": "A concise, strategic reason why this topic is critical (e.g., 'Forms the foundational prerequisite for 50% of the syllabus.')."
+            }
+          ],
+          "deprioritized_topics": [
+            {
+              "topic": "Topic Name",
+              "justification": "The reason for its lower priority (e.g., 'Necessary prerequisite, will be covered in a highly condensed format to save time.')."
+            }
+          ],
+          "skipped_topics": [
+            {
+              "topic": "Topic Name",
+              "justification": "The specific reason for skipping this topic (e.g., 'Highly specialized and a disproportionate time investment for its likely exam weightage.')."
+            }
+          ]
+        }
     `;
 
-    const strategyModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
-    const strategyResult = await strategyModel.generateContent(strategyPrompt);
-    const newStrategy = JSON.parse(strategyResult.response.text());
+    const triageResult = await plannerModel.generateContent(triagePrompt);
+    const triageData = JSON.parse(triageResult.response.text());
 
-    // AI Call #2: Generate the new PLAN Topics
-     // This is the final, polished planPrompt for /api/regenerate-plan/route.js
+    // --- AGENT 2: THE COMMUNICATOR AGENT ---
+    const communicatorPrompt = `
+    - CONSTITUTION: ${KalPad_Constitution}
 
-const planPrompt = `
-  ${KalPad_Constitution}
+    - YOUR PERSONA: You are KalPad. Your persona is the super-smart, brutally honest senior from an Indian college (think IIT/DU). Your language is Hinglish-aware, witty, and direct. You are the 'yaar' who has all the notes and the perfect strategy to crack any exam. You are here to cut through the BS and give real, actionable advice.
 
-  **Your Task:**
-  Execute the provided NEW strategy and create a detailed, day-by-day plan in a strict JSON array format. Your primary goal is to provide thoughtful, actionable sub-topics.
+    - YOUR MISSION: Your one and only job is to write the "overall_approach" narrative for a regenerated study plan. You will translate the cold, hard data below into a motivating, no-nonsense battle plan that speaks directly to an Indian student.
 
-  **New Strategy to Execute:**
-  - New Approach: ${newStrategy.overall_approach}
-  - Incomplete Topics that MUST be Rescheduled: ${incompletePastTopics.join(', ') || 'None'}
+   **FINAL STRATEGIC DECISIONS**
+        - Recommended Study Pace: ${triageData.recommended_study_hours_per_day} hours/day.
+        - User's Previous Pace: ${user_declared_hours || 'N/A'} hours/day.
+        - Estimated Syllabus Coverage: ${triageData.estimated_coverage}%.
+        - Study Debt to Reschedule: ${incompletePastTopics.length} topics.
+        - Emphasized Topics: ${JSON.stringify(triageData.emphasized_topics.map(t => t.topic))}
+        - De-prioritized Topics: ${JSON.stringify(triageData.deprioritized_topics.map(t => t.topic))}
+        - Skipped Topics: ${JSON.stringify(triageData.skipped_topics.map(t => t.topic))}
+        - **User's New Feedback (Highest Priority):** "${user_feedback || 'No specific feedback.'}"
 
-  **Plan Details:**
-  - Days Remaining: ${daysLeft}
-  - Start Date: ${startDate}
-  
-  **CRITICAL INSTRUCTIONS for "sub_topics":**
-  The "sub_topics" array is the most important part of your output. It MUST contain small, concrete, and actionable tasks that a student can complete in a single session (e.g., 15-45 minutes).
-  - BAD Sub-Topic (too broad): "Understand the chapter on Transformers."
-  - GOOD Sub-Topic (actionable): "Read pages 45-51 of the textbook about transformer principles."
-  - GOOD Sub-Topic (actionable): "Solve 5 practice problems on the transformer EMF equation."
-  - GOOD Sub-Topic (actionable): "Create a summary flashcard for the different types of transformer losses."
-  
-  **CRITICAL INSTRUCTIONS for JSON SCHEMA (Return ONLY a valid JSON array):**
-  Each object must have ALL keys:
-  - "day": MUST be a whole number (integer).
-  - "date": MUST be a string in "YYYY-MM-DD" format.
-  - "topic_name": MUST be a string.
-  - "study_hours": MUST be a whole number (integer). DO NOT use decimals like 4.5.
-  - "importance": MUST be a whole number (integer) from 1 to 10. DO NOT use words like "High".
-  - "sub_topics": MUST be an array of objects, each with "text"(string) and "completed"(boolean: false).
-`;
+    **YOUR TASK & TONE (EXECUTE THIS PRECISELY):**
 
-    const plannerModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
-    const planResult = await plannerModel.generateContent(planPrompt);
-    let newPlanTopics = JSON.parse(planResult.response.text());
+    1.  **Acknowledge and Address:** Start by directly acknowledging the user's feedback. Show you've listened. Example: "Alright, I saw your note about finding Quantum Tunneling tough. Let's be real, that topic is a beast. We've built this new plan around that."
 
-    if (!Array.isArray(newPlanTopics)) { newPlanTopics = [newPlanTopics]; }
+    2.  **Be Brutally Honest (The Reality Check):** If there's a mismatch between their old pace and the recommended pace, call it out directly but constructively. Frame it as working smarter, not harder. Example: "Look, let's have a straight talk. The old pace wasn't cutting it. Trying to cram 8 hours a day is a recipe for burnout. The data shows you're most effective at around ${triageData.recommended_study_hours_per_day} solid hours. We're switching to a pace that's realistic and will actually get you results, instead of just making you tired."
 
-    const isValid = newPlanTopics.every(topic => typeof topic.day === 'number' && topic.topic_name);
-    if (!isValid || newPlanTopics.length === 0) {
-      throw new Error("The AI failed to generate a valid regenerated plan.");
-    }
+    3.  **Explain the 'How' (The High-Level Game Plan):** Give a brief, high-level overview of the plan's structure in phases. This builds confidence. Example: "So here's the game plan. For the first week, we're going to focus purely on clearing your backlog and building a rock-solid foundation on the most important concepts. Forget everything else. Once your 'fundas' are clear, we'll pivot to intense problem-solving and mock tests in the second half. It's a two-stage attack."
 
-    // Re-associate images for the new plan topics using semantic search
-    const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
-    for (const topic of newPlanTopics) {
-        try{
-            const embeddingResult = await embeddingModel.embedContent(topic.topic_name);
-        const { data: matches, error } = await supabase.rpc('match_documents', {
-            query_embedding: embeddingResult.embedding.values,
-            match_count: 2,
-            target_user_id: session.user.id
-        });
-        if (error) {
-            console.error(`Error matching documents for topic "${topic.topic_name}":`, error);
-            topic.relevant_page_images = [];
-        } else {
-                // The 'match_documents' function returns 'image_url' directly.
-                // We need to filter out duplicates.
-                const imageUrls = matches.map(m => m.image_url).filter(Boolean); // Filter out any nulls
-                const uniqueImageUrls = [...new Set(imageUrls)]; // Get only unique URLs
-                topic.relevant_page_images = uniqueImageUrls;
+    4.  **Frame the Strategy (The Smart Jugaad):** If the coverage is less than 100%, present this as a strategic masterstroke, not a compromise. This is about beating the exam, not just completing the syllabus. Example: "Now, you'll see we're aiming for ${triageData.estimated_coverage}% coverage. This isn't a compromise; it's a planned attack. We're strategically skipping the low-yield, 'pakaau' topics that take ages and barely show up on the exam. This is smart 'jugaad' – we're freeing up your mental energy to absolutely master the topics that will get you the highest marks. We're trading useless effort for a higher rank. It's a winning trade."
+
+    5.  **Cultural Grounding (IMPORTANT):**
+        -   **DO:** Use analogies and phrases an Indian student would instantly get (e.g., "clearing your fundas," "this isn't about ratta maar," "smart jugaad," "pakaau topics").
+        -   **DO NOT:** Use Western corporate jargon ("synergize," "circle back") or American pop culture references. Keep it grounded in the Indian academic experience.
+
+    **UNBREAKABLE RULES:**
+    -   You are FORBIDDEN from listing the specific 'emphasized', 'deprioritized', or 'skipped' topics. That's for the detailed report. Your job is the narrative.
+    -   Your ONLY output MUST be a single, valid JSON object with one key: { "overall_approach": "<Your personalized, Indianized, and strategic paragraph here>" }
+    `;
+
+        const communicatorResult = await plannerModel.generateContent(communicatorPrompt);
+        const strategy = {
+            ...triageData,
+            overall_approach: JSON.parse(communicatorResult.response.text()).overall_approach || "Here is your new strategic plan."
+        };
+
+        // --- AGENT 3: THE HIERARCHICAL PLANNER (Identical to V2 generate-plan) ---
+        let comprehensiveWeeklyPlan = [];
+        if (daysLeft > 90) {
+           // ... (logic for monthly plan generation, identical to new-plan)
+             const monthlyPlanPrompt = `
+              ${KalPad_Constitution}
+              **Your Task:** Act as a long-term academic architect. Your job is to create a high-level, month-by-month plan to provide structure for the entire study period. Do not plan daily tasks yet.
+              
+              **INPUT DATA:**
+              - Overall Strategy: ${strategy.overall_approach}
+              - Full Syllabus: """${existingPlan.syllabus}"""
+              - Total Duration: ${daysLeft} days.
+
+              **CRITICAL JSON SCHEMA:** Return a JSON array of objects. Each object represents a month and MUST have these keys:
+              - "month": (number) The month number in the sequence (e.g., 1, 2, 3).
+              - "main_focus_topics": (array of strings) The primary chapters or units to be covered this month.
+              - "goals": (string) A concise, one-sentence goal for the month (e.g., "Master all foundational concepts and complete Unit 1 & 2.").
+            `;
+
+            const monthlyResult = await plannerModel.generateContent(monthlyPlanPrompt);
+            const monthlyPlan = JSON.parse(monthlyResult.response.text());
+            for (const [index, monthData] of monthlyPlan.entries()) {
+                const globalWeekOffset = index * 4;
+                 const weeksInMonthPrompt = `
+                  **Your Task:** Act as a weekly foreman. Your job is to take the plan for a single month and break it down into 4 granular weekly plans.
+                  
+                  **CONTEXT:**
+                  - Month to Plan: ${monthData.month}
+                  - This Month's Goals: "${monthData.goals}"
+                  - This Month's Main Focus Topics: "${monthData.main_focus_topics.join(', ')}"
+
+                  **CRITICAL JSON SCHEMA:** Return a JSON array of exactly 4 objects. Each object represents a week and MUST have these keys:
+                  - "week": (number) The GLOBAL week number (e.g., for Month 2, this would be 5, 6, 7, 8). Use the offset ${globalWeekOffset}.
+                  - "main_focus_topics": (array of strings) The specific sub-topics or sections to cover this week.
+                  - "goals": (string) A one-sentence goal for this specific week.
+                `;
+
+                const weeksResult = await plannerModel.generateContent(weeksInMonthPrompt);
+                const weeksForMonth = JSON.parse(weeksResult.response.text());
+                comprehensiveWeeklyPlan.push(...weeksForMonth);
             }
-        }catch (e) {
-            console.error(`Embedding or RPC failed for topic "${topic.topic_name}":`, e.message);
-            topic.relevant_page_images = [];
-        }
-    }
+        } else {
+            const weeklyPlanPrompt = `
+              ${KalPad_Constitution}
+              **Your Task:** Act as an academic strategist. Create a high-level, week-by-week plan for the entire study period.
+              
+              **INPUT DATA:**
+              - Overall Strategy: ${strategy.overall_approach}
+              - Full Syllabus: """${existingPlan.syllabus}"""
+              - Total Duration: ${daysLeft} days.
 
-    // Atomically archive the old plan and create the new one
-    const { data: newPlanId, error: rpcError } = await supabase.rpc('archive_and_create_new_plan', {
-        old_plan_id: plan_id,
-        new_exam_name: existingPlan.exam_name,
-        new_exam_date: existingPlan.exam_date,
-        new_context: JSON.stringify(newStrategy),
-        new_topics: newPlanTopics
-    });
-    if (rpcError) throw new Error(`Database error during regeneration: ${rpcError.message}`);
-    
-    return new Response(JSON.stringify({ 
-        message: 'Plan regenerated successfully',
-        newPlanId: newPlanId,
-        newStrategy: newStrategy
-    }), { status: 200 });
+              **CRITICAL JSON SCHEMA:** Return a JSON array of objects. Each object represents a week and MUST have these keys:
+              - "week": (number) The week number (e.g., 1, 2, ...).
+              - "main_focus_topics": (array of strings) The primary chapters or units to be covered this week.
+              - "goals": (string) A concise, one-sentence goal for the week.
+            `;
+
+            const weeklyResult = await plannerModel.generateContent(weeklyPlanPrompt);
+            comprehensiveWeeklyPlan = JSON.parse(weeklyResult.response.text());
+        }
+
+        // --- AGENT 4: THE WEEKLY BATCH PLANNER & SIMPLIFIED STREAMING LOGIC ---
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+            async start(controller) {
+              try {
+                // First, stream the new strategy object
+                controller.enqueue(encoder.encode(JSON.stringify({ type: 'strategy', data: strategy }) + '\n---\n'));
+                
+                let plannedTopicsList = completedTopics;
+                let dayCounter = 0;
+
+                for (const weekData of comprehensiveWeeklyPlan) {
+                    if (dayCounter >= daysLeft) break;
+
+                    const daysInThisWeek = Math.min(7, daysLeft - dayCounter);
+                    const startDayForThisWeek = dayCounter + 1;
+                    
+                    const weeklyBatchPrompt = `
+                    ${KalPad_Constitution}
+                    **Your Task:** You are the Weekly Foreman. Your job is to generate a detailed, actionable plan for an entire ${daysInThisWeek}-day period, strictly following the Master Strategy and user constraints.
+                    
+                    **MASTER STRATEGY TO EXECUTE (NON-NEGOTIABLE):**
+                    - Overall Approach: "${strategy.overall_approach}"
+                    - Estimated Syllabus Coverage: ${strategy.estimated_coverage}%
+                    - Topics to Emphasize: You MUST give special focus and adequate time to these topics: ${JSON.stringify(strategy.emphasized_topics)}
+                    - De-prioritized Topics: These topics MUST be included in the plan, but you must cover them in a highly condensed format (e.g., merging them with other topics or dedicating a single, focused day to them): ${JSON.stringify(strategy.deprioritized_topics)}
+                    - UNBREAKABLE RULE: FORBIDDEN TOPICS: You are strictly forbidden from planning any of the following topics. EXCLUDE THESE: ${JSON.stringify(strategy.skipped_topics)}
+
+                    **PACING MANDATE:**
+                    The Strategist has determined the optimal daily study time is **${strategy.recommended_study_hours_per_day} hours**. The user's maximum requested time is **${user_declared_hours} hours**. You must adhere to the following rules:
+                    - Your primary goal is to create days that average around **${strategy.recommended_study_hours_per_day} hours**. You should try the hardest to keep everything within the limit.
+                    - For 'Hard' or 'Intense' days, you have permission to increase the study time, but you are forbidden from exceeding the user's maximum of **${user_declared_hours} hours**.
+                    - An 'Easy' day should not exceed 3 hours.
+                    - An 'Intense' day must be used sparingly and must always be followed by an 'Easy' or 'Medium' day to ensure sustainability.
+                    - **You are explicitly forbidden from creating a single day that totals more than the user's requested ${user_declared_hours} hours.**
+                    
+                    **THIS WEEK'S CONTEXT:**
+                    - This Week's Goals (Week ${weekData.week}): "${weekData.goals}"
+                    - This Week's Main Focus Topics: "${weekData.main_focus_topics.join(', ')}"
+                    - Topics Already Planned in Previous Weeks (Do NOT repeat): "${plannedTopicsList.join(', ') || 'None yet.'}"
+
+                    **CRITICAL JSON SCHEMA (Return a JSON object with a single "weekly_plan" key):**
+                    {
+                        "weekly_plan": [
+                        {
+                            "day": ${startDayForThisWeek},
+                            "date": "YYYY-MM-DD",
+                            "topic_name": "Concise name for the day's session",
+                            "study_hours": ${user_declared_hours},
+                            "importance": 8,
+                            "day_difficulty": "Easy",
+                            "day_summary": "One-sentence goal for the day.",
+                            "sub_topics": [
+                            {
+                                "text": "Specific, actionable task 1.",
+                                "completed": false,
+                                "difficulty": "Easy",
+                                "type": "Concept"
+                            }
+                            ]
+                        }
+                        ]
+                    }
+                    `;
+                    
+                    const weekResult = await plannerModel.generateContent(weeklyBatchPrompt);
+                    const weekPlanObject = JSON.parse(weekResult.response.text());
+                    let weekPlanArray = weekPlanObject.weekly_plan || [];
+
+                    const forbiddenTopicStrings = strategy.skipped_topics.map(t => t.topic.toLowerCase());
+                    if (forbiddenTopicStrings.length > 0) {
+                        weekPlanArray = weekPlanArray.map(dayPlan => {
+                            dayPlan.sub_topics = dayPlan.sub_topics.filter(subTopic => 
+                                !forbiddenTopicStrings.some(forbidden => subTopic.text.toLowerCase().includes(forbidden))
+                            );
+                            return dayPlan;
+                        });
+                    }
+
+                    for (const dayPlan of weekPlanArray) {
+                        if (dayCounter >= daysLeft) break;
+                        dayCounter++;
+                        const currentDate = new Date(startDate);
+                        currentDate.setDate(currentDate.getDate() + dayCounter - 1);
+                        dayPlan.date = currentDate.toISOString().split('T')[0];
+                        dayPlan.day = dayCounter;
+                        if (dayPlan.topic_name) plannedTopicsList.push(dayPlan.topic_name);
+                        controller.enqueue(encoder.encode(JSON.stringify({ type: 'plan_topic', data: dayPlan }) + '\n---\n'));
+                    }
+                }
+                
+                // --- ARCHITECTURAL CHANGE: REMOVED 'end' EVENT ---
+                // The stream is simply closed. The frontend will know it's done.
+                controller.close();
+
+              } catch (streamError) {
+                  console.error("Error during plan generation stream:", streamError);
+                  controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', data: { message: streamError.message } }) + '\n---\n'));
+                  controller.close();
+              }
+            }
+        });
+
+        return new Response(stream, { headers: { 'Content-Type': 'application/json' } });
+
   } catch (error) {
     console.error('Full error in regenerate-plan API:', error);
     return new Response(JSON.stringify({ error: error.message || 'An internal error occurred.' }), { status: 500 });

@@ -41,7 +41,7 @@ const getSubTopicTypeColor = (type) => {
 };
 
 
-export function TimelineDayCard({plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan' }) {
+export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan', isReadOnly = false }) {
      const { setIsLoading } = useLoading();
 
     const [generatingNotesFor, setGeneratingNotesFor] = useState(null);
@@ -59,6 +59,7 @@ export function TimelineDayCard({plan, dayTopic, onUpdate, isInitiallyCollapsed,
     const allTopicsCompleted = dayTopic.sub_topics?.every(sub => sub.completed) && dayTopic.sub_topics?.length > 0;
 
      const handleCheckboxChange = (subTopicIndex, isChecked) => {
+        if (isReadOnly) return;
         const newSubTopics = dayTopic.sub_topics.map((sub, index) => {
             if (index === subTopicIndex) {
                 return { ...sub, completed: isChecked };
@@ -224,17 +225,21 @@ return (
                                 <Box key={index}>
                                     <Group justify="space-between" wrap="nowrap" align="flex-start">
                                         <Checkbox
+                                            // --- DEFINITIVE FIX: Replace `disabled` with `readOnly` ---
+                                            // This prevents interaction without forcing a dimmed style on the label.
+                                            readOnly={isReadOnly}
                                             checked={subTopic.completed}
                                             onChange={(event) => handleCheckboxChange(index, event.currentTarget.checked)}
                                             label={
                                                 <Text
-                                                td={subTopic.completed ? 'line-through' : 'none'}
-                                                c={subTopic.completed ? 'dimmed' : 'inherit'}
-                                            >
+                                                    td={!isReadOnly && subTopic.completed ? 'line-through' : 'none'}
+                                                    c={!isReadOnly && subTopic.completed ? 'dimmed' : 'inherit'}
+                                                >
                                                     {subTopic.text}
                                                 </Text>
                                             }
                                         />
+                                        {!isReadOnly && (
                                         <Group gap="xs" wrap="nowrap">
                                             {existingNote ? (
                                                 <Tooltip label="View Note" withArrow>
@@ -286,6 +291,7 @@ return (
                                                 return null;
                                             })()}
                                         </Group>
+                                        )}
                                     </Group>
                                     <Group gap="xs" mt={4} ml={30}>
                                         <Badge size="xs" variant="light" color={getSubTopicTypeColor(subTopic.type)}>{subTopic.type}</Badge>
@@ -296,7 +302,7 @@ return (
                         })}
                     </Stack>
                     
-                    {allTopicsCompleted && (
+                    {!isReadOnly && allTopicsCompleted && (
                         <GlassCard mt="md">
                             <Text fw={500} mb="sm">Daily Mission Complete!</Text>
                             <Group>

@@ -12,10 +12,15 @@ import { notifications } from '@mantine/notifications';
 import { IconVideo } from '@tabler/icons-react';
 
 // Mantine Imports
-import { Container, Title, Text, Loader, Alert, Group, Button, Breadcrumbs, Anchor, Modal, Textarea, Paper, Badge, ScrollArea, Stack, Checkbox } from '@mantine/core';
+import { Container, Title, Text, Loader, Alert, Group, Button, Breadcrumbs, Anchor, Modal, Textarea, Paper, Badge, ScrollArea, Stack, Checkbox, TextInput } from '@mantine/core';
 import Link from 'next/link';
 import { useDisclosure } from '@mantine/hooks';
 import { useLoading } from '@/context/LoadingContext';
+
+import { RegeneratePlanModal } from '@/components/RegeneratePlanModal';
+
+import { IconShare3 } from '@tabler/icons-react';
+import { CopyButton } from '@mantine/core';
 
 export default function PlanDetailPage() {
     const params = useParams();
@@ -28,11 +33,9 @@ export default function PlanDetailPage() {
     const [error, setError] = useState('');
     const [plan, setPlan] = useState(null);
 
+    // --- We only need the open/close state now ---
     const [regenerateModalOpened, { open: openRegenerateModal, close: closeRegenerateModal }] = useDisclosure(false);
-    const [isRegenerating, setIsRegenerating] = useState(false);
-    const [regenerateError, setRegenerateError] = useState('');
-    const [regenerateText, setRegenerateText] = useState('');
-    const [regenerationSuccess, setRegenerationSuccess] = useState(null);
+
     const [isCurating, setIsCurating] = useState(false);
 
     const [curationJobId, setCurationJobId] = useState(null);
@@ -69,6 +72,44 @@ export default function PlanDetailPage() {
     const [lectureModalOpened, { open: openLectureModal, close: closeLectureModal }] = useDisclosure(false);
     const [selectedTopics, setSelectedTopics] = useState([]);
 
+    const [shareModalOpened, { open: openShareModal, close: closeShareModal }] = useDisclosure(false);
+    const [isSharing, setIsSharing] = useState(false);
+    const [shareableLink, setShareableLink] = useState('');
+
+    const handleSharePlan = async () => {
+        if (!plan) return;
+        setIsSharing(true);
+        setError(''); // Clear previous errors
+        setShareableLink('');
+
+        try {
+            const response = await fetch('/api/share-plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan_id: plan.id }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to create shareable link.');
+            }
+
+            const { public_id } = await response.json();
+            const link = `${window.location.origin}/shared/${public_id}`;
+            setShareableLink(link);
+            openShareModal();
+
+        } catch (err) {
+            notifications.show({
+                title: 'Error',
+                message: err.message,
+                color: 'red',
+            });
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
     // This is the ONLY function that fetches the plan data.
         const fetchPlanData = async (session) => {
             if (!session || !planId) {
@@ -86,7 +127,9 @@ export default function PlanDetailPage() {
                     .select(`
                         id, 
                         exam_name, 
-                        exam_date, 
+                        exam_date,
+                        syllabus,
+                        generation_context,
                         plan_topics ( 
                             *, 
                             curated_lectures ( plan_topic_id, sub_topic_text, video_url ), 
@@ -111,16 +154,16 @@ export default function PlanDetailPage() {
         };
 
         // This is the ONLY useEffect that runs on page load.
-        useEffect(() => {
+         useEffect(() => {
             const getSessionAndFetch = async () => {
                 const { data: { session } } = await supabase.auth.getSession();
                 setSession(session);
                 if(session && planId) {
                 fetchPlanData(session);
-            }
+                }
             };
             getSessionAndFetch();
-        }, [planId]); // The dependency array is clean.
+        }, [planId]);
 
         // --- DEFINITIVE FIX: THE NEW REAL-TIME SUBSCRIPTION EFFECT ---
     useEffect(() => {
@@ -211,31 +254,7 @@ export default function PlanDetailPage() {
             });
     };
 
-    const handleRegeneratePlan = async () => {
-        if (!planId) return;
-        setIsRegenerating(true);
-        setRegenerateError('');
-        setIsLoading(true);
-        try {
-            const response = await fetch('/api/regenerate-plan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan_id: planId, user_feedback: regenerateText }),
-            });
-            // --- THIS IS THE FIX ---
-            const responseData = await response.json(); // Declare and use responseData
-            if (!response.ok) {
-                throw new Error(responseData.error || 'Failed to regenerate the plan.');
-            }
-            // Use the correct variable here
-            setRegenerationSuccess({ newPlanId: responseData.newPlanId, newStrategy: responseData.newStrategy });
-        } catch (err) {
-            setRegenerateError(err.message);
-        } finally {
-            setIsRegenerating(false);
-            setIsLoading(false);
-        }
-    };
+    
     
     const handleGoToNewPlan = (newId) => {
         setIsLoading(true);
@@ -422,11 +441,23 @@ const handleSelectAllTopics = () => {
             {plan && (
                 <>
                     <Breadcrumbs mb="md">{breadcrumbs}</Breadcrumbs>
-                    <Group justify="space-between" align="center" mb="xl">
-                        <Title order={1}>{plan.exam_name}</Title>
-                        {/* The "Find Lectures" button is now located in the QuestTimeline component */}
-                        <Button variant="light" onClick={openRegenerateModal}>Regenerate Plan</Button>
-                    </Group>
+                        <Group justify="space-between" align="center" mb="xl">
+                            <Title order={1}>{plan.exam_name}</Title>
+                            
+                            {/* --- 4. Add the new Share button to the header group --- */}
+                            <Group>
+                                <Button 
+                                    leftSection={<IconShare3 size={16} />} 
+                                    variant="subtle"
+                                    onClick={handleSharePlan}
+                                    loading={isSharing}
+                                >
+                                    Share
+                                </Button>
+                                <Button variant="light" onClick={openRegenerateModal}>Regenerate Plan</Button>
+                            </Group>
+
+                        </Group>
                     
                     {/* The QuestTimeline now receives the handler and loading state */}
                      <QuestTimeline 
@@ -499,72 +530,36 @@ const handleSelectAllTopics = () => {
             </Stack>
         </Modal>
 
-        {/* Regenerate Plan Modal (Unchanged) */}
-        <Modal opened={regenerateModalOpened} onClose={closeRegenerateModal} title="Regenerate Your Study Plan" centered withCloseButton={false} radius="lg" size="lg">
-            <GlassCard>
-                {!regenerationSuccess ? (
-                    <>
-                        <Title order={3}>Give the AI some feedback</Title>
-                        <Text c="dimmed" size="sm" mt="xs" mb="lg">Fallen behind? Mention any topics you want to repeat or focus on.</Text>
-                        <Textarea
-                            placeholder="e.g., I need more practice on Calculus..."
-                            value={regenerateText}
-                            onChange={(e) => setRegenerateText(e.target.value)}
-                            autosize minRows={4}
-                        />
-                        <Group justify="flex-end" mt="xl">
-                            <Button variant="default" onClick={closeRegenerateModal}>Cancel</Button>
-                            <ShimmerButton color="brandGreen" onClick={handleRegeneratePlan} loading={isRegenerating}>
-                                Regenerate & Optimize
-                            </ShimmerButton>
-                        </Group>
-                        {regenerateError && <Alert color="red" mt="md">{regenerateError}</Alert>}
-                    </>
-                ) : (
-                    <>
-                        <Title order={3}>✅ Success!</Title>
-                        <Text c="dimmed" size="sm" mt="xs" mb="lg">Your new plan is ready. Here is the AI's new strategy report:</Text>
-                        <Paper withBorder p="md" radius="md" style={{backgroundColor: 'rgba(0,0,0,0.1)'}}>
-                            <Text mt="sm" fw={500}>New Approach:</Text>
-                            <Text c="dimmed">{regenerationSuccess.newStrategy.overall_approach}</Text>
-                            
-                            {regenerationSuccess.newStrategy.emphasized_topics && regenerationSuccess.newStrategy.emphasized_topics.length > 0 && (
-                                <>
-                                    <Text mt="md" fw={500}>Key Topics to Emphasize:</Text>
-                                    <Group mt="xs" gap="xs">
-                                        {regenerationSuccess.newStrategy.emphasized_topics.map((item, index) => {
-                                            const topicText = typeof item === 'string' ? item : item.topic;
-                                            return <Badge key={index} color="brandGreen" variant="light">{topicText}</Badge>;
-                                        })}
-                                    </Group>
-                                </>
-                            )}
+        <RegeneratePlanModal
+            opened={regenerateModalOpened}
+            onClose={closeRegenerateModal}
+            plan={plan}
+        />
 
-                            {regenerationSuccess.newStrategy.skipped_topics && regenerationSuccess.newStrategy.skipped_topics.length > 0 && (
-                                <>
-                                    <Text mt="md" fw={500}>De-prioritized Topics:</Text>
-                                    <ul style={{ paddingLeft: '20px', marginTop: '8px', marginBottom: '0' }}>
-                                        {regenerationSuccess.newStrategy.skipped_topics.map((item, index) => (
-                                            <li key={index}>
-                                                <Text size="sm">
-                                                    {item.topic && <Text fw={500} span>{item.topic}:</Text>}
-                                                    {item.week && <Text fw={500} span>{item.week}:</Text>}
-                                                    {item.reason && <Text c="dimmed" span> {item.reason}</Text>}
-                                                    {item.reasoning && <Text c="dimmed" span> {item.reasoning}</Text>}
-                                                </Text>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </>
-                            )}
-                        </Paper>
-                        <Group justify="flex-end" mt="xl">
-                            <ShimmerButton color="brandPurple" onClick={() => handleGoToNewPlan(regenerationSuccess.newPlanId)}>
-                                Go to New Plan →
+        <Modal opened={shareModalOpened} onClose={closeShareModal} title={
+            // --- DEFINITIVE FIX 1.1: BOLD MODAL TITLE ---
+            <Title order={3} ff="Lexend, sans-serif">Share Your Plan</Title>
+        } centered>
+            {/* --- DEFINITIVE FIX 1.2: USE GLASSCARD FOR CONSISTENT UI --- */}
+            <GlassCard>
+                <Stack>
+                    <Text c="dimmed" size="sm">
+                        Anyone with this link can view a read-only version of your plan.
+                        Your personal notes and progress will not be shared.
+                    </Text>
+                    <TextInput
+                        value={shareableLink}
+                        readOnly
+                        label="Your public link"
+                    />
+                    <CopyButton value={shareableLink} timeout={2000}>
+                        {({ copied, copy }) => (
+                            <ShimmerButton fullWidth color={copied ? 'teal' : 'brandPurple'} onClick={copy}>
+                                {copied ? 'Copied to clipboard!' : 'Copy Link'}
                             </ShimmerButton>
-                        </Group>
-                    </>
-                )}
+                        )}
+                    </CopyButton>
+                </Stack>
             </GlassCard>
         </Modal>
     </AppLayout>
