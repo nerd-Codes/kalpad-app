@@ -71,7 +71,7 @@ export async function POST(request) {
 
     // --- STAGE 1: THE OUTLINER AGENT ---
     const outlinePrompt = `
-      You are an academic author creating an outline for a study chapter. Be precise and logical.
+      You are an expert curriculum designer and master educator. Your task is to create the perfect skeleton—a detailed, pedagogical outline—for a self-contained study chapter. Your #1 priority is creating a logical flow that is perfectly tailored to the student's level.
       
       **Full Context:**
       - Exam: "${exam_name}"
@@ -80,8 +80,22 @@ export async function POST(request) {
       
       Reference Material: Provided as multimodal input (text and images).
       
-      Based on ALL of this context, create a detailed, structured outline for a comprehensive chapter on the specific sub-topic. Output ONLY the outline.`;
-    const outlineResult = await model.generateContent([outlinePrompt, ...imageParts]);
+      **UNBREAKABLE RULE: AUDIENCE AWARENESS IS CRITICAL.** The "Exam" context is your primary guide. An outline for "Class 10th Boards" must be simpler and more focused on fundamentals than an outline for "UPSC Mains" or "GATE Electronics". You MUST adjust the depth and complexity of the outline sections accordingly.
+      
+      **TASK:**
+      Based on ALL the provided context, create a detailed, structured outline for a comprehensive chapter on the specific sub-topic. 
+      
+      A good outline often includes:
+      - A brief introduction to the concept.
+      - A breakdown of the core principles or components.
+      - A section for key formulas or derivations (if applicable).
+      - A section for practical examples or applications.
+      - A concluding summary.
+      
+      **OUTPUT FORMAT:**
+      Output ONLY a structured Markdown outline (using ### for sections). This outline will be given to another AI to write the full chapter, so its clarity and logical flow are paramount.
+      `;
+      const outlineResult = await model.generateContent([outlinePrompt, ...imageParts]);
     const chapterOutline = outlineResult.response.text();
 
     // --- STAGE 2: THE VALIDATION GATE ---
@@ -91,12 +105,14 @@ export async function POST(request) {
 
     // --- STAGE 3: THE AUTHOR AGENT ---
      const authorPrompt = `
-      You are an expert academic author. Your task is to write a comprehensive, self-contained study chapter.
+      You are a world-class academic author and educator. Your writing style is the perfect balance between a university textbook and a brilliant, clear tutor. Your primary goal is to write a comprehensive, self-contained study chapter that is so clear a student can fully understand the topic from this note alone.
       
       **Full Context:**
       - Exam: "${exam_name}"
       - Main Chapter Topic: "${day_topic}"
       - Specific Sub-Topic to Write About: "${sub_topic_text}"
+      
+      **UNBREAKABLE RULE #1: AUDIENCE IS EVERYTHING.** The "Exam" context is your most important filter. A note for "Class 10th Physics" MUST be simpler, use more basic analogies, and avoid complex graphs compared to a note for "Undergraduate Quantum Mechanics". You must tailor the depth, examples, and tone to this specific audience.
       
       **Chapter Outline You MUST Follow Exactly:**
       ---
@@ -105,38 +121,38 @@ export async function POST(request) {
       
       Reference Material & Images: Provided as multimodal input.
       
-      **CRITICAL INSTRUCTIONS:**
-      1.  Write the full chapter by meticulously following the provided outline. Do not deviate.
-      2.  Format the output in beautiful, clean Markdown.
-      3.  Use LaTeX for all mathematical equations. Use single dollar signs ($...$) for inline math and double dollar signs ($$...$$) for block-level math.
-      4.  Conclude the chapter with a "Key Takeaways" summary section.
-      5.  **UNBREAKABLE RULE: No Redundant Titles.** The user is already seeing the "Main Chapter Topic" and the "Specific Sub-Topic" in the application's UI. Your response must NOT repeat them as a title or subtitle. Begin the note directly with the first point of the outline (e.g., start with "### I. Introduction to...").
+      **CRITICAL INSTRUCTIONS FOR NOTE QUALITY:**
+      1.  **Follow the Outline:** Meticulously follow the provided outline. Do not deviate.
+      2.  **Textbook Quality:** Write with clarity, precision, and authority. Ensure end-to-end coverage of the concepts listed in the outline.
+      3.  **Use Analogies & Examples:** Where appropriate, use simple analogies and real-world examples to make complex topics relatable and memorable for the target audience.
+      4.  **Include Practice Questions:** Conclude the chapter with a "Check Your Understanding" section containing 2-3 conceptual questions that test the core ideas of the note. This is mandatory.
+      5.  **Formatting:** Use beautiful, clean Markdown. Use LaTeX for all mathematical equations ($...$ for inline, $$...$$ for block-level).
+      6.  **No Redundant Titles:** Your response must NOT repeat the main topic or sub-topic as a title. Begin directly with the first point of the outline (e.g., "### I. Introduction...").
 
       **LATEX STYLE GUIDE (UNBREAKABLE RULES FOR KATEX COMPATIBILITY):**
-      - **For Matrices:** NEVER use the \`\\begin{vmatrix}\` environment. ALWAYS use the capitalized version: \`\\begin{Vmatrix}\` ... \`\\end{Vmatrix}\`. This is a non-negotiable compatibility requirement.
+      - **For Matrices:** ALWAYS use the capitalized version: \`\\begin{Vmatrix}\` ... \`\\end{Vmatrix}\`.
       - **Special Characters:** Inside any math block, you MUST escape standalone percentage signs like this: \`\\%\`.
-      - **Clarity:** Ensure all brackets and delimiters are correctly matched (e.g., \`\\left( ... \\right)\`).
+      - **Clarity:** Ensure all brackets and delimiters are correctly matched.
     
-     **ILLUSTRATION MANDATE (WITH COMPLEXITY BUDGET):**
-      When a visual plot is critical for explaining a core concept, you MUST insert an 'Illustration Placeholder'.
-      - **Budget:** You have a very low budget of illustrations per note. Use them only for the most important visual concepts. Do not generate multiple plots for slight variations of the same function.
-      - **Placement:** Insert the placeholder immediately after the paragraph that explains the concept the plot will illustrate.
-      - **Supported Engines:** 'matplotlib' for plots, 'mermaid' for flowcharts.
+     **ILLUSTRATION & DIAGRAMS (STRICT GUIDELINES):**
+      Your goal is to be a brilliant author, not just a graph generator.
+      1.  **UNBREAKABLE RULE #2: EXTREME CONSERVATISM.** Illustrations are a high-cost feature. You must only request one if a core concept is **truly impossible** to explain clearly with text and examples alone.
+      2.  **UNBREAKABLE RULE #3: SUPPORTED ENGINES ONLY.** You are authorized to use ONLY two engines: **'mermaid'** for flowcharts/diagrams and **'matplotlib'** for graphs/plots.** Do not request any other type of illustration.
+      3.  **Placement:** Insert the placeholder immediately after the paragraph that explains the concept.
       
+      Example for a Flowchart:
+      \`\`\`kalpad-illustration
+      {
+        "engine": "mermaid",
+        "description": "A simple flowchart that starts at A, goes to a process B, and ends at C. It must be appropriate for the audience's level."
+      }
+      \`\`\`
+
       Example for a Plot:
       \`\`\`kalpad-illustration
       {
         "engine": "matplotlib",
-        "description": "A plot of y = sin(x) from 0 to 2*pi, demonstrating one full period of a sine wave."
-      }
-      \`\`\`
-
-
-      Example for a Flowchart (mermaid):
-      \`\`\`kalpad-illustration
-      {
-        "engine": "mermaid",
-        "description": "A simple flowchart that starts at A, goes to a process B, and ends at C."
+        "description": "A simple plot of y = sin(x) from 0 to 2*pi, demonstrating one full period of a sine wave. It must be essential for understanding."
       }
       \`\`\`
       `;

@@ -216,7 +216,7 @@ export default function DashboardPage() {
             <Title order={1} ff="Lexend, sans-serif">Dashboard</Title>
             <Text c="dimmed" mb="xl">Welcome back! Here's your mission control for academic success.</Text>
             
-            {loading && <Group justify="center" py="xl"><Loader /></Group>}
+            {loading && <Group justify="center" py="xl"><Loader color="rgba(255, 255, 255, 1)"/></Group>}
             {error && <Alert color="red" title="Error" mb="xl" withCloseButton onClose={() => setError('')}>{error}</Alert>}
 
             {!loading && (

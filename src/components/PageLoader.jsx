@@ -8,34 +8,39 @@ import classes from './PageLoader.module.css';
 
 export function PageLoader({ isLoading }) {
   const [factIndex, setFactIndex] = useState(0);
+  const [showFact, setShowFact] = useState(false);
+  
   const intervalRef = useRef(null);
+  const timeoutRef = useRef(null);
 
-  // --- THIS IS THE FIX ---
-  // This effect is responsible for starting and stopping the timer.
   useEffect(() => {
-    // If the loader becomes visible, start the interval
     if (isLoading) {
-      // Set an initial random fact
+      // 1. Immediately reset state and set the initial fact for the cycle
+      setShowFact(false);
       setFactIndex(Math.floor(Math.random() * wittyFacts.length));
       
+      // 2. Schedule the witty fact to appear after 5 seconds
+      timeoutRef.current = setTimeout(() => {
+        setShowFact(true);
+      }, 5000);
+
+      // 3. Start the interval to cycle through subsequent facts
       intervalRef.current = setInterval(() => {
-        // Just update the index. The text will be derived from this.
         setFactIndex(prevIndex => (prevIndex + 1) % wittyFacts.length);
-      }, 5000); // Change fact every 5 seconds
+      }, 5000);
+
     } else {
-      // If the loader is hidden, clear the interval
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      // If the loader is hidden early, clear all timers to prevent state updates
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     }
 
-    // Cleanup function to clear the interval when the component unmounts
+    // Main cleanup function for when the component unmounts
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isLoading]); // This effect depends ONLY on the isLoading prop
+  }, [isLoading]);
 
   const fact = wittyFacts[factIndex];
 
@@ -49,19 +54,27 @@ export function PageLoader({ isLoading }) {
           className={classes.loaderOverlay}
         >
           <div className={classes.content}>
+            {/* The floating logo animation appears immediately via CSS */}
             <div className={classes.logo}>
               KalPad
             </div>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={fact} // The key now correctly changes, triggering the animation
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } }}
-                exit={{ opacity: 0, y: -10, transition: { duration: 0.4, ease: 'easeIn' } }}
-              >
-                <Text c="dimmed" ta="center">{fact}</Text>
-              </motion.div>
-            </AnimatePresence>
+            
+            {/* This container ensures the layout is stable and reserves space */}
+            <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+              <AnimatePresence mode="wait">
+                {/* The witty fact is conditionally rendered after 5 seconds */}
+                {showFact && (
+                  <motion.div
+                    key={fact}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } }}
+                    exit={{ opacity: 0, y: -10, transition: { duration: 0.4, ease: 'easeIn' } }}
+                  >
+                    <Text c="dimmed" ta="center">{fact}</Text>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </motion.div>
       )}

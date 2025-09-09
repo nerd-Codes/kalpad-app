@@ -9,7 +9,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: rgba(10, 10, 15, 0.5); /* Darker, more focused bg */
+    background-color: rgba(10, 10, 15, 0.5);
     backdrop-filter: blur(10px);
     z-index: 9999;
 }
@@ -19,6 +19,10 @@
     flex-direction: column;
     align-items: center;
     gap: 1.5rem;
+    width: 100%;
+    /* The critical fix for mobile padding is preserved */
+    padding: 0 var(--mantine-spacing-md);
+    box-sizing: border-box;
 }
 
 .logo {
@@ -26,18 +30,11 @@
     font-size: 2.5rem;
     font-weight: 700;
     color: white;
-    /* The Glow Effect */
-    /* text-shadow: 
-        0 0 5px #fff,
-        0 0 10px #fff,
-        0 0 20px var(--mantine-color-brandPurple-4),
-        0 0 30px var(--mantine-color-brandPurple-4),
-        0 0 40px var(--mantine-color-brandPurple-4); */
-    
-    /* The subtle float animation */
+    /* The restored float animation */
     animation: float 3s ease-in-out infinite;
 }
 
+/* The restored keyframes for the float animation */
 @keyframes float {
 	0% {
 		transform: translateY(0px);

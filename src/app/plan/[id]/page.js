@@ -435,7 +435,7 @@ const handleSelectAllTopics = () => {
     return (
     <AppLayout session={session}>
         <Container>
-            {loading && <Group justify="center" py="xl"><Loader /></Group>}
+            {loading && <Group justify="center" py="xl"><Loader color="rgba(255, 255, 255, 1)"/></Group>}
             {error && <Alert color="red" title="Error">{error}</Alert>}
             
             {plan && (
