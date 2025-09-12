@@ -146,6 +146,12 @@ export default function PlanDetailPage() {
                 
                 data.plan_topics.sort((a, b) => a.day - b.day);
                 setPlan(data);
+
+                if (window.Android && typeof window.Android.cachePlanForOffline === 'function') {
+                    console.log("Android bridge detected. Caching plan for offline access.");
+                    // We pass the entire fetched plan object as a JSON string to the native side.
+                    window.Android.cachePlanForOffline(JSON.stringify(data));
+                }
             } catch (err) {
                 setError(err.message);
             } finally {
