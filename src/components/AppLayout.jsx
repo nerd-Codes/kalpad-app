@@ -1,11 +1,12 @@
 // src/components/AppLayout.jsx
 "use client";
 
-import { AppShell, Burger, Group, NavLink, Text, Menu, Avatar, rem, UnstyledButton, ActionIcon, Stack, Title } from '@mantine/core';
+import { AppShell, Burger, Group, NavLink, Text, Menu, Avatar, rem, UnstyledButton, ActionIcon, Stack, Title, Paper, SimpleGrid, Box } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLoading } from '@/context/LoadingContext';
 import supabase from '@/lib/supabaseClient';
+import { AnimatePresence, motion } from 'framer-motion'; // <-- DEFINITIVE ADDITION #1: Import animation tools
 import { 
     IconLayoutDashboard, 
     IconFileText, 
@@ -18,20 +19,17 @@ import {
     IconChartBar,
 } from '@tabler/icons-react';
 
-// --- SUB-COMPONENT: UserButton ---
+// --- SUB-COMPONENT: UserButton (Unchanged) ---
 function UserButton({ user, desktopOpened, onSignOut }) {
+    // ... (This component's code is unchanged)
     const userInitials = user?.email?.substring(0, 2).toUpperCase() || 'KP';
-
     return (
         <Menu shadow="md" width={220} position="top-end" withArrow>
             <Menu.Target>
                 <UnstyledButton
                     style={(theme) => ({
-                        display: 'block',
-                        width: '100%',
-                        padding: theme.spacing.md,
-                        color: theme.colors.dark[0],
-                        borderRadius: theme.radius.md,
+                        display: 'block', width: '100%', padding: theme.spacing.md,
+                        color: theme.colors.dark[0], borderRadius: theme.radius.md,
                         '&:hover': { backgroundColor: theme.colors.dark[5] },
                     })}
                 >
@@ -47,27 +45,18 @@ function UserButton({ user, desktopOpened, onSignOut }) {
                 </UnstyledButton>
             </Menu.Target>
             <Menu.Dropdown>
-                <Menu.Item leftSection={<IconUser style={{ width: rem(14), height: rem(14) }} />}>
-                    <Text c ="dimmed">Profile</Text>
-                </Menu.Item>
-                 <Menu.Item leftSection={<IconSettings style={{ width: rem(14), height: rem(14) }} />}>
-                    <Text c ="dimmed">Settings</Text>
-                </Menu.Item>
+                <Menu.Item leftSection={<IconUser style={{ width: rem(14), height: rem(14) }} />} disabled>Profile</Menu.Item>
+                <Menu.Item leftSection={<IconSettings style={{ width: rem(14), height: rem(14) }} />} disabled>Settings</Menu.Item>
                 <Menu.Divider />
-                <Menu.Item
-                    color="red"
-                    leftSection={<IconLogout style={{ width: rem(14), height: rem(14) }} />}
-                    onClick={onSignOut}
-                >
-                    Sign Out
-                </Menu.Item>
+                <Menu.Item color="red" leftSection={<IconLogout style={{ width: rem(14), height: rem(14) }} />} onClick={onSignOut}>Sign Out</Menu.Item>
             </Menu.Dropdown>
         </Menu>
     );
 }
 
-// --- SUB-COMPONENT: MainNavbar ---
+// --- SUB-COMPONENT: MainNavbar for Sidebar (Unchanged) ---
 function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
+    // ... (This component's code is unchanged)
     const pathname = usePathname();
     const navLinks = [
         { icon: IconLayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -75,7 +64,6 @@ function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
         { icon: IconPlus, label: 'New Plan', href: '/new-plan' },
         { icon: IconChartBar, label: 'Analytics', href: '#', disabled: true },
     ];
-    
     return (
         <Stack justify="space-between" h="100%">
             <Stack>
@@ -85,7 +73,6 @@ function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
                         {desktopOpened ? <IconChevronLeft size={18} /> : <IconChevronRight size={18} />}
                     </ActionIcon>
                 </Group>
-                
                 {navLinks.map((link) => (
                     <NavLink
                         key={link.label + (desktopOpened ? '-full' : '-mini')}
@@ -96,16 +83,13 @@ function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
                         disabled={link.disabled}
                         variant="filled"
                         styles={(theme) => ({
-                            root: {
-                                borderRadius: theme.radius.md,
-                                padding: rem(12),
-                                justifyContent: desktopOpened ? 'flex-start' : 'center',
-                                '&[dataActive': {
+                            root: { borderRadius: theme.radius.md, padding: rem(12), justifyContent: desktopOpened ? 'flex-start' : 'center',
+                                '&[data-active]': {
                                    backgroundColor: theme.colors.brandPurple[6],
                                    color: 'white',
                                    '&:hover': { backgroundColor: theme.colors.brandPurple[6] }
                                 },
-                            },
+                             },
                             label: { fontSize: theme.fontSizes.md, fontWeight: 500, fontFamily: 'var(--font-lexend)' },
                         })}
                     />
@@ -115,63 +99,124 @@ function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
     );
 }
 
-// --- MAIN LAYOUT COMPONENT ---
+// --- DEFINITIVE ADDITION: THE RE-ARCHITECTED BOTTOM NAVIGATION BAR ---
+function BottomNavbar({ user, onNavigate, onSignOut }) {
+    const pathname = usePathname();
+    const userInitials = user?.email?.substring(0, 2).toUpperCase() || 'KP';
+    
+    const navLinks = [
+        { icon: IconLayoutDashboard, label: 'Dashboard', href: '/dashboard' },
+        { icon: IconPlus, label: 'New Plan', href: '/new-plan' },
+        { icon: IconFileText, label: 'All Plans', href: '/plans' },
+    ];
+
+    return (
+        <Paper 
+            p="xs" shadow="xl" radius={0}
+            style={{ position: 'fixed', bottom: 0, left: 0, right: 0,
+                backgroundColor: 'rgba(37, 38, 43, 0.8)', backdropFilter: 'blur(10px)',
+                borderTop: '1px solid var(--mantine-color-dark-5)', zIndex: 1000,
+            }}
+            hiddenFrom="sm"
+        >
+            <SimpleGrid cols={4} spacing={0}>
+                {navLinks.map((link) => {
+                    const isActive = pathname === link.href;
+                    return (
+                        <UnstyledButton key={link.label} onClick={() => onNavigate(link.href)}>
+                            {/* --- DEFINITIVE FIX #1: The "Purple Pill" --- */}
+                            <Box 
+                                style={{
+                                    borderRadius: 'var(--mantine-radius-md)',
+                                    padding: 'var(--mantine-spacing-xs)',
+                                    backgroundColor: isActive ? 'var(--mantine-color-brandPurple-6)' : 'transparent',
+                                    transition: 'background-color 0.2s ease',
+                                }}
+                            >
+                                <Stack align="center" gap={2}>
+                                    <link.icon 
+                                        size="1.5rem" 
+                                        stroke={1.5} 
+                                        color={isActive ? 'white' : 'var(--mantine-color-gray-5)'}
+                                    />
+                                    <Text 
+                                        size="xs" 
+                                        c={isActive ? 'white' : 'gray.5'}
+                                    >
+                                        {link.label}
+                                    </Text>
+                                </Stack>
+                            </Box>
+                        </UnstyledButton>
+                    );
+                })}
+                {/* Profile Menu Button (Unchanged) */}
+                <Menu shadow="md" width={220} position="top-end" withArrow>
+                    <Menu.Target>
+                        <UnstyledButton>
+                            <Box style={{ borderRadius: 'var(--mantine-radius-md)', padding: 'var(--mantine-spacing-xs)' }}>
+                                <Stack align="center" gap={2}>
+                                    <Avatar color="brandPurple" radius="xl" size="sm">{userInitials}</Avatar>
+                                    <Text size="xs" c="gray.5">Profile</Text>
+                                </Stack>
+                            </Box>
+                        </UnstyledButton>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                        <Menu.Item leftSection={<IconUser style={{ width: rem(14), height: rem(14) }} />} disabled>Profile</Menu.Item>
+                        <Menu.Divider />
+                        <Menu.Item color="red" leftSection={<IconLogout style={{ width: rem(14), height: rem(14) }} />} onClick={onSignOut}>Sign Out</Menu.Item>
+                    </Menu.Dropdown>
+                </Menu>
+            </SimpleGrid>
+        </Paper>
+    );
+}
+
+// --- MAIN LAYOUT COMPONENT (RE-ARCHITECTED FOR ANIMATIONS) ---
 export default function AppLayout({ children, session }) {
-  const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
-  const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
-  const router = useRouter();
-  const { setIsLoading } = useLoading();
-  const pathname = usePathname();
+    const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
+    const router = useRouter();
+    const { setIsLoading } = useLoading();
+    const pathname = usePathname();
 
-  const handleNavigation = (path) => {
-    if (pathname === path || path === '#') return;
-    setIsLoading(true);
-    router.push(path);
-    if(mobileOpened) toggleMobile();
-  };
-  
-  const handleSignOut = () => {
-      supabase.auth.signOut().then(() => handleNavigation('/'));
-  };
+    const handleNavigation = (path) => {
+        if (pathname === path || path === '#') return;
+        setIsLoading(true);
+        router.push(path);
+    };
+    
+    const handleSignOut = () => {
+        supabase.auth.signOut().then(() => handleNavigation('/'));
+    };
 
-  const headerGlass = {
-    backgroundColor: 'rgba(23, 24, 28, 0.6)',
-    backdropFilter: 'blur(16px)',
-    border: 'none',
-  };
-  
-  const navbarGlass = {
-    backgroundColor: 'rgba(37, 38, 43, 0.5)', 
-    backdropFilter: 'blur(16px)',
-    borderRight: '1px solid var(--mantine-color-dark-5)',
-    transition: 'width 200ms ease-in-out',
-  };
+    const headerGlass = { backgroundColor: 'rgba(23, 24, 28, 0.6)', backdropFilter: 'blur(16px)', border: 'none' };
+    const navbarGlass = { backgroundColor: 'rgba(37, 38, 43, 0.5)', backdropFilter: 'blur(16px)', borderRight: '1px solid var(--mantine-color-dark-5)', transition: 'width 200ms ease-in-out' };
 
-  // --- DEFINITIVE FIX: Conditionally define the navbar configuration ---
-  // If there is no session, the entire navbar object is null, so it will not be rendered.
-  const navbarConfig = session ? { 
-    width: desktopOpened ? 280 : 80, 
-    breakpoint: 'sm', 
-    collapsed: { mobile: !mobileOpened } 
-  } : null;
+    if (!session) {
+      // Non-logged-in layout is unchanged
+      return (
+          <AppShell header={{ height: 70 }} padding="md">
+              <AppShell.Header style={headerGlass}>
+                  <Group h="100%" px="lg"><Title order={2} ff="Lexend, sans-serif">KalPad</Title></Group>
+              </AppShell.Header>
+              <AppShell.Main>{children}</AppShell.Main>
+          </AppShell>
+      );
+  }
 
   return (
     <AppShell
       header={{ height: 70 }}
-      navbar={navbarConfig} // Pass the conditional config object here
+      navbar={{ width: desktopOpened ? 280 : 80, breakpoint: 'sm', collapsed: { mobile: true, desktop: false } }}
       padding="md"
+      style={{ paddingBottom: '80px' }}
     >
       <AppShell.Header style={headerGlass}>
-        <Group h="100%" px="lg">
-          {/* The Burger is now only rendered if a session exists, preventing a useless button */}
-          {session && <Burger opened={mobileOpened} onClick={toggleMobile} hiddenFrom="sm" size="sm" />}
-          <Title order={2} ff="Lexend, sans-serif">KalPad</Title>
-        </Group>
+        <Group h="100%" px="lg"><Title order={2} ff="Lexend, sans-serif">KalPad</Title></Group>
       </AppShell.Header>
 
-      {/* Conditionally render the entire Navbar component */}
-      {session && (
-        <AppShell.Navbar p="md" style={navbarGlass}>
+      <AppShell.Navbar p="md" style={navbarGlass} visibleFrom="sm">
           <MainNavbar 
               desktopOpened={desktopOpened}
               toggleDesktop={toggleDesktop}
@@ -182,12 +227,28 @@ export default function AppLayout({ children, session }) {
               desktopOpened={desktopOpened}
               onSignOut={handleSignOut}
           />
-        </AppShell.Navbar>
-      )}
+      </AppShell.Navbar>
 
       <AppShell.Main>
-        {children}
+          {/* --- DEFINITIVE FIX #2: PAGE TRANSITION ANIMATIONS --- */}
+          <AnimatePresence mode="wait">
+              <motion.div
+                  key={pathname} // This key is critical for AnimatePresence to detect page changes
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+              >
+                  {children}
+              </motion.div>
+          </AnimatePresence>
       </AppShell.Main>
+
+      <BottomNavbar 
+          user={session?.user}
+          onNavigate={handleNavigation}
+          onSignOut={handleSignOut}
+      />
     </AppShell>
   );
 }
