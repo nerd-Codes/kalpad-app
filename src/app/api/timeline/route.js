@@ -54,34 +54,6 @@ export async function GET(request) {
 
     if (error) throw new Error(error.message);
 
-    // --- DEFINITIVE ADDITION #2: THE PROACTIVE TRIGGER LOGIC ---
-    let triggerNativeAction = null;
-    const userAgent = headers().get('user-agent') || '';
-
-    // Check if the request is from our Android app AND if there are tasks for today.
-    if (userAgent.includes('KalPad-Android-App') && data && data.length > 0) {
-        const firstPlanForDay = data[0];
-        const firstTopic = firstPlanForDay.plan_topics[0];
-        const firstSubTopic = firstTopic.sub_topics[0];
-
-        if (firstSubTopic) {
-            // Set a reminder for 9 AM on the day of the task.
-            const reminderDate = new Date(targetDate);
-            reminderDate.setHours(9, 0, 0, 0);
-
-            // Only set a reminder if it's in the future.
-            if (reminderDate.getTime() > new Date().getTime()) {
-                triggerNativeAction = {
-                    type: "SET_REMINDER",
-                    details: {
-                        title: `Today's Mission: ${firstPlanForDay.exam_name}`,
-                        message: `Your first task is: ${firstSubTopic.text}`,
-                        timestamp: reminderDate.getTime(),
-                    }
-                };
-            }
-        }
-    }
 
     // --- DEFINITIVE ADDITION #3: THE NEW RESPONSE STRUCTURE ---
     // We now wrap our response in an object to include the optional trigger.

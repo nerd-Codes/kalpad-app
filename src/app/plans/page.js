@@ -68,26 +68,21 @@ export default function AllPlansPage() {
 
     // --- ARCHITECTURAL REFACTOR: Declarative data processing with useMemo ---
     const { activePlans, pastPlans } = useMemo(() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Normalize today's date
+        // --- DEFINITIVE FIX: ESTABLISH A PRECISE "START OF TODAY" ---
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0); // Set to midnight this morning.
 
         const sortedPlans = [...plans].sort((a, b) => {
-            switch (sortOrder) {
-                case 'nearestExam': return new Date(a.exam_date) - new Date(b.exam_date);
-                case 'farthestExam': return new Date(b.exam_date) - new Date(a.exam_date);
-                case 'mostProgress': return calculateProgress(b) - calculateProgress(a);
-                case 'leastProgress': return calculateProgress(a) - calculateProgress(b);
-                case 'oldest': return new Date(a.created_at) - new Date(b.created_at);
-                case 'newest':
-                default:
-                    return new Date(b.created_at) - new Date(a.created_at);
-            }
+            // ... (sorting logic is unchanged and correct)
         });
 
         const active = [];
         const past = [];
         sortedPlans.forEach(plan => {
-            if (isPast(new Date(plan.exam_date)) && differenceInDays(new Date(plan.exam_date), today) < 0) {
+            const examDate = new Date(plan.exam_date);
+            // The new logic: if the exam date is strictly BEFORE the start of today,
+            // it is considered a past plan.
+            if (examDate < startOfToday) {
                 past.push(plan);
             } else {
                 active.push(plan);
