@@ -30,20 +30,17 @@ async function getAuthenticatedUser(request) {
 
 export async function GET(request) {
   try {
-    // 1. Authorize the user using our new universal function
     const user = await getAuthenticatedUser(request);
     if (!user) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
     }
 
-    // 2. Get the target date (Unchanged)
     const { searchParams } = new URL(request.url);
     const targetDate = searchParams.get('date');
     if (!targetDate) {
       return new Response(JSON.stringify({ error: 'Date parameter is required' }), { status: 400 });
     }
 
-    // 3. Fetch the plan data (Unchanged)
     const supabase = createRouteHandlerClient({ cookies });
     const { data, error } = await supabase
       .from('study_plans')
@@ -54,9 +51,10 @@ export async function GET(request) {
 
     if (error) throw new Error(error.message);
 
+    // --- DEFINITIVE FIX: DECLARE THE VARIABLE ---
+    // This ensures the variable always exists, even though we are not populating it.
+    let triggerNativeAction = null; 
 
-    // --- DEFINITIVE ADDITION #3: THE NEW RESPONSE STRUCTURE ---
-    // We now wrap our response in an object to include the optional trigger.
     const responsePayload = {
         plans: data,
         triggerNativeAction: triggerNativeAction

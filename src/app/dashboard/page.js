@@ -251,7 +251,7 @@ export default function DashboardPage() {
                         <Title order={2} ff="Lexend, sans-serif">Today's Mission</Title>
                         <GlassCard>
                             <DatePicker selectedDate={selectedDate} setSelectedDate={setSelectedDate} examDates={examDates} />
-                            {timelineLoading && <Group justify="center" py="xl"><Loader /></Group>}
+                            {timelineLoading && <Group justify="center" py="xl"><Loader color="rgba(255, 255, 255, 1)"/></Group>}
                             {!timelineLoading && dailyTasks.length === 0 && (
                                 <Text ta="center" c="dimmed" py="md">Nothing scheduled for this day. Enjoy your break!</Text>
                             )}
