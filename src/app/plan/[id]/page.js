@@ -9,7 +9,7 @@ import { QuestTimeline } from '@/components/QuestTimeline';
 import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { notifications } from '@mantine/notifications';
-import { IconVideo } from '@tabler/icons-react';
+
 
 // Mantine Imports
 import { Container, Title, Text, Loader, Alert, Group, Button, Breadcrumbs, Anchor, Modal, Textarea, Paper, Badge, ScrollArea, Stack, Checkbox, TextInput } from '@mantine/core';
@@ -19,8 +19,9 @@ import { useLoading } from '@/context/LoadingContext';
 
 import { RegeneratePlanModal } from '@/components/RegeneratePlanModal';
 
-import { IconShare3 } from '@tabler/icons-react';
 import { CopyButton } from '@mantine/core';
+import { IconBellRinging, IconShare3, IconVideo } from '@tabler/icons-react';
+import { format } from 'date-fns';// <-- Make sure this is imported
 
 export default function PlanDetailPage() {
     const params = useParams();
@@ -66,6 +67,55 @@ export default function PlanDetailPage() {
         "Finding an escape route from the 'pakaau' paragraph prison.",
         "One day, my rival will generate a note about how I made it obsolete."
     ];
+
+    const [isInApp, setIsInApp] = useState(false);
+    useEffect(() => {
+        // This check runs once on mount.
+        if (navigator.userAgent.includes('KalPad-Android-App')) {
+            setIsInApp(true);
+        }
+    }, []);
+
+    const handleScheduleReminders = () => {
+        if (!plan) return;
+
+        // DEFINITIVE FIX #1: Use timezone-aware date formatting.
+        const todayString = format(new Date(), 'yyyy-MM-dd');
+        const todaysTopic = plan.plan_topics.find(t => t.date === todayString);
+
+        if (!todaysTopic || !todaysTopic.sub_topics) {
+            notifications.show({ title: 'Nothing to Schedule', message: 'There are no tasks scheduled for today.', color: 'blue' });
+            return;
+        }
+
+        const remainingTasks = todaysTopic.sub_topics.filter(task => !task.completed);
+        if (remainingTasks.length === 0) {
+            notifications.show({ title: 'All Done!', message: "You've already completed all tasks for today.", color: 'green' });
+            return;
+        }
+        
+        const totalHours = todaysTopic.study_hours || 1;
+        const minutesPerTask = (totalHours * 60) / remainingTasks.length;
+        
+        // DEFINITIVE FIX #2: Add a 5-second buffer to the start time to prevent race conditions.
+        let currentTime = new Date().getTime() + 5000; // Start 5 seconds from now
+        const remindersArray = remainingTasks.map(task => {
+            const reminderTime = currentTime;
+            currentTime += minutesPerTask * 60 * 1000;
+            return {
+                title: todaysTopic.topic_name,
+                message: `Time to start: ${task.text}`,
+                timestamp: reminderTime,
+            };
+        });
+
+        if (window.Android && typeof window.Android.scheduleBulkReminders === 'function') {
+            console.log("Sending bulk reminders to native:", JSON.stringify(remindersArray));
+            window.Android.scheduleBulkReminders(JSON.stringify(remindersArray));
+        } else {
+            alert("This smart scheduling feature is only available in the KalPad Android app.");
+        }
+    };
 
     const [todaysTopics, setTodaysTopics] = useState([]);
 
@@ -452,6 +502,7 @@ const handleSelectAllTopics = () => {
                             
                             {/* --- 4. Add the new Share button to the header group --- */}
                             <Group>
+
                                 <Button 
                                     leftSection={<IconShare3 size={16} />} 
                                     variant="subtle"
@@ -473,6 +524,8 @@ const handleSelectAllTopics = () => {
                         onFindLectures={handleStartCuration}
                         isCurating={isCurating}
                         onNoteGenerated={() => fetchPlanData(session)}
+                        isInApp={isInApp}
+                        onScheduleReminders={handleScheduleReminders}
                     />
                 </>
             )}

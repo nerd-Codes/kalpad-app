@@ -1,7 +1,7 @@
 // src/components/TimelineDayCard.jsx
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 // --- MODIFICATION: ADDED NEW MANTINE COMPONENTS & ICONS ---
 import { Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, Stack, Title, ActionIcon, Tooltip, Menu } from '@mantine/core';
 import { IconPencilPlus, IconBrain, IconPlayerPlay, IconClock, IconEye, IconDots } from '@tabler/icons-react';
@@ -55,16 +55,34 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
     // This will eventually open the FullscreenNoteViewer.jsx modal.
     // For now, setting this state is the goal.
 
+    // --- DEFINITIVE FIX #1: LOCAL STATE MANAGEMENT ---
+    // The card now manages its own sub-topics for an instantaneous UI response.
+    const [internalSubTopics, setInternalSubTopics] = useState(dayTopic.sub_topics || []);
+
+    // --- DEFINITIVE FIX #2: SYNCHRONIZATION EFFECT ---
+    // This effect ensures that if the parent's data changes (e.g., on a full refresh),
+    // our local state is updated to match, preventing stale data.
+    useEffect(() => {
+        setInternalSubTopics(dayTopic.sub_topics || []);
+    }, [dayTopic.sub_topics]);
+
     const allTopicsCompleted = dayTopic.sub_topics?.every(sub => sub.completed) && dayTopic.sub_topics?.length > 0;
 
      const handleCheckboxChange = (subTopicIndex, isChecked) => {
         if (isReadOnly) return;
-        const newSubTopics = dayTopic.sub_topics.map((sub, index) => {
+
+        // 1. Create the new state array for an immediate update.
+        const newSubTopics = internalSubTopics.map((sub, index) => {
             if (index === subTopicIndex) {
                 return { ...sub, completed: isChecked };
             }
             return sub;
         });
+
+        // 2. Update the local state INSTANTLY. This is the optimistic UI update.
+        setInternalSubTopics(newSubTopics);
+
+        // 3. Call the parent's onUpdate function in the background to sync the change.
         onUpdate(dayTopic.id, { sub_topics: newSubTopics });
     };
     
@@ -167,6 +185,24 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
     if (daysLeft < 7) color = 'red';
     else if (daysLeft < 14) color = 'yellow';
 
+    const handleSetReminder = (subTopicText) => {
+    if (window.Android && typeof window.Android.setReminder === 'function') {
+        const reminderTime = new Date().getTime() + 60 * 1000;
+        
+        const reminderDetails = {
+            title: dayTopic.topic_name,
+            message: `Time to start: ${subTopicText}`,
+            timestamp: reminderTime,
+        };
+        
+        // --- DEFINITIVE FIX: Use JSON.stringify for proper logging ---
+        console.log("Sending reminder to native:", JSON.stringify(reminderDetails));
+        window.Android.setReminder(JSON.stringify(reminderDetails));
+    } else {
+        alert("This feature is only available in the KalPad Android app.");
+    }
+};
+
 return (
     <>
         {viewMode === 'dashboard' && (
@@ -209,7 +245,7 @@ return (
                     </Text>
                     
                     <Stack gap="sm" mt="xs">
-                        {dayTopic.sub_topics?.map((subTopic, index) => {
+                        {internalSubTopics.map((subTopic, index) => {
                             const v2_note = dayTopic.new_notes?.find(n => n.sub_topic_text === subTopic.text);
                             const v1_note = (index === 0 && dayTopic.generated_notes) ? { notes_markdown: dayTopic.generated_notes, sub_topic_text: subTopic.text } : null;
                             const existingNote = v2_note || v1_note;
@@ -275,6 +311,12 @@ return (
                                                             </Menu.Item>
                                                         </>
                                                     )}
+                                                    <Menu.Item
+                                                        leftSection={<IconClock size={16} />}
+                                                        onClick={() => handleSetReminder(subTopic.text)}
+                                                    >
+                                                        Remind Me (in 1 min)
+                                                    </Menu.Item>
                                                 </Menu.Dropdown>
                                             </Menu>
                                         )}

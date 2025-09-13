@@ -93,17 +93,34 @@ export default function DashboardPage() {
             try {
                 const response = await fetch(`/api/timeline?date=${dateString}`);
                 if (!response.ok) throw new Error((await response.json()).error);
-                const data = await response.json();
-                setDailyTasks(data);
+                
+                // --- DEFINITIVE MODIFICATION: PARSE THE NEW RESPONSE STRUCTURE ---
+                const responseData = await response.json();
+                
+                // Set the state for the UI with the plan data
+                setDailyTasks(responseData.plans || []);
+
+                // --- DEFINITIVE MODIFICATION: THE "SMART CLIENT" LOGIC ---
+                // Check if the backend sent a native command.
+                const trigger = responseData.triggerNativeAction;
+
+                // If a trigger exists AND we are in the native app, execute the command.
+                if (trigger && window.Android && typeof window.Android.setReminder === 'function') {
+                    if (trigger.type === 'SET_REMINDER') {
+                        console.log("Native trigger received from API. Executing:", trigger);
+                        // Pass the details object to the native setReminder function.
+                        window.Android.setReminder(JSON.stringify(trigger.details));
+                    }
+                }
+                
             } catch (err) {
                 console.error("Timeline fetch error:", err.message);
-                // Optionally set a specific error for the timeline
             } finally {
                 setTimelineLoading(false);
             }
         };
         fetchTimelineData();
-    }, [selectedDate, session]);
+    }, [selectedDate, session]); // This dependency array is correct.
 
     const calculateAllStats = (allPlans) => {
         if (!allPlans || allPlans.length === 0) {

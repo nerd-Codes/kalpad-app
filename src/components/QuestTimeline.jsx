@@ -1,17 +1,31 @@
 // src/components/QuestTimeline.jsx
 "use client";
 
+import { useEffect, useRef } from 'react'; 
 import { Timeline, Text, Box, Group, Button } from '@mantine/core';
 // --- FIX: Import the necessary icons ---
-import { IconCircleCheck, IconCircleDashed, IconCircle, IconVideo } from '@tabler/icons-react';
+import { IconCircleCheck, IconCircleDashed, IconCircle, IconVideo, IconBellRinging } from '@tabler/icons-react';
 import { isToday, isPast, format } from 'date-fns';
 import { TimelineDayCard } from './TimelineDayCard';
 import classes from './QuestTimeline.module.css';
 
 // --- FIX: The component now accepts the new props ---
-export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCurating, onNoteGenerated, isReadOnly = false }) {
+export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCurating, onNoteGenerated, isReadOnly = false, isInApp, onScheduleReminders}) {
     // For read-only view, we treat today as just another day.
     const todayIndex = isReadOnly ? -1 : planTopics.findIndex(topic => isToday(new Date(topic.date)));
+    const itemRefs = useRef({});
+
+    useEffect(() => {
+        if (todayIndex !== -1 && itemRefs.current[todayIndex]) {
+            // Use a short timeout to ensure the DOM has fully rendered and the card is expanded
+            setTimeout(() => {
+                itemRefs.current[todayIndex].scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center' // This centers the item nicely in the viewport
+                });
+            }, 500); // 500ms delay is robust
+        }
+    }, [todayIndex]); // Run only when todayIndex changes (i.e., on initial load)
 
     return (
         <Timeline 
@@ -54,6 +68,7 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
 
                 return (
                     <Timeline.Item
+                        ref={el => itemRefs.current[index] = el}
                         key={dayTopic.id || index} // Use index as fallback key for public plans
                         title={`Day ${dayTopic.day}: ${dayTopic.topic_name}`}
                         className={itemClassName}
@@ -71,17 +86,29 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
                         
                         {/* --- FIX: The new "Find Lectures" button is rendered conditionally here --- */}
                          {isToday_ && !isReadOnly && (
-                            <Button
-                                mt="md" 
-                                variant="light" 
-                                color="red" 
-                                size="xs"
-                                leftSection={<IconVideo size={16} />}
-                                onClick={onFindLectures}
-                                loading={isCurating}
-                            >
-                                Find Lectures for Today
-                            </Button>
+                            <Group mt="md">
+                                {isInApp && (
+                                    <Button
+                                        variant="light"
+                                        color="teal"
+                                        size="xs"
+                                        leftSection={<IconBellRinging size={16} />}
+                                        onClick={onScheduleReminders}
+                                    >
+                                        Set Today's Reminders
+                                    </Button>
+                                )}
+                                <Button
+                                    variant="light"
+                                    color="red"
+                                    size="xs"
+                                    leftSection={<IconVideo size={16} />}
+                                    onClick={onFindLectures}
+                                    loading={isCurating}
+                                >
+                                    Find Lectures
+                                </Button>
+                            </Group>
                         )}
 
                         {(isToday_ || isPastDay) && (
