@@ -79,29 +79,36 @@ export default function PlanDetailPage() {
     const handleScheduleReminders = () => {
         if (!plan) return;
 
-        // DEFINITIVE FIX #1: Use timezone-aware date formatting.
         const todayString = format(new Date(), 'yyyy-MM-dd');
         const todaysTopic = plan.plan_topics.find(t => t.date === todayString);
 
-        if (!todaysTopic || !todaysTopic.sub_topics) {
+        if (!todaysTopic || !todaysTopic.sub_topics || todaysTopic.sub_topics.length === 0) {
             notifications.show({ title: 'Nothing to Schedule', message: 'There are no tasks scheduled for today.', color: 'blue' });
             return;
         }
 
+        // --- DEFINITIVE FIX #1: CALCULATE DURATION BASED ON ALL TASKS ---
+        // The time budget for each task is now fixed based on the original plan.
+        const totalHours = todaysTopic.study_hours || 1;
+        const minutesPerOriginalTask = (totalHours * 60) / todaysTopic.sub_topics.length;
+
+        // --- DEFINITIVE FIX #2: FILTER *AFTER* CALCULATION ---
         const remainingTasks = todaysTopic.sub_topics.filter(task => !task.completed);
+
         if (remainingTasks.length === 0) {
             notifications.show({ title: 'All Done!', message: "You've already completed all tasks for today.", color: 'green' });
             return;
         }
         
-        const totalHours = todaysTopic.study_hours || 1;
-        const minutesPerTask = (totalHours * 60) / remainingTasks.length;
-        
-        // DEFINITIVE FIX #2: Add a 5-second buffer to the start time to prevent race conditions.
-        let currentTime = new Date().getTime() + 5000; // Start 5 seconds from now
+        // --- DEFINITIVE FIX #3: START THE FIRST REMINDER 1 MINUTE FROM NOW ---
+        let currentTime = new Date().getTime() + 60 * 1000; // 1 minute (60,000 ms) grace period
+
         const remindersArray = remainingTasks.map(task => {
             const reminderTime = currentTime;
-            currentTime += minutesPerTask * 60 * 1000;
+            
+            // Increment the time for the next task using the original, fixed duration.
+            currentTime += minutesPerOriginalTask * 60 * 1000; 
+
             return {
                 title: todaysTopic.topic_name,
                 message: `Time to start: ${task.text}`,
