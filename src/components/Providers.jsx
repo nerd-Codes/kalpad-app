@@ -1,7 +1,7 @@
 // src/components/Providers.jsx
 "use client";
 
-import { MantineProvider, createTheme } from '@mantine/core';
+import { MantineProvider, createTheme,  CSSVariablesResolver } from '@mantine/core';
 // --- FIX: Import the Notifications component and its required CSS ---
 import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
@@ -60,7 +60,25 @@ export function Providers({ children }) {
         {/* It sits inside MantineProvider but outside your main content. */}
         {/* The `position` prop ensures it appears in the bottom right corner. */}
         <PostHogProvider>
-        <Notifications position="bottom-right" zIndex={1000} />
+        <style>
+          {`
+            @media (max-width: 768px) {
+              .mantine-Notifications-root {
+                top: var(--mantine-spacing-md) !important;
+                right: var(--mantine-spacing-md) !important;
+                bottom: auto !important;
+                left: auto !important;
+                width: calc(100% - var(--mantine-spacing-md) * 2);
+              }
+              .mantine-Notification-root {
+                  font-size: var(--mantine-font-size-sm);
+              }
+            }
+          `}
+        </style>
+        
+        {/* The zIndex is increased to ensure notifications appear above the bottom navbar. */}
+        <Notifications zIndex={2000} />
         
         <BackgroundBlobs />
         <AppContent>{children}</AppContent>

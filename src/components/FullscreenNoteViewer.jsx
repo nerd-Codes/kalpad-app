@@ -196,6 +196,7 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
             }}
 
             transitionProps={{ duration: 200 }} 
+            zIndex={3000}
         >
 
             <Popover opened={selection.text.length > 5} position="top" withArrow shadow="md">
@@ -275,6 +276,7 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
                 onClose={handleCloseResponseModal}
                 title={ <Group> <IconSparkles size={20} /> <Title order={4}>The Professor</Title> </Group> }
                 centered size="xl"
+                zIndex={3001}
             >
                 <Stack>
                     {isLoading && <Group justify="center" p="xl"><Loader /></Group>}
