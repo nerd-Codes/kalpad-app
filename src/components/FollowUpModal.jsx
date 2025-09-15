@@ -22,6 +22,7 @@ export function FollowUpModal({ opened, onClose, onSubmit, isLoading }) {
             title="Ask a Custom Question"
             centered
             size="lg"
+            zIndex={3005}
         >
             <Stack>
                 <Textarea
@@ -30,6 +31,7 @@ export function FollowUpModal({ opened, onClose, onSubmit, isLoading }) {
                     onChange={(event) => setQuestion(event.currentTarget.value)}
                     autosize
                     minRows={3}
+                    
                 />
                 <Group justify="flex-end">
                     <Button variant="default" onClick={onClose}>Cancel</Button>

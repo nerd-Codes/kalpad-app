@@ -56,7 +56,7 @@ export async function POST(req) {
     
     // --- DEFINITIVE FIX: NON-STREAMING API CALL ---
     const response = await groq.chat.completions.create({
-        model: 'openai/gpt-oss-120b',
+        model: 'llama-3.3-70b-versatile',
         stream: false, // Explicitly disable streaming
         messages: [
             { role: 'system', content: systemPrompt },

@@ -199,15 +199,15 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
             zIndex={3000}
         >
 
-            <Popover opened={selection.text.length > 5} position="top" withArrow shadow="md">
+            <Popover opened={selection.text.length > 5} position="top" withArrow shadow="md" zIndex={3002}>
                     <Popover.Target>
                         <div style={{ position: 'absolute', top: `${selection.position.y - 45}px`, left: `${selection.position.x}px`, transform: 'translateX(-50%)' }} />
                     </Popover.Target>
                     <Popover.Dropdown>
                         <Group gap="xs">
-                            <Tooltip label="Explain this simply" withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('explain')}><IconBook size={18} /></ActionIcon></Tooltip>
-                            <Tooltip label="Give a real-world analogy" withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('analogy')}><IconBulb size={18} /></ActionIcon></Tooltip>
-                            <Tooltip label="Why is this important?" withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('importance')}><IconMessageCircle size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Explain this simply" zIndex={3003} withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('explain')}><IconBook size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Give a real-world analogy" zIndex={3003} withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('analogy')}><IconBulb size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Why is this important?" zIndex={3003} withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('importance')}><IconMessageCircle size={18} /></ActionIcon></Tooltip>
                         </Group>
                     </Popover.Dropdown>
                 </Popover>
