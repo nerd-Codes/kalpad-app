@@ -5,7 +5,7 @@ import { PDFDocument } from 'pdf-lib';
 
 export const dynamic = 'force-dynamic';
 
-const PDF_SERVICE_URL = process.env.MD_TO_PDF_SERVICE_URL || 'https://md-to-pdf-production-6554.up.railway.app/';
+const PDF_SERVICE_URL = process.env.MD_TO_PDF_SERVICE_URL;
 const CHUNK_SIZE_LIMIT = 18000; // The safe payload limit for the service
 
 // --- DEFINITIVE FIX #1: THE INTELLIGENT CHUNKING HELPER ---
