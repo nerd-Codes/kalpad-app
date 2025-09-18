@@ -478,13 +478,16 @@ const svgRendererAgent = inngest.createFunction(
             .join("\n");
         }
 
-         const imageUrl = await step.run(`render-svg-with-${engine}`, async () => {
-            const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kalpad-svg-render-'));
+         const imageUrl = await step.run(`render-diagram-with-${engine}`, async () => {
+            const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), `kalpad-render-${engine}-`));
+            const isPng = engine === 'mermaid'; // We will render Mermaid to PNG
             const ext = engine === 'd2' ? '.d2' : '.mmd';
+            const outputExt = isPng ? '.png' : '.svg';
+
             const inputFile = path.join(tempDir, `input${ext}`);
-            const outputFile = path.join(tempDir, 'output.svg');
+            const outputFile = path.join(tempDir, `output${outputExt}`);
             
-            await fs.writeFile(inputFile, finalScript);
+            await fs.writeFile(inputFile, script);
 
             // --- DEFINITIVE FIX: USE ABSOLUTE PATHS FOR EXECUTABLES ---
             try {
@@ -493,9 +496,9 @@ const svgRendererAgent = inngest.createFunction(
                     // `path.resolve` creates a correct absolute path from the relative one.
                     const d2Path = path.resolve('./bin/d2');
                     execSync(`"${d2Path}" --theme=0 --sketch "${inputFile}" "${outputFile}"`);
-                } else { // mermaid
-                    // `npm install -g` in Vercel places binaries in this predictable location.
+                }  else { // mermaid
                     const mmdcPath = '/vercel/path0/.npm-global/bin/mmdc';
+                    // The -o flag now points to a PNG file.
                     execSync(`"${mmdcPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
                 }
             } catch (execError) {
@@ -517,23 +520,17 @@ const svgRendererAgent = inngest.createFunction(
             // --- END OF FIX ---
             
 
-            const svgContent = await fs.readFile(outputFile, 'utf-8');
-            const storagePath = `generated-illustrations/${note_id}-${engine}-${Date.now()}.svg`;
+            const imageContent = await fs.readFile(outputFile);
+            const storagePath = `generated-illustrations/${note_id}-${engine}-${Date.now()}${outputExt}`;
             
             const { error: uploadError } = await supabaseAdmin.storage
                 .from('generated-illustrations')
-                .upload(storagePath, svgContent, { contentType: 'image/svg+xml', upsert: true });
+                .upload(storagePath, imageContent, { contentType: isPng ? 'image/png' : 'image/svg+xml', upsert: true });
             
-            // Clean up the temporary directory
             await fs.rm(tempDir, { recursive: true, force: true });
+            if (uploadError) { throw new Error(`Supabase upload error: ${uploadError.message}`); }
             
-            if (uploadError) {
-                throw new Error(`Supabase upload error for ${engine} SVG: ${uploadError.message}`);
-            }
-            
-            const { data: { publicUrl } } = supabaseAdmin.storage
-                .from('generated-illustrations').getPublicUrl(storagePath);
-                
+            const { data: { publicUrl } } = supabaseAdmin.storage.from('generated-illustrations').getPublicUrl(storagePath);
             return publicUrl;
         });
 

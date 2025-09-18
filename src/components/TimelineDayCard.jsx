@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 // --- MODIFICATION: ADDED NEW MANTINE COMPONENTS & ICONS ---
 import { Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, Stack, Title, ActionIcon, Tooltip, Menu } from '@mantine/core';
-import { IconPencilPlus, IconBrain, IconPlayerPlay, IconClock, IconEye, IconDots } from '@tabler/icons-react';
+import { IconPencilPlus, IconBrain, IconPlayerPlay, IconClock, IconEye, IconChevronsDown } from '@tabler/icons-react';
 import { FullscreenNoteViewer } from './FullscreenNoteViewer';
 import { differenceInCalendarDays } from 'date-fns';
 import Link from 'next/link';
@@ -280,7 +280,7 @@ return (
                                                         size="lg"
                                                         loading={generatingNotesFor === subTopic.text}
                                                     >
-                                                        <IconDots size={18} />
+                                                        <IconChevronsDown size={18} />
                                                     </ActionIcon>
                                                 </Menu.Target>
                                                 <Menu.Dropdown>
@@ -311,12 +311,12 @@ return (
                                                             </Menu.Item>
                                                         </>
                                                     )}
-                                                    <Menu.Item
+                                                    {/* <Menu.Item
                                                         leftSection={<IconClock size={16} />}
                                                         onClick={() => handleSetReminder(subTopic.text)}
                                                     >
                                                         Remind Me (in 1 min)
-                                                    </Menu.Item>
+                                                    </Menu.Item> */}
                                                 </Menu.Dropdown>
                                             </Menu>
                                         )}

@@ -2,8 +2,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { Modal, ScrollArea, Group, Title, Text, Textarea, Stack, Badge, Button, ActionIcon, Box, Loader, Tooltip, Alert } from '@mantine/core';
-import { IconCircleCheck, IconMessageQuestion,IconMessageCircle, IconBook, IconBulb, IconSparkles } from '@tabler/icons-react';
+import { IconCircleCheck, IconMessageQuestion,IconMessageCircle, IconBook, IconBulb, IconSparkles, IconFileExport  } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { Popover } from '@mantine/core';
 import { useTextSelection } from '../hooks/useTextSelection';
@@ -22,6 +23,11 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 
 import markdownStyles from '../styles/MarkdownStyles.module.css';
+
+import { PrintableNote } from './PrintableNote';
+
+// import katexCSS from '!!raw-loader!katex/dist/katex.min.css';
+// import markdownCustomCSS from '!!raw-loader!../styles/MarkdownStyles.module.css';
 
 
 // --- HELPER FUNCTIONS FOR DYNAMIC BADGE COLORS ---
@@ -45,6 +51,26 @@ const getSubTopicTypeColor = (type) => {
     }
 };
 
+const PDF_CSS = `@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lexend+Deca:wght@900&display=swap');
+body { font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; color: #222; margin: 2rem; }
+h1, h2, h3, h4, h5, h6 { font-family: 'Lexend Deca', sans-serif; font-weight: 600; margin: 1.5rem 0 0.75rem 0; color: #111; }
+h1 { font-size: 2rem; } h2 { font-size: 1.6rem; } h3 { font-size: 1.3rem; } h4 { font-size: 1.1rem; } h5, h6 { font-size: 1rem; }
+a { color: #2563eb; text-decoration: none; } a:hover { text-decoration: underline; }
+pre, code { font-family: 'Fira Code', monospace; background: #f6f8fa; padding: 0.25rem 0.5rem; border-radius: 4px; }
+pre { padding: 1rem; overflow-x: auto; }
+img { max-width: 100%; display: block; margin: 1rem auto; }
+blockquote { border-left: 4px solid #ddd; padding-left: 1rem; color: #555; font-style: italic; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+th { background: #f0f0f0; }
+.katex { font: normal 1.1em 'KaTeX_Main', 'Times New Roman', serif; line-height: 1.2; white-space: nowrap; text-indent: 0; text-rendering: auto; }
+.katex-display { display: block; margin: 1em 0; text-align: center; }
+.katex .katex-mathml { position: absolute; clip: rect(1px, 1px, 1px, 1px); padding: 0; border: 0; height: 1px; width: 1px; overflow: hidden; }
+.katex .katex-html { display: inline-block; }
+.katex .katex-html > .newline { display: block; height: 0; }
+.katex { font-family: 'Lexend Deca', 'Inter', serif; font-size: 1em; }
+@page { size: A4; margin: 0.3in; }`;
+
 export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
 
     const [renderContent, setRenderContent] = useState(false);
@@ -56,6 +82,8 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [aiResponse, setAiResponse] = useState(null);
+
+    const [isExporting, setIsExporting] = useState(false);
 
     // This effect delays the rendering of the heavy markdown content.
     useEffect(() => {
@@ -176,6 +204,43 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
         setAiResponse(null);
         setError(null);
     };
+const handleExportToPdf = async () => {
+        if (!noteData) return;
+        setIsExporting(true);
+        try {
+            const response = await fetch('/api/export-note-pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    markdown: notes_markdown,
+                    topicName: day_topic.topic_name,
+                    subTopicName: sub_topic.text,
+                    css: PDF_CSS, // Send the definitive CSS
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to export PDF.');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const fileName = `${sub_topic.text.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            notifications.show({ title: 'Export Successful', message: 'Your PDF has started downloading.', color: 'green' });
+        } catch (err) {
+            notifications.show({ title: 'Export Failed', message: err.message, color: 'red' });
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
 
 
@@ -231,6 +296,14 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
                     
                     {/* --- THE ACTION BAR --- */}
                     <Group justify="flex-end" className="action-bar">
+                        <Button
+                            leftSection={<IconFileExport size={16} />}
+                            variant="default"
+                            onClick={handleExportToPdf}
+                            loading={isExporting}
+                        >
+                            Export to PDF
+                        </Button>
                         {/* --- DEFINITIVE ADDITION: THE "ASK A FOLLOW-UP" BUTTON --- */}
                         <Button
                             leftSection={<IconMessageQuestion size={16} />}
