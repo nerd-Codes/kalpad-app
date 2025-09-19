@@ -1,0 +1,60 @@
+/* src/styles/PrintableNote.css */
+
+/* Import necessary web fonts */
+@import url('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Lexend:wght@700;900&display=swap');
+
+/*
+  The 'body' styles apply to the entire print page, ensuring a clean,
+  white background and black text, overriding any potential inherited styles.
+*/
+body {
+    font-family: 'Inter', sans-serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #000000 !important; 
+    background-color: #ffffff !important;
+}
+
+/* Ensure all header levels are pure black for high contrast on paper. */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Lexend', sans-serif;
+    font-weight: 700;
+    color: #000000 !important;
+}
+h1 { font-size: 24pt; font-weight: 900; }
+h2 { font-size: 18pt; }
+h3 { font-size: 14pt; }
+
+/* Standard styling for other elements */
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+.katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/*
+  This is the most critical block. The @media print query defines styles
+  that are ONLY applied when the user's browser is generating the print preview
+  or sending the document to a printer.
+*/
+@media print {
+    /* Hide any element with the 'no-print' class, like our print button. */
+    .no-print {
+        display: none !important;
+    }
+    
+    /* Remove any browser-added margins for a clean, edge-to-edge print. */
+    body {
+        margin: 0;
+    }
+
+    /* A page-break rule to prevent large code blocks or images from being awkwardly split */
+    pre, blockquote, img {
+        page-break-inside: avoid;
+    }
+}

@@ -1,31 +1,40 @@
 // src/app/layout.js
 import "./globals.css";
-// import '@mantine/core/styles.css';
-import '../styles/print.css';
 import { ColorSchemeScript } from '@mantine/core';
 import { Providers } from "@/components/Providers";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { headers } from 'next/headers'; // Import the headers function
 
-// Fonts can be loaded here, but passed to the theme in Providers.jsx
 import { Inter, Lexend } from "next/font/google";
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const lexend = Lexend({ subsets: ["latin"], variable: '--font-lexend' });
 
-// Metadata can now be safely exported from this Server Component
 export const metadata = {
   title: "KalPad",
   description: "AI-Powered Study Planner",
 };
 
 export default function RootLayout({ children }) {
+  // --- DEFINITIVE FIX: SERVER-SIDE PATH DETECTION ---
+  const heads = headers();
+  const pathname = heads.get('next-url') || '';
+  
+  // Determine the variant and color scheme based on the URL path.
+  const isPrintPath = pathname.startsWith('/print');
+  const layoutVariant = isPrintPath ? 'print' : 'app';
+  const colorScheme = isPrintPath ? 'light' : 'dark';
+
   return (
     <html lang="en" className={`${inter.variable} ${lexend.variable}`}>
       <head>
-        <ColorSchemeScript defaultColorScheme="dark" />
+        <ColorSchemeScript defaultColorScheme={colorScheme} />
       </head>
       <body>
-        <Providers>{children}</Providers>
+        {/* Pass the determined variant and color scheme to the Providers */}
+        <Providers variant={layoutVariant} colorScheme={colorScheme}>
+            {children}
+        </Providers>
         <Analytics />
         <SpeedInsights />
       </body>

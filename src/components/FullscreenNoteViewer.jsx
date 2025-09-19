@@ -12,6 +12,8 @@ import { notifications } from '@mantine/notifications';
 
 import { ShimmerButton } from './landing/ShimmerButton';
 
+import Link from 'next/link';
+
 import { FollowUpModal } from './FollowUpModal';
 
 // Markdown and LaTeX imports
@@ -242,6 +244,56 @@ const handleExportToPdf = async () => {
         }
     };
 
+const handleAutoPrint = () => {
+    if (!noteData) return;
+    setIsExporting(true);
+
+    const printUrl = `/print/${noteData.id}`;
+    const printWindow = window.open(printUrl, '_blank');
+
+    if (!printWindow) {
+        notifications.show({
+            title: 'Popup Blocked',
+            message: 'Please allow popups for this site to export your note.',
+            color: 'yellow',
+        });
+        setIsExporting(false);
+        return;
+    }
+
+    // --- THE DEFINITIVE "LISTENER" LOGIC ---
+    const handleMessage = (event) => {
+        // 1. We only care about messages from the window we just opened.
+        if (event.source !== printWindow) {
+            return;
+        }
+        
+        // 2. We only care about our specific "ready" signal.
+        if (event.data === 'KALPAD_PRINT_READY') {
+            console.log("Print page is ready. Triggering print command.");
+            
+            // 3. Trigger the print command on the popup window.
+            printWindow.print();
+            setIsExporting(false); // Can re-enable the button now
+            
+            // 4. Clean up this listener to prevent memory leaks.
+            window.removeEventListener('message', handleMessage);
+        }
+    };
+
+    const handleAfterPrint = () => {
+        printWindow.close();
+        printWindow.removeEventListener('afterprint', handleAfterPrint);
+        // Ensure the message listener is also cleaned up if the user closes the print dialog
+        window.removeEventListener('message', handleMessage);
+    };
+    
+    // Start listening for messages from the popup window.
+    window.addEventListener('message', handleMessage);
+    // Listen for when the print dialog is closed.
+    printWindow.addEventListener('afterprint', handleAfterPrint, { once: true });
+};
+
 
 
     return (
@@ -299,7 +351,7 @@ const handleExportToPdf = async () => {
                         <Button
                             leftSection={<IconFileExport size={16} />}
                             variant="default"
-                            onClick={handleExportToPdf}
+                            onClick={handleAutoPrint} // Use the new auto-print handler
                             loading={isExporting}
                         >
                             Export to PDF

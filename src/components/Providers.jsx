@@ -1,15 +1,14 @@
 // src/components/Providers.jsx
 "use client";
 
-import { MantineProvider, createTheme,  CSSVariablesResolver } from '@mantine/core';
-// --- FIX: Import the Notifications component and its required CSS ---
+import { MantineProvider, createTheme } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
+import '@mantine/core/styles.css'; // Ensure base styles are always included
 
 import { BackgroundBlobs } from "@/components/BackgroundBlobs";
 import { PageLoader } from "@/components/PageLoader";
 import { LoadingProvider, useLoading } from "@/context/LoadingContext";
-
 import { PostHogProvider } from './PostHogProvider';
 
 // The theme definition is unchanged
@@ -41,7 +40,6 @@ const theme = createTheme({
 
 });
 
-// AppContent wrapper is unchanged
 function AppContent({ children }) {
     const { isLoading } = useLoading();
     return (
@@ -52,36 +50,37 @@ function AppContent({ children }) {
     );
 }
 
-export function Providers({ children }) {
+// --- DEFINITIVE FIX: THE PROVIDER IS NOW "VARIANT-AWARE" ---
+export function Providers({ children, variant = 'app', colorScheme = 'dark' }) {
+  // For the 'print' variant, we render a minimal, clean wrapper.
+  if (variant === 'print') {
+    return (
+      <MantineProvider theme={theme} defaultColorScheme={colorScheme}>
+        <main style={{ backgroundColor: '#FFFFFF', color: '#000000' }}>
+          {children}
+        </main>
+      </MantineProvider>
+    );
+  }
+
+  // For the default 'app' variant, we render the full application chrome.
   return (
     <LoadingProvider>
-      <MantineProvider theme={theme} defaultColorScheme="dark">
-        {/* --- FIX: The Notifications component is added here --- */}
-        {/* It sits inside MantineProvider but outside your main content. */}
-        {/* The `position` prop ensures it appears in the bottom right corner. */}
+      <MantineProvider theme={theme} defaultColorScheme={colorScheme}>
         <PostHogProvider>
-        <style>
-          {`
+          <style>{`
             @media (max-width: 768px) {
               .mantine-Notifications-root {
                 top: var(--mantine-spacing-md) !important;
                 right: var(--mantine-spacing-md) !important;
-                bottom: auto !important;
-                left: auto !important;
+                bottom: auto !important; left: auto !important;
                 width: calc(100% - var(--mantine-spacing-md) * 2);
               }
-              .mantine-Notification-root {
-                  font-size: var(--mantine-font-size-sm);
-              }
             }
-          `}
-        </style>
-        
-        {/* The zIndex is increased to ensure notifications appear above the bottom navbar. */}
-        <Notifications zIndex={2000} />
-        
-        <BackgroundBlobs />
-        <AppContent>{children}</AppContent>
+          `}</style>
+          <Notifications zIndex={2000} />
+          <BackgroundBlobs />
+          <AppContent>{children}</AppContent>
         </PostHogProvider>
       </MantineProvider>
     </LoadingProvider>
