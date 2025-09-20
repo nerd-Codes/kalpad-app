@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { inngest } from '@/lib/inngest';
+import { getVertexAIModel } from '@/lib/vertexai'; 
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
@@ -65,7 +66,7 @@ export async function POST(request) {
         }
     }
     
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = await getVertexAIModel('gemini-2.5-flash');
 
     // --- ARCHITECTURAL UPGRADE: THE VALIDATED TWO-SHOT CHAIN ---
 
@@ -95,10 +96,12 @@ export async function POST(request) {
       **OUTPUT FORMAT:**
       Output ONLY a structured Markdown outline (using ### for sections). This outline will be given to another AI to write the full chapter, so its clarity and logical flow are paramount.
       `;
-      const outlineResult = await model.generateContent([outlinePrompt, ...imageParts]);
-    const chapterOutline = outlineResult.response.text();
+    const outlineResult = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: outlinePrompt }, ...imageParts] }]
+    });
+    const chapterOutline = outlineResult.response.candidates[0].content.parts[0].text;
 
-    // --- STAGE 2: THE VALIDATION GATE ---
+    // --- STAGE 2: THE VALIDATION GATE (Unchanged) ---
     if (!chapterOutline || chapterOutline.trim().length < 50) {
       throw new Error("The AI could not build a valid outline for this topic. It may be too abstract or lack sufficient context in your documents. Please try rephrasing.");
     }
@@ -157,15 +160,17 @@ export async function POST(request) {
       \`\`\`
       `;
 
-    const authorResult = await model.generateContent([authorPrompt, ...imageParts]);
-    const notesText = authorResult.response.text();
+    const authorResult = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: authorPrompt }, ...imageParts] }]
+    });
+    const notesText = authorResult.response.candidates[0].content.parts[0].text;
 
-    // --- STAGE 4: FINAL CONTENT VALIDATION ---
+    // --- STAGE 4: FINAL CONTENT VALIDATION (Unchanged) ---
     if (!notesText || notesText.trim().length < 50) {
         throw new Error("The AI failed to generate a sufficiently detailed note from the outline. Please try again.");
     }
     
-    // --- DATABASE WRITE ---
+    // --- DATABASE WRITE & INNGEST (Unchanged) ---
     const { data: savedNote, error: saveError } = await supabase
       .from('generated_notes')
       .upsert({

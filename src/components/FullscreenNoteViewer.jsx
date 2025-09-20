@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Modal, ScrollArea, Group, Title, Text, Textarea, Stack, Badge, Button, ActionIcon, Box, Loader, Tooltip, Alert } from '@mantine/core';
-import { IconCircleCheck, IconMessageQuestion,IconMessageCircle, IconBook, IconBulb, IconSparkles, IconFileExport  } from '@tabler/icons-react';
+import { Modal, ScrollArea, Group, Title, Text, Textarea, Stack, Badge, Button, ActionIcon, Box, Loader, Tooltip, Alert, Paper, ThemeIcon } from '@mantine/core';
+import { IconCircleCheck, IconMessageQuestion,IconMessageCircle, IconBook, IconBulb, IconSparkles, IconFileExport, IconBolt, IconAward   } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { Popover } from '@mantine/core';
 import { useTextSelection } from '../hooks/useTextSelection';
@@ -86,6 +86,8 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
     const [aiResponse, setAiResponse] = useState(null);
 
     const [isExporting, setIsExporting] = useState(false);
+
+    const [exportModalOpened, { open: openExportModal, close: closeExportModal }] = useDisclosure(false);
 
     // This effect delays the rendering of the heavy markdown content.
     useEffect(() => {
@@ -294,6 +296,67 @@ const handleAutoPrint = () => {
     printWindow.addEventListener('afterprint', handleAfterPrint, { once: true });
 };
 
+    // Handler 1: API-based export
+    const handleAPIBasedExport = async () => {
+        setIsExporting(true);
+        closeExportModal(); // Close the choice modal
+        try {
+            const response = await fetch('/api/export-note-pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    markdown: notes_markdown,
+                    topicName: day_topic.topic_name,
+                    subTopicName: sub_topic.text,
+                    css: PDF_CSS,
+                }),
+            });
+            if (!response.ok) { throw new Error((await response.json()).error || 'Failed to export PDF.'); }
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const fileName = `${sub_topic.text.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            notifications.show({ title: 'Export Successful', message: 'Your PDF has started downloading.', color: 'green' });
+        } catch (err) {
+            notifications.show({ title: 'Export Failed', message: err.message, color: 'red' });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    // Handler 2: The high-quality, client-side auto-print
+    const handleClientSidePrint = () => {
+        setIsExporting(true);
+        closeExportModal(); // Close the choice modal
+        const printUrl = `/print/${noteData.id}`;
+        const printWindow = window.open(printUrl, '_blank');
+        if (!printWindow) {
+            notifications.show({ title: 'Popup Blocked', message: 'Please allow popups for this site to export your note.', color: 'yellow' });
+            setIsExporting(false);
+            return;
+        }
+        const handleMessage = (event) => {
+            if (event.source === printWindow && event.data === 'KALPAD_PRINT_READY') {
+                printWindow.print();
+                setIsExporting(false);
+                window.removeEventListener('message', handleMessage);
+            }
+        };
+        const handleAfterPrint = () => {
+            printWindow.close();
+            printWindow.removeEventListener('afterprint', handleAfterPrint);
+            window.removeEventListener('message', handleMessage);
+        };
+        window.addEventListener('message', handleMessage);
+        printWindow.addEventListener('afterprint', handleAfterPrint, { once: true });
+    };
+
 
 
     return (
@@ -349,12 +412,12 @@ const handleAutoPrint = () => {
                     {/* --- THE ACTION BAR --- */}
                     <Group justify="flex-end" className="action-bar">
                         <Button
-                            leftSection={<IconFileExport size={16} />}
-                            variant="default"
-                            onClick={handleAutoPrint} // Use the new auto-print handler
-                            loading={isExporting}
-                        >
-                            Export to PDF
+                                leftSection={<IconFileExport size={16} />}
+                                variant="default"
+                                onClick={openExportModal} // This now opens the choice modal
+                                loading={isExporting}
+                            >
+                                Export to PDF
                         </Button>
                         {/* --- DEFINITIVE ADDITION: THE "ASK A FOLLOW-UP" BUTTON --- */}
                         <Button
@@ -429,6 +492,42 @@ const handleAutoPrint = () => {
                     handleDoubtRequest('custom', question);
                 }}
             />
+
+            <Modal
+                opened={exportModalOpened}
+                onClose={closeExportModal}
+                title={<Title order={3} ff="Lexend, sans-serif">Choose Export Quality</Title>}
+                centered
+                zIndex={3010}
+            >
+                <Stack>
+                    <Text c="dimmed" size="sm" mb="md">
+                        Select an export method based on your needs.
+                    </Text>
+                    <Paper withBorder p="md" radius="md" style={{ cursor: 'pointer' }} onClick={handleAPIBasedExport}>
+                        <Group>
+                            <ThemeIcon color="teal" size="lg" variant="light">
+                                <IconBolt size={20} />
+                            </ThemeIcon>
+                            <Box>
+                                <Text fw={500}>Fast Export</Text>
+                                <Text size="xs" c="dimmed">Quickest method. Good for text, but may have minor styling issues with complex math.</Text>
+                            </Box>
+                        </Group>
+                    </Paper>
+                    <Paper withBorder p="md" radius="md" style={{ cursor: 'pointer' }} onClick={handleClientSidePrint}>
+                        <Group>
+                            <ThemeIcon color="brandPurple" size="lg" variant="light">
+                                <IconAward size={20} />
+                            </ThemeIcon>
+                            <Box>
+                                <Text fw={500}>High-Quality Export</Text>
+                                <Text size="xs" c="dimmed">Pixel-perfect rendering. Recommended for final drafts. May be slower to load.</Text>
+                            </Box>
+                        </Group>
+                    </Paper>
+                </Stack>
+            </Modal>
         </>
 
     );

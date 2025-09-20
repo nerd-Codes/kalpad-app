@@ -2,10 +2,12 @@
 
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { getVertexAIModel, getVertexAIEmbeddingModel } from '@/lib/vertexai';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const getTopicsFromSyllabus = (syllabus) => {
   return syllabus.split('\n').filter(line => line.trim() !== '');
@@ -29,6 +31,7 @@ const KalPad_Constitution = `
   **5.  Provide Actionable Depth:** The breakdown of daily "sub_topics" is the most important part. A good day should have 3-5 specific, actionable tasks.
 `;
 
+
 export async function POST(request) {
 
   const supabase = createRouteHandlerClient({ cookies });
@@ -48,7 +51,6 @@ export async function POST(request) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
 
-  // --- CHANGE 2: ACCEPTING THE NEW `studyHoursPerDay` VARIABLE ---
   const { examName, syllabus, examDate, useDocuments, studyHoursPerDay } = await request.json();
 
   const encoder = new TextEncoder();
@@ -71,22 +73,35 @@ export async function POST(request) {
         const daysLeft = Math.max(1, Math.ceil((new Date(examDate) - today) / (1000 * 60 * 60 * 24)));
         
         let retrievedContext = "No documents were used for context.";
-        if (useDocuments) {
+    if (useDocuments) {
             streamUpdate('status', 'Processing documents with semantic search...');
-            const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
-            const syllabusTopics = getTopicsFromSyllabus(syllabus);
-            let allMatches = [];
             
+            // --- DEFINITIVE FIX V4: Use the PredictionServiceClient for embeddings ---
+           const syllabusTopics = getTopicsFromSyllabus(syllabus);
+            let allMatches = [];
+            const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
+
             for (const [index, topic] of syllabusTopics.entries()) {
               streamUpdate('status', `Analyzing syllabus topic ${index + 1}/${syllabusTopics.length}: "${topic}"`);
+              
+              // Use the original, working embedContent method
               const result = await embeddingModel.embedContent(topic);
+              
               const { data: matches, error } = await supabase.rpc('match_documents', {
+                  // Parse the response from the old SDK's structure
                   query_embedding: result.embedding.values,
                   match_count: 2,
                   target_user_id: session.user.id
               });
-              if (error) { console.error(`Error matching documents for topic "${topic}":`, error); continue; }
-              if (matches && matches.length > 0) { allMatches.push(`For topic "${topic}", notes say: """${matches.map(m => m.content).join('\n---\n')}"""`); }
+
+              if (error) { 
+                console.error(`Error matching documents for topic "${topic}":`, error); 
+                continue; 
+              }
+              
+              if (matches && matches.length > 0) { 
+                allMatches.push(`For topic "${topic}", notes say: """${matches.map(m => m.content).join('\n---\n')}"""`); 
+              }
             }
             if (allMatches.length > 0) { 
               retrievedContext = allMatches.join('\n\n');
@@ -100,11 +115,11 @@ export async function POST(request) {
           streamUpdate('status', 'Building strategy...');
         }
         
-        const plannerModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
+        // --- VERTEX AI MIGRATION: USE CENTRALIZED GENERATIVE MODEL ---
+        const plannerModel = await getVertexAIModel('gemini-2.5-flash', { responseMimeType: "application/json" });
 
-         // --- STAGE 1: THE TRIAGE AGENT (NEW) ---
-        // This agent makes the hard decisions and outputs pure, structured data. This is our immutable source of truth.
         streamUpdate('status', 'Performing strategic triage...');
+
         const triagePrompt = `
         You are a ruthless, hyper-logical academic strategist. Your only job is to analyze the provided data and make the optimal strategic decisions. You do not write prose or explanations; you output ONLY a single, valid JSON object containing your final, data-driven conclusions.
 
@@ -144,11 +159,15 @@ export async function POST(request) {
           ]
         }
         `;
-        const triageResult = await plannerModel.generateContent(triagePrompt);
-        const triageData = JSON.parse(triageResult.response.text());
+        // --- VERTEX AI MIGRATION: UPDATE GENERATE CONTENT CALL SYNTAX ---
+        const triageResult = await plannerModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: triagePrompt }] }]
+        });
+        
+        // --- VERTEX AI MIGRATION: UPDATE RESPONSE PARSING SYNTAX ---
+        const triageResponseText = triageResult.response.candidates[0].content.parts[0].text;
+        const triageData = JSON.parse(triageResponseText);
 
-        // --- STAGE 2: THE COMMUNICATOR AGENT (NEW) ---
-        // This agent does not make decisions. It only explains the Triage Agent's decisions empathetically.
         streamUpdate('status', 'Translating strategy into guidance...');
         const communicatorPrompt = `
             - CONSTITUTION: ${KalPad_Constitution}
@@ -182,18 +201,23 @@ export async function POST(request) {
             -   Your ONLY output MUST be a single, valid JSON object with one key: { "overall_approach": "<Your personalized, Indianized, and strategic paragraph here>" }
             `;
             
-        const communicatorResult = await plannerModel.generateContent(communicatorPrompt);
-        // We now construct the final, trustworthy strategy object.
+            
+        // --- VERTEX AI MIGRATION: UPDATE GENERATE CONTENT CALL SYNTAX ---
+        const communicatorResult = await plannerModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: communicatorPrompt }] }]
+        });
+        
+        // --- VERTEX AI MIGRATION: UPDATE RESPONSE PARSING SYNTAX ---
+        const communicatorResponseText = communicatorResult.response.candidates[0].content.parts[0].text;
         const strategy = {
             ...triageData,
-            overall_approach: JSON.parse(communicatorResult.response.text()).overall_approach || "Here is your strategic plan."
+            overall_approach: JSON.parse(communicatorResponseText).overall_approach || "Here is your strategic plan."
         };
         controller.enqueue(encoder.encode(JSON.stringify({ type: 'strategy', data: strategy }) + '\n---\n'));
 
-        // --- STAGE 2 & 3: THE HIERARCHICAL PLANNER ---
         let comprehensiveWeeklyPlan = [];
         if (daysLeft > 90) {
-          streamUpdate('status', 'Architecting high-level monthly structure...');
+            streamUpdate('status', 'Architecting high-level monthly structure...');
 
             const monthlyPlanPrompt = `
               ${KalPad_Constitution}
@@ -209,10 +233,11 @@ export async function POST(request) {
               - "main_focus_topics": (array of strings) The primary chapters or units to be covered this month.
               - "goals": (string) A concise, one-sentence goal for the month (e.g., "Master all foundational concepts and complete Unit 1 & 2.").
             `;
-            const monthlyResult = await plannerModel.generateContent(monthlyPlanPrompt);
-            const monthlyPlan = JSON.parse(monthlyResult.response.text());
+            const monthlyResult = await plannerModel.generateContent({ contents: [{ role: 'user', parts: [{ text: monthlyPlanPrompt }] }] });
+            const monthlyPlan = JSON.parse(monthlyResult.response.candidates[0].content.parts[0].text);
+            
             for (const [index, monthData] of monthlyPlan.entries()) {
-              streamUpdate('status', `Breaking down Month ${index + 1}/${monthlyPlan.length} into weekly goals...`);
+                streamUpdate('status', `Breaking down Month ${index + 1}/${monthlyPlan.length} into weekly goals...`);
 
                 const globalWeekOffset = index * 4;
                 const weeksInMonthPrompt = `
@@ -228,14 +253,12 @@ export async function POST(request) {
                   - "main_focus_topics": (array of strings) The specific sub-topics or sections to cover this week.
                   - "goals": (string) A one-sentence goal for this specific week.
                 `;
-                const weeksResult = await plannerModel.generateContent(weeksInMonthPrompt);
-                const weeksForMonth = JSON.parse(weeksResult.response.text());
+                const weeksResult = await plannerModel.generateContent({ contents: [{ role: 'user', parts: [{ text: weeksInMonthPrompt }] }] });
+                const weeksForMonth = JSON.parse(weeksResult.response.candidates[0].content.parts[0].text);
                 comprehensiveWeeklyPlan.push(...weeksForMonth);
             }
         } else {
-
-          streamUpdate('status', 'Architecting high-level weekly structure...');
-
+            streamUpdate('status', 'Architecting high-level weekly structure...');
           
             const weeklyPlanPrompt = `
               ${KalPad_Constitution}
@@ -251,13 +274,12 @@ export async function POST(request) {
               - "main_focus_topics": (array of strings) The primary chapters or units to be covered this week.
               - "goals": (string) A concise, one-sentence goal for the week.
             `;
-            const weeklyResult = await plannerModel.generateContent(weeklyPlanPrompt);
-            comprehensiveWeeklyPlan = JSON.parse(weeklyResult.response.text());
+            const weeklyResult = await plannerModel.generateContent({ contents: [{ role: 'user', parts: [{ text: weeklyPlanPrompt }] }] });
+            comprehensiveWeeklyPlan = JSON.parse(weeklyResult.response.candidates[0].content.parts[0].text);
         }
 
         streamUpdate('status', 'High-level architecture complete. Generating detailed tasks...');
 
-        // --- CHANGE 4: THE UPGRADED WEEKLY FOREMAN AGENT (STAGE 4) ---
         let plannedTopicsList = [];
         let dayCounter = 0;
         
@@ -315,23 +337,20 @@ export async function POST(request) {
               }
             `;
             
-            const weekResult = await plannerModel.generateContent(weeklyBatchPrompt);
-            const weekPlanObject = JSON.parse(weekResult.response.text());
+            
+            const weekResult = await plannerModel.generateContent({ contents: [{ role: 'user', parts: [{ text: weeklyBatchPrompt }] }] });
+            const weekPlanObject = JSON.parse(weekResult.response.candidates[0].content.parts[0].text);
             let weekPlanArray = weekPlanObject.weekly_plan || [];
 
-            // --- STAGE 4: THE INTEGRITY FILTER (NEW PROGRAMMATIC LAYER) ---
-            // This is the final, non-negotiable check. We trust the AI, but we verify with code.
+            // The Integrity Filter logic remains unchanged.
             const forbiddenTopicStrings = strategy.skipped_topics.map(t => t.topic.toLowerCase());
-            
             if (forbiddenTopicStrings.length > 0) {
                 weekPlanArray = weekPlanArray.map(dayPlan => {
                     const sanitizedSubTopics = dayPlan.sub_topics.filter(subTopic => {
                         const subTopicTextLower = subTopic.text.toLowerCase();
-                        // Return true (keep) only if NO forbidden topic is found in the text.
                         return !forbiddenTopicStrings.some(forbidden => subTopicTextLower.includes(forbidden));
                     });
                     
-                    // If filtering removed all sub-topics, we should reflect that.
                     if (sanitizedSubTopics.length === 0 && dayPlan.sub_topics.length > 0) {
                         dayPlan.day_summary = "This day's original tasks were removed by the Integrity Filter to align with the strategic decision to skip certain topics. Consider this a buffer day.";
                     }

@@ -2,6 +2,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getVertexAIModel } from '@/lib/vertexai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
@@ -64,13 +65,16 @@ export async function POST(request) {
       }
     `;
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash", // Upgraded model for higher quality questions
-      generationConfig: { responseMimeType: "application/json" },
+    // REPLACE WITH THIS BLOCK
+    const model = await getVertexAIModel('gemini-2.5-flash', { 
+      responseMimeType: "application/json" 
     });
 
-    const result = await model.generateContent(prompt);
-    const quizData = JSON.parse(result.response.text());
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }]
+    });
+
+    const quizData = JSON.parse(result.response.candidates[0].content.parts[0].text);
 
     return new Response(JSON.stringify(quizData), { status: 200 });
 

@@ -60,15 +60,28 @@ export async function POST(request) {
 
     const headerMarkdown = `# ${topicName || 'Note'}\n## ${subTopicName || ''}\n***\n`;
     
-    // Chunk the main body of the markdown, not the header.
+    // --- DEFINITIVE ADDITION #1: DEFINE THE BRANDING FOOTER ---
+    const brandingFooter = "\n\n---\n\n*Crafted with the KalPad AI Study Mentor ✨*";
+
+    // Chunk the main body of the markdown.
     const markdownChunks = chunkMarkdown(markdown, CHUNK_SIZE_LIMIT - headerMarkdown.length);
 
-    // --- DEFINITIVE FIX #2: THE PARALLEL PROCESSING & MERGING PIPELINE ---
     const pdfPromises = markdownChunks.map(async (chunk, index) => {
         const formData = new URLSearchParams();
         
+        let content = '';
+
         // Prepend the header ONLY to the first chunk.
-        const content = index === 0 ? headerMarkdown + chunk : chunk;
+        if (index === 0) {
+            content += headerMarkdown;
+        }
+
+        content += chunk;
+
+        // --- DEFINITIVE ADDITION #2: APPEND THE FOOTER ONLY TO THE LAST CHUNK ---
+        if (index === markdownChunks.length - 1) {
+            content += brandingFooter;
+        }
 
         formData.append('markdown', content);
         formData.append('css', css);
@@ -85,7 +98,7 @@ export async function POST(request) {
 
     const pdfBuffers = await Promise.all(pdfPromises);
 
-    // Merge the resulting PDFs seamlessly.
+    // Merging logic is unchanged and correct.
     const mergedPdf = await PDFDocument.create();
     for (const pdfBuffer of pdfBuffers) {
         try {

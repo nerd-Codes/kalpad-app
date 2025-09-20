@@ -10,6 +10,8 @@ import { execSync } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { getVertexAIModel } from "@/lib/vertexai";
+
 import which from 'which'; 
 
 const preferredLangs = ['en-IN', 'hi-IN', 'en-US'];
@@ -95,8 +97,8 @@ const curationPipeline = inngest.createFunction(
         const topicProcessingPromises = sub_topics_to_curate.map(async (subTopic) => {
             try {
                 // AGENT 0.5: The Topic Distiller
-                const cleanTopic = await step.run(`agent-0.5-distill-topic-${subTopic.text.slice(0, 15)}`, async () => {
-                    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+                const cleanTopic = await step.run(`agent-1-generate-keywords${stepIdSuffix}`, async () => {
+                    const model = await getVertexAIModel("gemini-1.5-flash-001", { responseMimeType: "application/json" });
                     const prompt = `You are a Topic Distiller. Your one job is to read the following instructional text and extract the core, searchable academic concept.
                         Context: 
                         The overall exam is "${subTopic.exam_name}".    
@@ -104,10 +106,12 @@ const curationPipeline = inngest.createFunction(
                         CRITICAL: Respond with ONLY the clean, concise topic name. Do not add any other words.
                         Example Input: "Biology: Introduction to Life Processes and Autotrophic Nutrition. Grasp the fundamental concept of 'Life Processes'..."
                         Example Output: "Autotrophic Nutrition and Photosynthesis"`;
-                    const result = await model.generateContent(prompt);
-                    return result.response.text().trim();
+                    const result = await model.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+                    });
+                    return JSON.parse(result.response.candidates[0].content.parts[0].text);
                 });
-                
+                                
                 const stepIdSuffix = `-${cleanTopic.slice(0, 25).replace(/\s/g, '_')}`;
 
                 // AGENT 0: The Librarian (Cache Check)
@@ -170,7 +174,7 @@ const curationPipeline = inngest.createFunction(
                         if (fullTranscript) {
                         // Step 2 (NEW): Run the "Smart Snippet" Agent to extract the golden passage
                         const smartSnippet = await step.run(`agent-3.5-get-snippet-for-${candidate.id}`, async () => {
-                            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Using the fast, low-cost model
+                            const model = await getVertexAIModel("gemini-2.5-flash");
                             const prompt = `You are an AI pre-processor. Your sole function is to analyze a raw video transcript and extract the single most academically relevant and information-dense passage related to a specific topic. Aggressively ignore all filler, introductions, and promotions.
                                 - Overall Exam Name: "${subTopic.exam_name}"
                                 - Target Academic Topic: "${cleanTopic}"
@@ -182,13 +186,14 @@ const curationPipeline = inngest.createFunction(
 
                                 Your Task: Read the transcript, identify the core educational segment for the topic, and extract a single, contiguous block of text approximately 1000 words long. Return ONLY the raw text of this passage.`;
                             
-                            const result = await model.generateContent(prompt);
-                            return result.response.text().trim();
+                            const result = await model.generateContent({
+                                contents: [{ role: 'user', parts: [{ text: prompt }] }]
+                            });
+                            return result.response.candidates[0].content.parts[0].text.trim();
                         });
-
                         if (smartSnippet) {
                             const analysis = await step.run(`agent-3-verify-${candidate.id}`, async () => {
-                                 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
+                                const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
                                  const prompt = `You are a meticulous Verification Analyst for an AI study platform. Your task is to act as a strict quality gate. Analyze the provided "smart snippet" to determine if it is a high-quality, relevant educational resource for the given sub-topic.
                                     - Overall Exam Name: "${subTopic.exam_name}"
                                     - Specific Sub-Topic: "${subTopic.sub_topic_text}"
@@ -204,8 +209,10 @@ const curationPipeline = inngest.createFunction(
                                     CRITICAL: A video is high quality if the accent and context are appropriate for a user in '${user_timezone}'. A video in Hindi or with an Indian accent is strongly preferred. Penalize the score for heavy Western accents.
                                     CRITICAL JSON SCHEMA (Return ONLY a single, valid JSON object):
                                     { "relevance_score": number, "justification": "A one-sentence explanation of your reasoning." }`;
-                                 const result = await model.generateContent(prompt);
-                                 return JSON.parse(result.response.text());
+                                const result = await model.generateContent({
+                                    contents: [{ role: 'user', parts: [{ text: prompt }] }]
+                                });
+                                return JSON.parse(result.response.candidates[0].content.parts[0].text);
                             });
 
                             if (analysis && analysis.relevance_score > 60) {
@@ -228,8 +235,8 @@ const curationPipeline = inngest.createFunction(
         // --- AGENT 5: The Cohesion Agent (Meta-Analysis) ---
         const finalCuration = await step.run("agent-5-cohesion-and-curation", async () => {
             if (allVerifiedVideos.length === 0) return [];
-            
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
+
+            const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
             const prompt = `You are a master Curation Agent. Select the single best YouTube video for each sub-topic from a list of verified candidates. Prioritize cohesion.
                 Today's Full Learning Context: ${cohesion_context.join(', ')}
                 Verified Video Candidates (JSON): ${JSON.stringify(allVerifiedVideos)}
@@ -238,8 +245,10 @@ const curationPipeline = inngest.createFunction(
                 2. For each unique sub-topic, select the single BEST video.
                 3. Cohesion Rule: If multiple candidates for different topics are from the same highly-rated channel, STRONGLY prefer selecting them to create a consistent learning experience.
                 CRITICAL JSON SCHEMA: Return an array of objects: [{ "subTopicText": "...", "id": "...", "title": "...", "channel": "...", "relevance_score": ... }]`;
-            const result = await model.generateContent(prompt);
-            return JSON.parse(result.response.text());
+            const result = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }]
+            });
+            return JSON.parse(result.response.candidates[0].content.parts[0].text);
         });
 
         // --- FINAL STEP: Index and Save ONLY the final, cohesive selections ---
@@ -313,8 +322,7 @@ const scripterAgent = inngest.createFunction(
 
             if (placeholderData.engine === 'matplotlib') {
                 const imageUrl = await step.run(`generate-quickchart-url-for-${placeholderData.description.slice(0, 20)}`, async () => {
-                    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
-
+                    const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
                     const prompt = `You are an expert data visualization designer creating a chart for QuickChart.io. Your sole task is to convert a natural language description into a valid, aesthetically pleasing, and polished QuickChart JSON configuration.
 
                         Description: "${placeholderData.description}"
@@ -359,8 +367,10 @@ const scripterAgent = inngest.createFunction(
                         }
                            UNBREAKABLE RULE: Your entire response must be ONLY the raw JSON object, starting with '{' and ending with '}'. Do not wrap it in \`\`\`json or any other text.
                         `;
-                    const result = await model.generateContent(prompt);
-                    let rawResponse = result.response.text();
+                    const result = await model.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+                    });
+                    let rawResponse = result.response.candidates[0].content.parts[0].text;
                     const jsonMatch = rawResponse.match(/```json\n([\s\S]*?)\n```|({[\s\S]*})/);
                     const jsonString = jsonMatch ? (jsonMatch[1] || jsonMatch[2]) : rawResponse;
                     const chartConfig = JSON.parse(jsonString.trim());
@@ -408,7 +418,7 @@ const svgRendererAgent = inngest.createFunction(
 
         // Step 1: Generate the script from the description
         const script = await step.run(`generate-script-for-${engine}`, async () => {
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            const model = await getVertexAIModel("gemini-2.5-flash");
             let prompt = `You are an expert script generator for diagrams. Convert the natural language description into a valid, complete script for the specified engine. Respond ONLY with the raw script code. Do not add any explanation or markdown formatting.`;
             
             if (engine === 'd2') {
@@ -449,8 +459,10 @@ const svgRendererAgent = inngest.createFunction(
                 `;
             }
 
-            const result = await model.generateContent(prompt);
-            return result.response.text().trim();
+            const result = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }]
+            });
+            return result.response.candidates[0].content.parts[0].text.trim();
         });
 
         if (!script) {

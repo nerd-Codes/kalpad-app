@@ -2,6 +2,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getVertexAIModel } from '@/lib/vertexai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
@@ -62,11 +63,17 @@ export async function POST(request) {
                 "feedback_summary": "Your overall performance summary."
             }
         `;
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro", generationConfig: { responseMimeType: "application/json" } });
-        const result = await model.generateContent(prompt);
-        const aiData = JSON.parse(result.response.text());
-        aiFeedbackSummary = aiData.feedback_summary;
-        explanations = aiData.explanations;
+            const model = await getVertexAIModel('gemini-2.5-flash', { 
+            responseMimeType: "application/json" 
+            });
+
+            const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+            });
+
+            const aiData = JSON.parse(result.response.candidates[0].content.parts[0].text);
+            aiFeedbackSummary = aiData.feedback_summary;
+            explanations = aiData.explanations;
     }
     
     // 3. Save everything to the database in a single transaction

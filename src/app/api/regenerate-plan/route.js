@@ -1,6 +1,7 @@
 // src/api/regenerate-plan/route.js
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { getVertexAIModel } from '@/lib/vertexai';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -114,7 +115,7 @@ function analyzeUserPerformance(planTopics, userDeclaredHours) {
 
     const performanceAnalysis = analyzeUserPerformance(existingPlan.plan_topics, user_declared_hours || 4);
     
-    const plannerModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
+    const plannerModel = await getVertexAIModel('gemini-2.5-flash', { responseMimeType: "application/json" });
 
     // --- AGENT 1: THE TRIAGE AGENT (THE BRAIN) ---
     const triagePrompt = `
@@ -158,8 +159,10 @@ function analyzeUserPerformance(planTopics, userDeclaredHours) {
         }
     `;
 
-    const triageResult = await plannerModel.generateContent(triagePrompt);
-    const triageData = JSON.parse(triageResult.response.text());
+    const triageResult = await plannerModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: triagePrompt }] }]
+    });
+    const triageData = JSON.parse(triageResult.response.candidates[0].content.parts[0].text);
 
     // --- AGENT 2: THE COMMUNICATOR AGENT ---
     const communicatorPrompt = `
@@ -198,10 +201,12 @@ function analyzeUserPerformance(planTopics, userDeclaredHours) {
     -   Your ONLY output MUST be a single, valid JSON object with one key: { "overall_approach": "<Your personalized, Indianized, and strategic paragraph here>" }
     `;
 
-        const communicatorResult = await plannerModel.generateContent(communicatorPrompt);
+        const communicatorResult = await plannerModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: communicatorPrompt }] }]
+        });
         const strategy = {
             ...triageData,
-            overall_approach: JSON.parse(communicatorResult.response.text()).overall_approach || "Here is your new strategic plan."
+            overall_approach: JSON.parse(communicatorResult.response.candidates[0].content.parts[0].text).overall_approach || "Here is your new strategic plan."
         };
 
         // --- AGENT 3: THE HIERARCHICAL PLANNER (Identical to V2 generate-plan) ---
@@ -223,8 +228,10 @@ function analyzeUserPerformance(planTopics, userDeclaredHours) {
               - "goals": (string) A concise, one-sentence goal for the month (e.g., "Master all foundational concepts and complete Unit 1 & 2.").
             `;
 
-            const monthlyResult = await plannerModel.generateContent(monthlyPlanPrompt);
-            const monthlyPlan = JSON.parse(monthlyResult.response.text());
+            const monthlyResult = await plannerModel.generateContent({
+              contents: [{ role: 'user', parts: [{ text: monthlyPlanPrompt }] }]
+          });
+            const monthlyPlan = JSON.parse(monthlyResult.response.candidates[0].content.parts[0].text);
             for (const [index, monthData] of monthlyPlan.entries()) {
                 const globalWeekOffset = index * 4;
                  const weeksInMonthPrompt = `
@@ -241,8 +248,10 @@ function analyzeUserPerformance(planTopics, userDeclaredHours) {
                   - "goals": (string) A one-sentence goal for this specific week.
                 `;
 
-                const weeksResult = await plannerModel.generateContent(weeksInMonthPrompt);
-                const weeksForMonth = JSON.parse(weeksResult.response.text());
+                const weeksResult = await plannerModel.generateContent({
+                  contents: [{ role: 'user', parts: [{ text: weeksInMonthPrompt }] }]
+                });
+                const weeksForMonth = JSON.parse(weeksResult.response.candidates[0].content.parts[0].text);
                 comprehensiveWeeklyPlan.push(...weeksForMonth);
             }
         } else {
@@ -261,8 +270,10 @@ function analyzeUserPerformance(planTopics, userDeclaredHours) {
               - "goals": (string) A concise, one-sentence goal for the week.
             `;
 
-            const weeklyResult = await plannerModel.generateContent(weeklyPlanPrompt);
-            comprehensiveWeeklyPlan = JSON.parse(weeklyResult.response.text());
+            const weeklyResult = await plannerModel.generateContent({
+                contents: [{ role: 'user', parts: [{ text: weeklyPlanPrompt }] }]
+            });
+            comprehensiveWeeklyPlan = JSON.parse(weeklyResult.response.candidates[0].content.parts[0].text);
         }
 
         // --- AGENT 4: THE WEEKLY BATCH PLANNER & SIMPLIFIED STREAMING LOGIC ---
@@ -330,8 +341,10 @@ function analyzeUserPerformance(planTopics, userDeclaredHours) {
                     }
                     `;
                     
-                    const weekResult = await plannerModel.generateContent(weeklyBatchPrompt);
-                    const weekPlanObject = JSON.parse(weekResult.response.text());
+                    const weekResult = await plannerModel.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: weeklyBatchPrompt }] }]
+                    });
+                    const weekPlanObject = JSON.parse(weekResult.response.candidates[0].content.parts[0].text);
                     let weekPlanArray = weekPlanObject.weekly_plan || [];
 
                     const forbiddenTopicStrings = strategy.skipped_topics.map(t => t.topic.toLowerCase());
