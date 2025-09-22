@@ -12,7 +12,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useDisclosure } from '@mantine/hooks';
 
 import { Skeleton, Container, Title, Text, TextInput, Textarea, Button, Paper, Group, FileInput, Checkbox, Alert, Badge, Progress, Loader, Stack, Grid, GridCol, NumberInput, Collapse, List, ThemeIcon } from '@mantine/core';
-import { IconCalendar, IconFileText, IconBooks, IconPdf, IconClock, IconTargetArrow, IconX, IconListDetails, IconInfoCircle } from '@tabler/icons-react';
+import { IconCalendar, IconFileText, IconBooks, IconPdf, IconClock, IconTargetArrow, IconX, IconListDetails, IconInfoCircle, IconSettings } from '@tabler/icons-react';
+import { PlanModeModal } from '@/components/PlanModeModal';
 
 const useTypingEffect = (text = '', speed = 1) => {
     const [displayedText, setDisplayedText] = useState('');
@@ -95,6 +96,10 @@ export default function NewPlanPage() {
 
     const [currentFact, setCurrentFact] = useState(wittyFacts[0]);
     const typedApproach = useTypingEffect(strategy?.overall_approach);
+
+    const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
+    // --- ADD THIS STATE for the selected plan mode ---
+    const [planMode, setPlanMode] = useState('default'); 
 
     useEffect(() => {
         let factInterval = null;
@@ -197,7 +202,7 @@ export default function NewPlanPage() {
         const response = await fetch('/api/generate-plan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ examName, syllabus, examDate, useDocuments, studyHoursPerDay }),
+                body: JSON.stringify({ examName, syllabus, examDate, useDocuments, studyHoursPerDay, planMode }),
             });
 
         if (!response.body) { throw new Error("Streaming response not available."); }
@@ -505,6 +510,23 @@ return (
                 disabled={isGenerating}
                 size="md"
             />
+            <Group justify="flex-start" mt="sm">
+                <Button
+                    leftSection={<IconSettings size={16} />}
+                    variant="subtle"
+                    onClick={openModal}
+                >
+                    Advanced Settings (Mode: {planMode.charAt(0).toUpperCase() + planMode.slice(1)})
+                </Button>
+            </Group>
+
+            {/* --- NEW: PLAN MODE MODAL --- */}
+            <PlanModeModal
+                opened={modalOpened}
+                close={closeModal}
+                currentMode={planMode}
+                onSelectMode={setPlanMode}
+            />
         </Stack>
 
         {/* --- SECTION 2: OPTIONAL MATERIALS (REFINED) --- */}
@@ -547,6 +569,7 @@ return (
                     )}
                 </Stack>
             </Paper>
+            
         </Stack>
 
         {/* --- SECTION 3: CALL TO ACTION --- */}
