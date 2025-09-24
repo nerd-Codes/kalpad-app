@@ -450,17 +450,23 @@ const svgRendererAgent = inngest.createFunction(
         await fs.writeFile(inputFile, script);
 
         try {
-            // This is now the only execution path
-            const mmdcPath = '/vercel/path0/.npm-global/bin/mmdc';
-            execSync(`"${mmdcPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
+            // --- DEFINITIVE FIX V2: Use the correct filename 'mermaid.js' ---
+            const mermaidCliPath = path.resolve('./bin/mermaid.js');
+            
+            // The command must call the node runtime to execute our bundled .js file
+            const command = `node "${mermaidCliPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`;
+            
+            execSync(command);
+
         } catch (execError) {
-            // Fallback for local development
-            console.log("Global mmdc failed, attempting fallback to system PATH...");
+            // Fallback logic remains the same, but we update the log for clarity
+            console.log("Bundled mermaid.js renderer failed, attempting fallback to system PATH `mmdc`...");
             try {
+                // The system PATH command is still likely 'mmdc'
                 execSync(`mmdc -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
             } catch (fallbackError) {
                 await fs.rm(tempDir, { recursive: true, force: true });
-                throw new Error(`Failed to execute mmdc renderer using both global path and system PATH.`);
+                throw new Error(`Failed to execute Mermaid renderer using both bundled binary and system PATH.`);
             }
         }
         
