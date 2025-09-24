@@ -450,23 +450,24 @@ const svgRendererAgent = inngest.createFunction(
         await fs.writeFile(inputFile, script);
 
         try {
-            // --- DEFINITIVE FIX V2: Use the correct filename 'mermaid.js' ---
-            const mermaidCliPath = path.resolve('./bin/mermaid.js');
+            // --- DEFINITIVE FIX V3: Use the modern, bundled 'mmdc' binary ---
+            const mmdcPath = path.resolve('./bin/mmdc');
             
-            // The command must call the node runtime to execute our bundled .js file
-            const command = `node "${mermaidCliPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`;
+            // The modern CLI is a self-contained executable. We do not need to call it with `node`.
+            const command = `"${mmdcPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`;
             
+            // We must give the binary executable permissions within the serverless environment.
+            execSync(`chmod +x "${mmdcPath}"`);
             execSync(command);
 
         } catch (execError) {
-            // Fallback logic remains the same, but we update the log for clarity
-            console.log("Bundled mermaid.js renderer failed, attempting fallback to system PATH `mmdc`...");
+            // The fallback is now for local dev where `mmdc` might be in the global PATH
+            console.log("Bundled mmdc failed, attempting fallback to system PATH...");
             try {
-                // The system PATH command is still likely 'mmdc'
                 execSync(`mmdc -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
             } catch (fallbackError) {
                 await fs.rm(tempDir, { recursive: true, force: true });
-                throw new Error(`Failed to execute Mermaid renderer using both bundled binary and system PATH.`);
+                throw new Error(`Failed to execute mmdc renderer using both bundled binary and system PATH.`);
             }
         }
         
