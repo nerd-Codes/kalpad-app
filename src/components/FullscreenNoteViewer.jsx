@@ -73,7 +73,7 @@ th { background: #f0f0f0; }
 .katex { font-family: 'Lexend Deca', 'Inter', serif; font-size: 1em; }
 @page { size: A4; margin: 0.3in; }`;
 
-export function FullscreenNoteViewer({ noteData, onClose, onUpdate }) {
+export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet = false }) {
 
     const [renderContent, setRenderContent] = useState(false);
     const { selection, clearSelection } = useTextSelection();
@@ -250,7 +250,10 @@ const handleAutoPrint = () => {
     if (!noteData) return;
     setIsExporting(true);
 
-    const printUrl = `/print/${noteData.id}`;
+    const printUrl = isCramSheet 
+    ? `/print-cram-sheet/${noteData.id}` 
+    : `/print/${noteData.id}`;
+
     const printWindow = window.open(printUrl, '_blank');
 
     if (!printWindow) {
@@ -334,7 +337,9 @@ const handleAutoPrint = () => {
     const handleClientSidePrint = () => {
         setIsExporting(true);
         closeExportModal(); // Close the choice modal
-        const printUrl = `/print/${noteData.id}`;
+        const printUrl = isCramSheet 
+            ? `/print-cram-sheet/${noteData.id}` 
+            : `/print/${noteData.id}`;
         const printWindow = window.open(printUrl, '_blank');
         if (!printWindow) {
             notifications.show({ title: 'Popup Blocked', message: 'Please allow popups for this site to export your note.', color: 'yellow' });
@@ -399,6 +404,7 @@ const handleAutoPrint = () => {
                     <Stack gap="xs" className="modal-header">
                         <Title order={2} ff="Lexend, sans-serif">{day_topic.topic_name}</Title>
                         <Title order={4} fw={500}>{sub_topic.text}</Title>
+                        {!isCramSheet && (
                         <Group>
                             <Badge color={getDayDifficultyColor(day_topic.day_difficulty)} variant="light">
                                 Day: {day_topic.day_difficulty}
@@ -407,6 +413,7 @@ const handleAutoPrint = () => {
                                 Task: {sub_topic.difficulty}
                             </Badge>
                         </Group>
+                        )}
                     </Stack>
                     
                     {/* --- THE ACTION BAR --- */}
@@ -428,6 +435,7 @@ const handleAutoPrint = () => {
                             Ask a Follow-up
                         </Button>
 
+                        {!isCramSheet && (
                         <ShimmerButton
                             leftSection={<IconCircleCheck size={16} />}
                             color="green"
@@ -437,6 +445,7 @@ const handleAutoPrint = () => {
                         >
                             {sub_topic.completed ? 'Completed' : 'Mark as Complete'}
                         </ShimmerButton>
+                        )}
                     </Group>
                     
                    <Box className={markdownStyles.markdown}>

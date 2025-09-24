@@ -97,22 +97,22 @@ const curationPipeline = inngest.createFunction(
         const topicProcessingPromises = sub_topics_to_curate.map(async (subTopic) => {
             try {
                 // AGENT 0.5: The Topic Distiller
-                const cleanTopic = await step.run(`agent-1-generate-keywords${stepIdSuffix}`, async () => {
-                    const model = await getVertexAIModel("gemini-1.5-flash-001", { responseMimeType: "application/json" });
-                    const prompt = `You are a Topic Distiller. Your one job is to read the following instructional text and extract the core, searchable academic concept.
-                        Context: 
-                        The overall exam is "${subTopic.exam_name}".    
-                        Instructional Text: "${subTopic.text}"
-                        CRITICAL: Respond with ONLY the clean, concise topic name. Do not add any other words.
-                        Example Input: "Biology: Introduction to Life Processes and Autotrophic Nutrition. Grasp the fundamental concept of 'Life Processes'..."
-                        Example Output: "Autotrophic Nutrition and Photosynthesis"`;
-                    const result = await model.generateContent({
-                        contents: [{ role: 'user', parts: [{ text: prompt }] }]
-                    });
-                    return JSON.parse(result.response.candidates[0].content.parts[0].text);
+                const cleanTopic = await step.run(`agent-0.5-distill-topic-${subTopic.text.slice(0, 25)}`, async () => {
+                const model = await getVertexAIModel("gemini-2.5-flash"); // Use a specific model version for stability
+                const prompt = `You are a Topic Distiller. Your one job is to read the following instructional text and extract the core, searchable academic concept.
+                    Context: 
+                    The overall exam is "${subTopic.exam_name}".    
+                    Instructional Text: "${subTopic.text}"
+                    CRITICAL: Respond with ONLY the clean, concise topic name. Do not add any other words.`;
+                const result = await model.generateContent({
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }]
                 });
-                                
-                const stepIdSuffix = `-${cleanTopic.slice(0, 25).replace(/\s/g, '_')}`;
+                // The model is not supposed to return JSON, so we get the text directly
+                return result.response.candidates[0].content.parts[0].text.trim();
+            });
+                            
+            // Now that we HAVE cleanTopic, we can safely define the suffix
+            const stepIdSuffix = `-${cleanTopic.slice(0, 25).replace(/\s/g, '_')}`;
 
                 // AGENT 0: The Librarian (Cache Check)
                 const cacheHit = await step.run(`agent-0-cache-check${stepIdSuffix}`, async () => {
@@ -381,13 +381,13 @@ const scripterAgent = inngest.createFunction(
                 // Immediately replace the placeholder with the final image tag for matplotlib plots
                 updatedMarkdown = updatedMarkdown.replace(placeholder, `![${placeholderData.description}](${imageUrl})`);
 
-            } else if (placeholderData.engine === 'd2' || placeholderData.engine === 'mermaid') {
+            } else if (placeholderData.engine === 'mermaid') {
                 await step.sendEvent("dispatch-svg-render-job", {
                     name: 'notes/svg.render.requested',
                     data: {
                         note_id,
                         user_id,
-                        engine: placeholderData.engine,
+                        engine: 'mermaid',
                         description: placeholderData.description,
                         placeholder_text: placeholder
                     }
@@ -417,134 +417,66 @@ const svgRendererAgent = inngest.createFunction(
         const { note_id, user_id, engine, description, placeholder_text } = event.data;
 
         // Step 1: Generate the script from the description
-        const script = await step.run(`generate-script-for-${engine}`, async () => {
-            const model = await getVertexAIModel("gemini-2.5-flash");
-            let prompt = `You are an expert script generator for diagrams. Convert the natural language description into a valid, complete script for the specified engine. Respond ONLY with the raw script code. Do not add any explanation or markdown formatting.`;
+        const script = await step.run(`generate-mermaid-script`, async () => {
+        const model = await getVertexAIModel("gemini-2.5-flash");
+        const prompt = `
+            You are an expert script generator for Mermaid.js diagrams. Convert the natural language description into a valid, complete script. Respond ONLY with the raw script code.
             
-            if (engine === 'd2') {
-                prompt += `
-                Engine: d2
-                Description: "${description}"
-
-                CRITICAL D2 SYNTAX RULES (UNBREAKABLE):
-                1. Every node label MUST be wrapped in double quotes, with NOTHING after the closing quote on the same line.
-                ✅ GOOD: A: "Start"
-                ❌ BAD:  A: "Start" extra text
-                2. Use only simple node IDs like A, B, C, D (no spaces, no special chars).
-                3. Connections MUST be one edge per line. DO NOT chain edges.
-                ✅ GOOD: A --> B
-                            B --> C
-                ❌ BAD:  A --> B --> C
-                4. Do NOT create "edge inside edge". Only connect nodes, never connect an edge to another edge.
-                5. Do NOT add comments, markdown, explanations, or extra text. Only raw D2 code.
-                6. The entire output must be ONLY valid D2 code. No backticks, no JSON, no wrappers.
-                `;
-            } else { // mermaid
-                prompt += `
-                    Engine: mermaid
-                    Description: "${description}"
-                    
-                    CRITICAL MERMAID SYNTAX RULES (UNBREAKABLE):
-                    1.  **Node Text:** All text inside nodes must be enclosed in double quotes. Example: \`A["This is my text"]\`
-                    2.  **Escaping Characters:** You CANNOT use special characters like \`[\`, \`]\`, \`{\`, \`}\`, \`(\`, \`)\` directly inside node text. You must replace them with their HTML entity codes. Example: To show \`arr[j]\`, you must write \`"arr&lsqb;j&rsqb;"\`.
-                    3.  **Flowchart Declaration:** Always start the script with \`graph TD;\`.
-
-                    **GOOD EXAMPLE:**
-                    graph TD;
-                        A[Start] --> B{"Is x > 5?"};
-                        B -- Yes --> C["Process 'Yes'"];
-                        B -- No --> D["Process 'No'"];
-                        C --> E[End];
-                        D --> E;
-                `;
-            }
-
-            const result = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: prompt }] }]
-            });
-            return result.response.candidates[0].content.parts[0].text.trim();
+            Engine: mermaid
+            Description: "${description}"
+            
+            CRITICAL MERMAID SYNTAX RULES (UNBREAKABLE):
+            1.  Node Text: All text inside nodes MUST be enclosed in double quotes. Example: \`A["This is my text"]\`
+            2.  Escaping Characters: You MUST replace special characters like \`[\`, \`]\`, \`{\`, \`}\`, \`(\`, \`)\` inside node text with their HTML entity codes. Example: To show \`arr[j]\`, you must write \`"arr&lsqb;j&rsqb;"\`.
+            3.  Flowchart Declaration: Always start the script with \`graph TD;\`.
+            4.  Do not add comments, markdown, explanations, or any other text.
+        `;
+        const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }]
         });
+        return result.response.candidates[0].content.parts[0].text.trim();
+    });
 
         if (!script) {
             throw new Error(`AI failed to generate a valid script for engine: ${engine}`);
         }
 
-        let finalScript = script;
-        if (engine === 'd2') {
-        finalScript = finalScript
-            .split("\n")
-            .flatMap(line => {
-            // Expand chains like A --> B --> C into separate lines
-            if (line.includes("-->")) {
-                const parts = line.split("-->").map(s => s.trim());
-                if (parts.length > 2) {
-                const edges = [];
-                for (let i = 0; i < parts.length - 1; i++) {
-                    edges.push(`${parts[i]} --> ${parts[i+1]}`);
-                }
-                return edges;
-                }
-            }
-            return [line];
-            })
-            .join("\n");
-        }
 
-         const imageUrl = await step.run(`render-diagram-with-${engine}`, async () => {
-            const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), `kalpad-render-${engine}-`));
-            const isPng = engine === 'mermaid'; // We will render Mermaid to PNG
-            const ext = engine === 'd2' ? '.d2' : '.mmd';
-            const outputExt = isPng ? '.png' : '.svg';
+         const imageUrl = await step.run(`render-mermaid-diagram`, async () => {
+        const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), `kalpad-render-mermaid-`));
+        const inputFile = path.join(tempDir, `input.mmd`);
+        const outputFile = path.join(tempDir, `output.png`);
+        
+        await fs.writeFile(inputFile, script);
 
-            const inputFile = path.join(tempDir, `input${ext}`);
-            const outputFile = path.join(tempDir, `output${outputExt}`);
-            
-            await fs.writeFile(inputFile, script);
-
-            // --- DEFINITIVE FIX: USE ABSOLUTE PATHS FOR EXECUTABLES ---
+        try {
+            // This is now the only execution path
+            const mmdcPath = '/vercel/path0/.npm-global/bin/mmdc';
+            execSync(`"${mmdcPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
+        } catch (execError) {
+            // Fallback for local development
+            console.log("Global mmdc failed, attempting fallback to system PATH...");
             try {
-                if (engine === 'd2') {
-                    // This path is relative to the project root. Vercel makes the project files available.
-                    // `path.resolve` creates a correct absolute path from the relative one.
-                    const d2Path = path.resolve('./bin/d2');
-                    execSync(`"${d2Path}" --theme=0 --sketch "${inputFile}" "${outputFile}"`);
-                }  else { // mermaid
-                    const mmdcPath = '/vercel/path0/.npm-global/bin/mmdc';
-                    // The -o flag now points to a PNG file.
-                    execSync(`"${mmdcPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
-                }
-            } catch (execError) {
-                // ... (Fallback logic for local Windows testing remains the same)
-                console.log("Absolute/Relative path failed, attempting fallback to system PATH...");
-                try {
-                     if (engine === 'd2') {
-                        const d2Path = path.resolve('./bin/d2');
-                        execSync(`"${d2Path}" --theme=0 --sketch "${inputFile}" "${outputFile}"`);
-                    } else { // mermaid
-                        execSync(`mmdc -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
-                    }
-                } catch (fallbackError) {
-                    console.error(`Fallback to PATH also failed for ${engine}:`, fallbackError);
-                    await fs.rm(tempDir, { recursive: true, force: true });
-                    throw new Error(`Failed to execute renderer for ${engine} using both absolute path and system PATH.`);
-                }
+                execSync(`mmdc -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
+            } catch (fallbackError) {
+                await fs.rm(tempDir, { recursive: true, force: true });
+                throw new Error(`Failed to execute mmdc renderer using both global path and system PATH.`);
             }
-            // --- END OF FIX ---
-            
-
-            const imageContent = await fs.readFile(outputFile);
-            const storagePath = `generated-illustrations/${note_id}-${engine}-${Date.now()}${outputExt}`;
-            
-            const { error: uploadError } = await supabaseAdmin.storage
-                .from('generated-illustrations')
-                .upload(storagePath, imageContent, { contentType: isPng ? 'image/png' : 'image/svg+xml', upsert: true });
-            
-            await fs.rm(tempDir, { recursive: true, force: true });
-            if (uploadError) { throw new Error(`Supabase upload error: ${uploadError.message}`); }
-            
-            const { data: { publicUrl } } = supabaseAdmin.storage.from('generated-illustrations').getPublicUrl(storagePath);
-            return publicUrl;
-        });
+        }
+        
+        const imageContent = await fs.readFile(outputFile);
+        const storagePath = `generated-illustrations/${note_id}-mermaid-${Date.now()}.png`;
+        
+        const { error: uploadError } = await supabaseAdmin.storage
+            .from('generated-illustrations')
+            .upload(storagePath, imageContent, { contentType: 'image/png', upsert: true });
+        
+        await fs.rm(tempDir, { recursive: true, force: true });
+        if (uploadError) { throw new Error(`Supabase upload error: ${uploadError.message}`); }
+        
+        const { data: { publicUrl } } = supabaseAdmin.storage.from('generated-illustrations').getPublicUrl(storagePath);
+        return publicUrl;
+    });
 
         if (!imageUrl) {
             throw new Error(`Failed to generate and upload image URL for ${engine}`);

@@ -10,6 +10,9 @@ import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { notifications } from '@mantine/notifications';
 
+import { IconFlame } from '@tabler/icons-react';
+import { wittyFacts as cramSheetFacts } from '@/lib/newplanFacts';
+
 
 // Mantine Imports
 import { Container, Title, Text, Loader, Alert, Group, Button, Breadcrumbs, Anchor, Modal, Textarea, Paper, Badge, ScrollArea, Stack, Checkbox, TextInput } from '@mantine/core';
@@ -38,6 +41,9 @@ export default function PlanDetailPage() {
     const [regenerateModalOpened, { open: openRegenerateModal, close: closeRegenerateModal }] = useDisclosure(false);
 
     const [isCurating, setIsCurating] = useState(false);
+
+    const [cramSheet, setCramSheet] = useState(null);
+    const [isForging, setIsForging] = useState(false);
 
     const [curationJobId, setCurationJobId] = useState(null);
     const wittyStatusMessages = [
@@ -192,7 +198,8 @@ export default function PlanDetailPage() {
                             curated_lectures ( plan_topic_id, sub_topic_text, video_url ), 
                             topic_confidence ( score, activity_type ),
                             new_notes:generated_notes ( * )
-                        )
+                        ),
+                        generated_cram_sheets ( id, status ) 
                     `)
                     .eq('id', planId)
                     .eq('user_id', session.user.id)
@@ -203,6 +210,8 @@ export default function PlanDetailPage() {
                 
                 data.plan_topics.sort((a, b) => a.day - b.day);
                 setPlan(data);
+
+                setCramSheet(data.generated_cram_sheets?.[0] || null);
 
                 if (window.Android && typeof window.Android.cachePlanForOffline === 'function') {
                     console.log("Android bridge detected. Caching plan for offline access.");
@@ -217,7 +226,7 @@ export default function PlanDetailPage() {
         };
 
         // This is the ONLY useEffect that runs on page load.
-         useEffect(() => {
+        useEffect(() => {
             const getSessionAndFetch = async () => {
                 const { data: { session } } = await supabase.auth.getSession();
                 setSession(session);
@@ -494,6 +503,94 @@ const handleSelectAllTopics = () => {
     }
 };
 
+const handleForgeCramSheet = async () => {
+    if (!plan) return;
+
+    setIsForging(true);
+    let wittyMessageIndex = 0;
+
+    const notificationId = notifications.show({
+        loading: true,
+        title: 'Initializing the Forge...',
+        message: cramSheetFacts[wittyMessageIndex],
+        autoClose: false,
+        withCloseButton: false,
+    });
+
+    const wittyInterval = setInterval(() => {
+        wittyMessageIndex = (wittyMessageIndex + 1) % cramSheetFacts.length;
+        notifications.update({
+            id: notificationId,
+            message: cramSheetFacts[wittyMessageIndex],
+        });
+    }, 5000); // Cycle witty message every 5 seconds
+
+    try {
+        const response = await fetch('/api/forge-cram-sheet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan_id: plan.id }),
+        });
+
+        if (!response.body) throw new Error("Streaming response not available.");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split('\n---\n');
+            buffer = parts.pop() || ''; 
+            
+            for (const part of parts) {
+                if (part.trim() === '') continue;
+                
+                try {
+                    const message = JSON.parse(part);
+                    if (message.type === 'status') {
+                        notifications.update({
+                            id: notificationId,
+                            title: message.data.title,
+                        });
+                    } else if (message.type === 'complete') {
+                        clearInterval(wittyInterval);
+                        notifications.update({
+                            id: notificationId,
+                            loading: false,
+                            title: 'Forge Complete!',
+                            message: 'Your Cram Sheet is ready.',
+                            color: 'teal',
+                            autoClose: 5000,
+                        });
+
+                          await fetchPlanData(session); 
+                        router.push(`/cram-sheet/${message.data.cramSheetId}`);
+                        break; 
+                    } else if (message.type === 'error') {
+                        throw new Error(message.data.message);
+                    }
+                } catch (e) { console.warn("Stream parse error:", part, e); }
+            }
+        }
+    } catch (err) {
+        clearInterval(wittyInterval);
+        notifications.update({
+            id: notificationId,
+            loading: false,
+            title: 'Forge Failed',
+            message: err.message,
+            color: 'red',
+            autoClose: 7000,
+        });
+    } finally {
+        setIsForging(false);
+    }
+};
+
 
     return (
     <AppLayout session={session}>
@@ -509,6 +606,27 @@ const handleSelectAllTopics = () => {
                             
                             {/* --- 4. Add the new Share button to the header group --- */}
                             <Group>
+
+                                <Button
+                                    leftSection={<IconFlame size={16} />}
+                                    variant="outline"
+                                    color="orange"
+                                    onClick={() => {
+                                        if (cramSheet && cramSheet.status === 'complete') {
+                                            router.push(`/cram-sheet/${cramSheet.id}`);
+                                        } else {
+                                            handleForgeCramSheet();
+                                        }
+                                    }}
+                                    loading={isForging || (cramSheet && cramSheet.status === 'in_progress')}
+                                    disabled={cramSheet && cramSheet.status === 'in_progress'}
+                                >
+                                    {cramSheet && cramSheet.status === 'in_progress'
+                                        ? "Forging..."
+                                        : cramSheet && cramSheet.status === 'complete'
+                                        ? "View Cram Sheet"
+                                        : "Forge Cram Sheet"}
+                                </Button>
 
                                 <Button 
                                     leftSection={<IconShare3 size={16} />} 
