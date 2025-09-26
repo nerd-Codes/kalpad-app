@@ -2,7 +2,7 @@
 
 // This function generates the sitemap.xml file at build time.
 export default function sitemap() {
-  const baseUrl = 'https://www.kalpad.app'; // Replace with your final production domain
+  const baseUrl = 'https://kalpad-app.vercel.app'; // Replace with your final production domain
 
   // Define only the public-facing, static routes we want indexed.
   const staticRoutes = [
