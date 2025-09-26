@@ -19,7 +19,6 @@ export const metadata = {
 };
 
 
-
 export default function RootLayout({ children }) {
   // --- DEFINITIVE FIX: SERVER-SIDE PATH DETECTION ---
   const heads = headers();

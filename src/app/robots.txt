@@ -1,0 +1,17 @@
+# /src/app/robots.txt
+
+# Allow all crawlers full access to the site by default.
+User-agent: *
+Allow: /
+
+# Explicitly disallow crawlers from accessing private, user-specific directories.
+# This is critical for privacy and crawl budget efficiency.
+Disallow: /dashboard/
+Disallow: /plan/
+Disallow: /plans/
+Disallow: /cram-sheet/
+Disallow: /print/
+Disallow: /print-cram-sheet/
+
+# Point crawlers to our sitemap for a clear map of our public pages.
+Sitemap: https://kalpad-app.vercel.app/sitemap.xml
