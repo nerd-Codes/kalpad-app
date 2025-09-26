@@ -1,13 +1,10 @@
 // src/app/sitemap.xml/route.js
+export const runtime = "nodejs"; // force Node runtime (Buffer etc. work here)
+
 export async function GET() {
   const baseUrl = 'https://kalpad-app.vercel.app';
 
-  const routes = [
-    '/',
-    '/sign-in',
-    '/sign-up',
-    '/reset-password',
-  ];
+  const routes = ['/', '/sign-in', '/sign-up', '/reset-password'];
 
   const urls = routes.map(
     (route) => `
@@ -24,10 +21,11 @@ export async function GET() {
       ${urls.join('')}
     </urlset>`;
 
-return new Response(sitemap, {
-  headers: {
-    "Content-Type": "application/xml",
-    "Content-Length": Buffer.byteLength(sitemap).toString(),
-  },
-});
+  return new Response(sitemap, {
+    headers: {
+      "Content-Type": "application/xml; charset=utf-8",
+      // Node Buffer works now that runtime is forced to nodejs
+      "Content-Length": Buffer.byteLength(sitemap, "utf8").toString(),
+    },
+  });
 }
