@@ -452,12 +452,8 @@ const svgRendererAgent = inngest.createFunction(
         try {
             // --- DEFINITIVE FIX V3: Use the modern, bundled 'mmdc' binary ---
             const mmdcPath = path.resolve('./bin/mmdc');
-            
-            // The modern CLI is a self-contained executable. We do not need to call it with `node`.
             const command = `"${mmdcPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`;
             
-            // We must give the binary executable permissions within the serverless environment.
-            execSync(`chmod +x "${mmdcPath}"`);
             execSync(command);
 
         } catch (execError) {

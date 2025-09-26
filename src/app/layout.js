@@ -11,8 +11,18 @@ const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const lexend = Lexend({ subsets: ["latin"], variable: '--font-lexend' });
 
 export const metadata = {
-  title: "KalPad",
-  description: "AI-Powered Study Planner",
+  title: "KalPad - Your AI Study Mentor",
+  description: "Turn 'Kal Padhunga' into reality.",
+};
+
+// ADD the 'verification' key to it:
+export const metadata = {
+  title: 'KalPad - Your AI Study Mentor',
+  description: 'Turn "Kal Padhunga" into reality.',
+  // ... other metadata properties
+  verification: {
+    google: 'K1qMc1fHGSFMOHtq6DDOxd7LrrHkKmdpIbrwwEUtgoo',
+  },
 };
 
 export default function RootLayout({ children }) {
