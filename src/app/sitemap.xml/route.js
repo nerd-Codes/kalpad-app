@@ -24,9 +24,10 @@ export async function GET() {
       ${urls.join('')}
     </urlset>`;
 
-  return new Response(sitemap, {
-    headers: {
-      'Content-Type': 'application/xml',
-    },
-  });
+return new Response(sitemap, {
+  headers: {
+    "Content-Type": "application/xml",
+    "Content-Length": Buffer.byteLength(sitemap).toString(),
+  },
+});
 }
