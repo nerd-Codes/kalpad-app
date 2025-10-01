@@ -98,7 +98,7 @@ const curationPipeline = inngest.createFunction(
             try {
                 // AGENT 0.5: The Topic Distiller
                 const cleanTopic = await step.run(`agent-0.5-distill-topic-${subTopic.text.slice(0, 25)}`, async () => {
-                const model = await getVertexAIModel("gemini-2.5-flash-lite"); // Use a specific model version for stability
+                const model = await getVertexAIModel("gemini-2.5-flash"); // Use a specific model version for stability
                 const prompt = `You are a Topic Distiller. Your one job is to read the following instructional text and extract the core, searchable academic concept.
                     Context: 
                     The overall exam is "${subTopic.exam_name}".    
@@ -139,7 +139,7 @@ const curationPipeline = inngest.createFunction(
                     
                     // AGENT 1: The Research Strategist
                     const searchKeywords = await step.run(`agent-1-generate-keywords${stepIdSuffix}`, async () => {
-                        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite", generationConfig: { responseMimeType: "application/json" } });
+                        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
                         const prompt = `You are an expert Research Strategist for an AI study platform. Your sole task is to generate a diverse set of expert-level YouTube search queries for a specific academic topic.
                             Context:
                             - Overall Exam Name: "${subTopic.exam_name}"
@@ -174,7 +174,7 @@ const curationPipeline = inngest.createFunction(
                         if (fullTranscript) {
                         // Step 2 (NEW): Run the "Smart Snippet" Agent to extract the golden passage
                         const smartSnippet = await step.run(`agent-3.5-get-snippet-for-${candidate.id}`, async () => {
-                            const model = await getVertexAIModel("gemini-2.5-flash-lite");
+                            const model = await getVertexAIModel("gemini-2.5-flash");
                             const prompt = `You are an AI pre-processor. Your sole function is to analyze a raw video transcript and extract the single most academically relevant and information-dense passage related to a specific topic. Aggressively ignore all filler, introductions, and promotions.
                                 - Overall Exam Name: "${subTopic.exam_name}"
                                 - Target Academic Topic: "${cleanTopic}"
@@ -193,7 +193,7 @@ const curationPipeline = inngest.createFunction(
                         });
                         if (smartSnippet) {
                             const analysis = await step.run(`agent-3-verify-${candidate.id}`, async () => {
-                                const model = await getVertexAIModel("gemini-2.5-flash-lite", { responseMimeType: "application/json" });
+                                const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
                                  const prompt = `You are a meticulous Verification Analyst for an AI study platform. Your task is to act as a strict quality gate. Analyze the provided "smart snippet" to determine if it is a high-quality, relevant educational resource for the given sub-topic.
                                     - Overall Exam Name: "${subTopic.exam_name}"
                                     - Specific Sub-Topic: "${subTopic.sub_topic_text}"
@@ -236,7 +236,7 @@ const curationPipeline = inngest.createFunction(
         const finalCuration = await step.run("agent-5-cohesion-and-curation", async () => {
             if (allVerifiedVideos.length === 0) return [];
 
-            const model = await getVertexAIModel("gemini-2.5-flash-lite", { responseMimeType: "application/json" });
+            const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
             const prompt = `You are a master Curation Agent. Select the single best YouTube video for each sub-topic from a list of verified candidates. Prioritize cohesion.
                 Today's Full Learning Context: ${cohesion_context.join(', ')}
                 Verified Video Candidates (JSON): ${JSON.stringify(allVerifiedVideos)}
@@ -322,7 +322,7 @@ const scripterAgent = inngest.createFunction(
 
             if (placeholderData.engine === 'matplotlib') {
                 const imageUrl = await step.run(`generate-quickchart-url-for-${placeholderData.description.slice(0, 20)}`, async () => {
-                    const model = await getVertexAIModel("gemini-2.5-flash-lite", { responseMimeType: "application/json" });
+                    const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
                     const prompt = `You are an expert data visualization designer creating a chart for QuickChart.io. Your sole task is to convert a natural language description into a valid, aesthetically pleasing, and polished QuickChart JSON configuration.
 
                         Description: "${placeholderData.description}"
@@ -418,7 +418,7 @@ const svgRendererAgent = inngest.createFunction(
 
         // Step 1: Generate the script from the description
         const script = await step.run(`generate-mermaid-script`, async () => {
-        const model = await getVertexAIModel("gemini-2.5-flash-lite");
+        const model = await getVertexAIModel("gemini-2.5-flash");
         const prompt = `
             You are an expert script generator for Mermaid.js diagrams. Convert the natural language description into a valid, complete script. Respond ONLY with the raw script code.
             
