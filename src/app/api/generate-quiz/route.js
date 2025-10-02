@@ -66,7 +66,7 @@ export async function POST(request) {
     `;
 
     // REPLACE WITH THIS BLOCK
-    const model = await getVertexAIModel('gemini-2.5-flash', { 
+    const model = await getVertexAIModel('gemini-2.5-flash-lite', { 
       responseMimeType: "application/json" 
     });
 

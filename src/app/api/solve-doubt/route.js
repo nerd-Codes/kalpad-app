@@ -1,19 +1,13 @@
-// src/app/api/solve-doubt/route.js
-import Groq from 'groq-sdk';
+// /src/app/api/solve-doubt/route.js
 
-// NOTE: We no longer import anything from the 'ai' package.
-// The Edge runtime is removed as it's primarily for streaming.
-// export const runtime = 'edge'; 
+// --- MODIFICATION: Import our robust Vertex AI utility ---
+import { getVertexAIModel } from '@/lib/vertexai';
 
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-});
+// --- MODIFICATION: The 'groq' dependency is no longer needed ---
 
 export async function POST(req) {
   try {
     const body = await req.json();
-    // The frontend now nests the payload inside a `data` property.
-    // We will defensively check for both structures for robustness.
     const payload = body.data || body;
 
     const { 
@@ -24,7 +18,7 @@ export async function POST(req) {
         context 
     } = payload;
     
-    // --- Input Validation (Unchanged) ---
+    // --- Input Validation is unchanged ---
     if (!action || !context) {
         return new Response(JSON.stringify({ error: 'Missing required fields: action and context' }), { status: 400 });
     }
@@ -53,21 +47,34 @@ export async function POST(req) {
         systemPrompt += `\nYour task is to respond to a specific request about a piece of highlighted text from a larger note. The user has the full note, so you do not need to repeat context.`;
         userPrompt = `I am studying for my "${context.examName}" exam, focusing on the sub-topic "${context.subTopic}". I have highlighted the following text from my notes:\n\nHighlighted Text: "${highlightedText}"\n\nMy Request: "${action === 'explain' ? "Explain this to me like I'm 10." : action === 'analogy' ? "Give me a real-world analogy for this." : "Explain why this concept is important."}"\n\nPlease provide a direct and concise response.`;
     }
+     
+    // --- DEFINITIVE MIGRATION: Switch from Groq to Vertex AI ---
     
-    // --- DEFINITIVE FIX: NON-STREAMING API CALL ---
-    const response = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        stream: false, // Explicitly disable streaming
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-        ],
-        max_tokens: 1024, 
-    });
+    // 1. Get the Vertex AI model. 'gemini-1.5-flash-001' is an excellent choice for speed and a large context window.
+    const model = await getVertexAIModel('gemini-2.5-flash-lite');
 
-    const aiResponseText = response.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+    // 2. Construct the request payload in the format Vertex AI expects.
+    const requestPayload = {
+        systemInstruction: {
+            parts: [{ text: systemPrompt }]
+        },
+        contents: [{ 
+            role: 'user', 
+            parts: [{ text: userPrompt }] 
+        }],
+        generationConfig: {
+            maxOutputTokens: 2048, // Generous limit for detailed answers
+            temperature: 0.7,      // A balanced temperature for creative but factual responses
+        }
+    };
+    
+    // 3. Call the generateContent method.
+    const response = await model.generateContent(requestPayload);
 
-    // Return the full response in a single JSON object
+    // 4. Parse the response from the Vertex AI SDK's structure.
+    const aiResponseText = response.response.candidates[0]?.content?.parts[0]?.text || 'Sorry, I could not generate a response.';
+
+    // Return the full response in a single JSON object (unchanged).
     return new Response(JSON.stringify({ response: aiResponseText }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -75,7 +82,8 @@ export async function POST(req) {
 
   } catch (error) {
     console.error('Error in /api/solve-doubt:', error);
-    const errorMessage = error.error?.message || error.message || 'An unknown error occurred.';
+    // The Vertex AI SDK often nests the core error message, so we check for it.
+    const errorMessage = error.response?.candidates?.[0]?.finishReason || error.message || 'An unknown error occurred.';
     return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
   }
 }
