@@ -326,18 +326,6 @@ const handleResetOnboarding = async () => {
     </SimpleGrid>
 </Stack>
 
-<Button 
-                        color="red" 
-                        onClick={handleResetOnboarding} 
-                        style={{ 
-                            position: 'fixed', 
-                            bottom: '100px', // Raised to be above the mobile bottom nav
-                            right: '20px', 
-                            zIndex: 9999 
-                        }}
-                    >
-                        DEV: Reset Onboarding
-                    </Button>
                 </Stack>
             )}
         </Container>
