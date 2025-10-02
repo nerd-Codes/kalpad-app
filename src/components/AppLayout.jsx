@@ -1,11 +1,14 @@
 // src/components/AppLayout.jsx
 "use client";
 
+import { useState, useEffect, useRef } from 'react';
 import { AppShell, Burger, Group, NavLink, Text, Menu, Avatar, rem, UnstyledButton, ActionIcon, Stack, Title, Paper, SimpleGrid, Box } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLoading } from '@/context/LoadingContext';
 import supabase from '@/lib/supabaseClient';
+import { useOnboarding } from '@/context/OnboardingContext';
+import { OnboardingTour } from './OnboardingTour';
 import { AnimatePresence, motion } from 'framer-motion'; // <-- DEFINITIVE ADDITION #1: Import animation tools
 import { 
     IconLayoutDashboard, 
@@ -18,6 +21,8 @@ import {
     IconSettings,
     IconChartBar,
 } from '@tabler/icons-react';
+
+import onboardingSteps from '@/lib/onboardingSteps';
 
 // --- SUB-COMPONENT: UserButton (Unchanged) ---
 function UserButton({ user, desktopOpened, onSignOut }) {
@@ -61,7 +66,7 @@ function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
     const navLinks = [
         { icon: IconLayoutDashboard, label: 'Dashboard', href: '/dashboard' },
         { icon: IconFileText, label: 'All Plans', href: '/plans' },
-        { icon: IconPlus, label: 'New Plan', href: '/new-plan' },
+        { icon: IconPlus, label: 'New Plan', href: '/new-plan', id: 'new-plan-button' },
         { icon: IconChartBar, label: 'Analytics', href: '#', disabled: true },
     ];
     return (
@@ -75,10 +80,15 @@ function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
                 </Group>
                 {navLinks.map((link) => (
                     <NavLink
+                        id={link.id}
                         key={link.label + (desktopOpened ? '-full' : '-mini')}
                         label={desktopOpened ? link.label : null}
                         leftSection={<link.icon size="1.25rem" stroke={1.5} />}
-                        onClick={() => onNavigate(link.href)}
+                        onClick={() => {
+                            // Dispatch the event before navigating
+                            window.dispatchEvent(new CustomEvent('kalpad-onboarding-advance'));
+                            onNavigate(link.href);
+                        }}
                         active={pathname === link.href}
                         disabled={link.disabled}
                         variant="filled"
@@ -106,7 +116,7 @@ function BottomNavbar({ user, onNavigate, onSignOut }) {
     
     const navLinks = [
         { icon: IconLayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-        { icon: IconPlus, label: 'New Plan', href: '/new-plan' },
+        { icon: IconPlus, label: 'New Plan', href: '/new-plan', id: 'new-plan-button' },
         { icon: IconFileText, label: 'All Plans', href: '/plans' },
     ];
 
@@ -123,7 +133,7 @@ function BottomNavbar({ user, onNavigate, onSignOut }) {
                 {navLinks.map((link) => {
                     const isActive = pathname === link.href;
                     return (
-                        <UnstyledButton key={link.label} onClick={() => onNavigate(link.href)}>
+                        <UnstyledButton id={link.id} key={link.label} onClick={() => onNavigate(link.href)}>
                             {/* --- DEFINITIVE FIX #1: The "Purple Pill" --- */}
                             <Box 
                                 style={{
@@ -180,6 +190,25 @@ export default function AppLayout({ children, session }) {
     const { setIsLoading } = useLoading();
     const pathname = usePathname();
 
+    const { profile, isLoading: isProfileLoading, startTour } = useOnboarding();
+
+// REPLACE the useEffect in AppLayout.jsx with this
+useEffect(() => {
+    const firstStep = onboardingSteps[0];
+    // --- DEFINITIVE FIX: Add a check for the current pathname ---
+    if (
+        !isProfileLoading && 
+        profile && 
+        !profile.has_completed_onboarding &&
+        pathname === firstStep.route // Only start the tour if we are on the correct starting page
+    ) {
+        const timer = setTimeout(() => {
+            startTour();
+        }, 1000);
+        return () => clearTimeout(timer);
+    }
+}, [isProfileLoading, profile, startTour, pathname]); // Add pathname to dependency array
+
     const handleNavigation = (path) => {
         if (pathname === path || path === '#') return;
         setIsLoading(true);
@@ -228,6 +257,8 @@ export default function AppLayout({ children, session }) {
               onSignOut={handleSignOut}
           />
       </AppShell.Navbar>
+
+      <OnboardingTour /> 
 
       <AppShell.Main>
           {/* --- DEFINITIVE FIX #2: PAGE TRANSITION ANIMATIONS --- */}

@@ -11,11 +11,9 @@ const markdownComponents = {
 
 export function Devlog() {
     // --- MODIFICATION: The new story of the "Mentor Engine" ---
-    const latestUpdateText = "Our AI just got a personality transplant. It now runs on a **'Brutal Honesty First'** constitution. Tell it you can study 12 hours a day, and it will gently tell you to get some sleep and build a realistic plan that won't lead to burnout. It now gives you a **daily 'Mission Briefing'** with difficulty ratings, so you're never flying blind. Most importantly, we built a zero-tolerance **'Integrity Filter'**— a layer of code that guarantees with 100% certainty that the AI's words and its actions are one. It keeps its promises.";
-    
+    const latestUpdateText = "Our AI mentor just evolved. It's not one-size-fits-all anymore; it's a squad of specialists. Choose your weapon: the **'Balanced' Strategist** for a ruthless, high-ROI plan, or the **'Hardcore' Drill Sergeant** for a relentless 100% coverage march. And we gave the entire crew a new secret weapon: the **AI Doubt Solver.** Highlight any sentence in your notes, and our new Groq-powered tutor will give you a brutally honest explanation in a fraction of a second. The genius just got faster.";
     // --- MODIFICATION: Setting the stage for the Notes V2 overhaul ---
-    const upNextText = "**The Professor is getting a promotion.** We're doing a full overhaul of the Notes Generation engine, with a beautiful full-screen experience and properly formatted PDF exports. After that, the full **'Doodle in the Margin'** redesign will kill the corporate vibe for good. And yes, the mobile app is still being forged in the fires of Mount Doom.";
-
+    const upNextText = "The engine is built. Now, we're putting it in your pocket. The native **Android App** is being forged in the fires of Mount Doom, designed from the ground up to be the Mission Control for your entire academic life. And to make sure you're battle-ready from day one, we're designing a new **'First Mission' onboarding experience.** No boring tooltips. Just a fast, interactive tutorial that helps you launch your first plan and unleash the full power of your new AI co-founder.";
     return (
         <div style={{
             position: 'relative',

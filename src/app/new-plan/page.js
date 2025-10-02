@@ -9,11 +9,16 @@ import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { wittyFacts } from '@/lib/newplanFacts';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, usePrevious } from '@mantine/hooks';
 
 import { Skeleton, Container, Title, Text, TextInput, Textarea, Button, Paper, Group, FileInput, Checkbox, Alert, Badge, Progress, Loader, Stack, Grid, GridCol, NumberInput, Collapse, List, ThemeIcon } from '@mantine/core';
 import { IconCalendar, IconFileText, IconBooks, IconPdf, IconClock, IconTargetArrow, IconX, IconListDetails, IconInfoCircle, IconSettings } from '@tabler/icons-react';
 import { PlanModeModal } from '@/components/PlanModeModal';
+
+// AT THE TOP of NewPlanPage
+import { useOnboarding } from '@/context/OnboardingContext';
+import { SavePlanNudge } from '@/components/SavePlanNudge';
+import nudgeClasses from '@/components/SavePlanNudge.module.css'; 
 
 const useTypingEffect = (text = '', speed = 1) => {
     const [displayedText, setDisplayedText] = useState('');
@@ -98,8 +103,32 @@ export default function NewPlanPage() {
     const typedApproach = useTypingEffect(strategy?.overall_approach);
 
     const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
+    const { profile, isPaused, resumeTour, specialAction, clearSpecialAction, endTour } = useOnboarding();
+    const prevModalOpened = usePrevious(modalOpened);
     // --- ADD THIS STATE for the selected plan mode ---
     const [planMode, setPlanMode] = useState('default'); 
+    const [showSaveNudge, setShowSaveNudge] = useState(false);
+
+    useEffect(() => {
+        // This effect triggers ONLY when the modal transitions from OPENED to CLOSED.
+        if (prevModalOpened && !modalOpened && isPaused) {
+            resumeTour();
+        }
+    }, [modalOpened, prevModalOpened, isPaused, resumeTour]);
+
+        useEffect(() => {
+        if (specialAction === 'open_mode_modal') {
+            openModal();
+            clearSpecialAction(); // Consume the action so it doesn't re-trigger
+        }
+    }, [specialAction, openModal, clearSpecialAction]);
+
+    useEffect(() => {
+        // This effect triggers when plan generation finishes (isGenerating becomes false)
+        if (!isGenerating && plan.length > 0 && profile && !profile.has_completed_onboarding) {
+            setShowSaveNudge(true);
+        }
+    }, [isGenerating, plan, profile]);
 
     useEffect(() => {
         let factInterval = null;
@@ -195,6 +224,7 @@ export default function NewPlanPage() {
     };
 
     const handlePlanGeneration = async (e) => {
+        
     e.preventDefault();
     setError(''); setPlan([]); setStrategy(null); setGenerationContext(null); setIsGenerating(true);
 
@@ -212,6 +242,8 @@ export default function NewPlanPage() {
         let buffer = '';
 
         while (true) {
+
+            
             const { done, value } = await reader.read();
             if (done) break;
 
@@ -234,16 +266,27 @@ export default function NewPlanPage() {
                 } catch (e) { console.error("Stream parse error:", part, e); setError("A streaming error occurred."); }
             }
         }
-    } catch (err) { setError(err.message); } finally { setIsGenerating(false); }
+    } catch (err) { setError(err.message); }  finally { 
+        setIsGenerating(false);
+        // --- DEFINITIVE FIX: Resume the tour if it was paused ---
+        if (isPaused) {
+            resumeTour();
+        }
+    }
 };
 
             const handleSavePlan = async () => {
+
+                // const { endTour } = useOnboarding();
+                 endTour();
             // A simplified guard clause. We only need to check the plan here.
             if (!plan || plan.length === 0) return;
 
             setIsSaving(true);
             setSaveError('');
             setSaveSuccess(false);
+            
+
 
             try {
                 // --- DEFINITIVE FIX: Get the session directly inside the handler ---
@@ -446,7 +489,10 @@ return (
             <Text c="dimmed" mb="xl">Fill in the details below to generate your AI schedule.</Text>
 
             <GlassCard>
-                <form onSubmit={handlePlanGeneration}>
+                <form onSubmit={(e) => {
+                    window.dispatchEvent(new CustomEvent('kalpad-onboarding-advance'));
+                    handlePlanGeneration(e);
+                }}>
     <Stack gap="xl">
         {/* --- SECTION 1: CORE DETAILS (RE-ARCHITECTED FOR NARRATIVE FLOW) --- */}
         <Stack gap="lg">
@@ -456,6 +502,7 @@ return (
             
             {/* The Goal */}
             <TextInput
+                id="exam-name-input"
                 leftSection={<IconBooks size={18} />}
                 label="Exam or Project Name"
                 placeholder="e.g., Final Year Project, SATs, Hackathon Build"
@@ -470,6 +517,7 @@ return (
             <Grid gutter="lg">
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                      <TextInput
+                        id="exam-date-input"
                         leftSection={<IconCalendar size={18} />}
                         type="date"
                         label="Final Deadline"
@@ -483,6 +531,7 @@ return (
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                     <NumberInput
+                        id="study-hours-input"
                         leftSection={<IconClock size={18} />}
                         label="Daily Study Hours"
                         placeholder="Your realistic daily goal"
@@ -499,6 +548,7 @@ return (
 
             {/* The Material */}
             <Textarea
+                id="syllabus-input"
                 label="Syllabus or Topics"
                 description="Paste everything here. Topics, chapters, job descriptions—don't worry if it's messy, the AI will make sense of it."
                 placeholder="Chapter 1: Introduction to AI..."
@@ -512,9 +562,13 @@ return (
             />
             <Group justify="flex-start" mt="sm">
                 <Button
+                    id="plan-mode-selector"
                     leftSection={<IconSettings size={16} />}
                     variant="subtle"
-                    onClick={openModal}
+                    onClick={() => {
+                        window.dispatchEvent(new CustomEvent('kalpad-onboarding-advance'));
+                        openModal();
+                    }}
                 >
                     Advanced Settings (Mode: {planMode.charAt(0).toUpperCase() + planMode.slice(1)})
                 </Button>
@@ -525,7 +579,10 @@ return (
                 opened={modalOpened}
                 close={closeModal}
                 currentMode={planMode}
-                onSelectMode={setPlanMode}
+                onSelectMode={(mode) => {
+                    setPlanMode(mode);
+                    closeModal(); 
+                }}
             />
         </Stack>
 
@@ -575,6 +632,7 @@ return (
         {/* --- SECTION 3: CALL TO ACTION --- */}
         <Group justify="flex-end" mt="md">
             <ShimmerButton
+                id="generate-plan-button"
                 type="submit"
                 size="lg"
                 loading={isGenerating}
@@ -677,9 +735,19 @@ return (
             {strategy && (isGenerating || plan.length > 0) && (
                 <GlassCard mt="xl" ref={planContainerRef}>
                     <Group justify="space-between" mb="lg">
-                        <Title order={2}>{isGenerating && plan.length === 0 ? "Building Your Quest..." : "Your Generated Plan"}</Title>
-                        {!isGenerating && plan.length > 0 && (<Button onClick={handleSavePlan} loading={isSaving} disabled={saveSuccess} color="brandGreen"> {saveSuccess ? 'Saved!' : 'Save & View Plan'} </Button>)}
-                    </Group>
+    <Title order={2}>{isGenerating && plan.length === 0 ? "Building Your Quest..." : "Your Generated Plan"}</Title>
+    {!isGenerating && plan.length > 0 && (
+        // --- DEFINITIVE FIX: Add a relative Group for positioning and the glow effect ---
+        <Group style={{ position: 'relative' }} className={showSaveNudge ? nudgeClasses.glowEffect : ''}>
+                    {/* --- Conditionally render the nudge --- */}
+                    {showSaveNudge && <SavePlanNudge />}
+                    
+                    <Button id="save-plan-button" onClick={handleSavePlan} loading={isSaving} disabled={saveSuccess} color="brandGreen">
+                        {saveSuccess ? 'Saved!' : 'Save & View Plan'}
+                    </Button>
+                </Group>
+            )}
+        </Group>
                     
                     {plan.length > 0 ? (
                         <div style={{ maxHeight: '80vh', overflowY: 'auto', paddingRight: '1rem' }}>

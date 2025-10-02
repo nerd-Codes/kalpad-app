@@ -10,7 +10,7 @@ import { TimelineDayCard } from './TimelineDayCard';
 import classes from './QuestTimeline.module.css';
 
 // --- FIX: The component now accepts the new props ---
-export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCurating, onNoteGenerated, isReadOnly = false, isInApp, onScheduleReminders}) {
+export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCurating, onNoteGenerated, isReadOnly = false, isInApp, onScheduleReminders, isNewUserTourActive = false }) {
     // For read-only view, we treat today as just another day.
     const todayIndex = isReadOnly ? -1 : planTopics.findIndex(topic => isToday(new Date(topic.date)));
     const itemRefs = useRef({});
@@ -99,6 +99,7 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
                                     </Button>
                                 )}
                                 <Button
+                                    id={isNewUserTourActive ? 'lecture-scout-button' : undefined}
                                     variant="light"
                                     color="red"
                                     size="xs"
@@ -112,6 +113,7 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
                         )}
 
                         {(isToday_ || isPastDay) && (
+                            <div id={isToday_ && isNewUserTourActive ? 'quest-timeline-today' : undefined}>
                             <Box mt="md">
                                 <TimelineDayCard 
                                     plan={plan}
@@ -123,6 +125,8 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
                                     isReadOnly={isReadOnly} // Pass the prop down
                                 />
                             </Box>
+                            </div>
+                                
                         )}
 
                         {!isPastDay && !isToday_ && <Text size="xs" c="dimmed" mt="xs">This day is upcoming.</Text>}

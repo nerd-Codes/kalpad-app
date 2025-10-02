@@ -1,0 +1,19 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 3998; /* Just below the popover */
+  pointer-events: none; /* Allows clicks to pass through */
+}
+
+.spotlight {
+  position: absolute;
+  border-radius: var(--mantine-radius-md);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+  z-index: 3999;
+  transition: all 0.3s ease-in-out;
+  pointer-events: none;
+}

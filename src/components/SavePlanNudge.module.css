@@ -1,0 +1,47 @@
+/* /src/components/SavePlanNudge.module.css */
+
+.nudgeContainer {
+  position: absolute;
+  bottom: 100%; /* Position it right above the button */
+  right: 0;
+  margin-bottom: 8px; /* Small space between nudge and button */
+  z-index: 100;
+}
+
+.nudgePaper {
+  background-color: rgba(138, 56, 248, 0.2); /* Semi-transparent brand purple */
+  border-color: var(--mantine-color-brandPurple-4);
+  backdrop-filter: blur(5px);
+}
+
+.arrowIcon {
+  color: var(--mantine-color-brandPurple-3);
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.7;
+  }
+}
+
+/* We will apply this class to the Save Button's parent Group */
+.glowEffect {
+  position: relative;
+  border-radius: var(--mantine-radius-lg);
+  animation: glow 2s infinite ease-in-out;
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(138, 56, 248, 0.3), 0 0 10px rgba(138, 56, 248, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(138, 56, 248, 0.6), 0 0 25px rgba(138, 56, 248, 0.4);
+  }
+}

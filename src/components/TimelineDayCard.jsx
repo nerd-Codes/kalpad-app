@@ -42,7 +42,7 @@ const getSubTopicTypeColor = (type) => {
 };
 
 
-export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan', isReadOnly = false }) {
+export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan', isReadOnly = false, isNewUserTourActive = false }) {
      const { setIsLoading } = useLoading();
 
     const [generatingNotesFor, setGeneratingNotesFor] = useState(null);
@@ -272,6 +272,7 @@ return (
                                         </Box>
                                         
                                         {!isReadOnly && (
+                                            <div id={index === 0 && isNewUserTourActive ? 'quest-timeline-today' : undefined}>
                                             <Menu shadow="md" width={200} position="bottom-end">
                                                 <Menu.Target>
                                                     <ActionIcon 
@@ -319,6 +320,7 @@ return (
                                                     </Menu.Item> */}
                                                 </Menu.Dropdown>
                                             </Menu>
+                                            </div>
                                         )}
                                     </Group>
                                     <Group gap="xs" mt={4} ml={isReadOnly ? 0 : 30}>

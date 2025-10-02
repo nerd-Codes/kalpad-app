@@ -5,6 +5,7 @@ import { MantineProvider, createTheme } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
 import '@mantine/core/styles.css'; // Ensure base styles are always included
+import { OnboardingProvider } from '@/context/OnboardingContext';
 
 import { BackgroundBlobs } from "@/components/BackgroundBlobs";
 import { PageLoader } from "@/components/PageLoader";
@@ -67,6 +68,7 @@ export function Providers({ children, variant = 'app', colorScheme = 'dark' }) {
   return (
     <LoadingProvider>
       <MantineProvider theme={theme} defaultColorScheme={colorScheme}>
+        <OnboardingProvider>
         <PostHogProvider>
           <style>{`
             @media (max-width: 768px) {
@@ -82,6 +84,7 @@ export function Providers({ children, variant = 'app', colorScheme = 'dark' }) {
           <BackgroundBlobs />
           <AppContent>{children}</AppContent>
         </PostHogProvider>
+        </OnboardingProvider>
       </MantineProvider>
     </LoadingProvider>
   );

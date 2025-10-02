@@ -227,6 +227,39 @@ export default function DashboardPage() {
     // Calculate days left specifically for this plan for context
     const daysLeftForRecentPlan = mostRecentPlan ? Math.max(0, Math.ceil((new Date(mostRecentPlan.exam_date) - new Date()) / (1000 * 60 * 60 * 24))) : 0;
 
+    // ADD THIS ENTIRE FUNCTION inside the DashboardPage component
+
+const handleResetOnboarding = async () => {
+    // A guard clause to ensure we have a session before proceeding.
+    if (!session) {
+        alert("Session not found. Cannot reset onboarding.");
+        return;
+    }
+    
+    // Provide a confirmation dialog to prevent accidental resets.
+    const isConfirmed = window.confirm(
+        "DEV ONLY: Are you sure you want to reset your onboarding status? You will need to hard refresh after this."
+    );
+
+    if (isConfirmed) {
+        try {
+            // We use supabase.functions.invoke, which automatically handles authentication
+            // by passing the user's JWT from the client's session.
+            const { error } = await supabase.functions.invoke('reset-onboarding');
+
+            if (error) throw error;
+
+            alert('Onboarding status has been reset successfully. Please hard refresh the page (Ctrl+Shift+R or Cmd+Shift+R) to start the tour.');
+            
+            // Force a full page reload to re-initialize all contexts from scratch.
+            window.location.reload();
+        } catch (error) {
+            console.error("Failed to reset onboarding:", error);
+            alert(`Failed to reset onboarding: ${error.message}`);
+        }
+    }
+};
+
    return (
     <AppLayout session={session}>
         <Container size="xl">
@@ -292,6 +325,19 @@ export default function DashboardPage() {
 
     </SimpleGrid>
 </Stack>
+
+<Button 
+                        color="red" 
+                        onClick={handleResetOnboarding} 
+                        style={{ 
+                            position: 'fixed', 
+                            bottom: '100px', // Raised to be above the mobile bottom nav
+                            right: '20px', 
+                            zIndex: 9999 
+                        }}
+                    >
+                        DEV: Reset Onboarding
+                    </Button>
                 </Stack>
             )}
         </Container>
