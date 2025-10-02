@@ -65,6 +65,42 @@ export async function POST(request) {
             imageParts.push({ inlineData: { data: Buffer.from(buffer).toString("base64"), mimeType: 'image/jpeg' } });
         }
     }
+
+    // --- STEP 0 (NEW): The Exam Persona Analyst ---
+
+// Use a separate, lightweight model for this fast, preparatory step.
+const personaModel = await getVertexAIModel('gemini-2.5-flash', { responseMimeType: "application/json" });
+
+const personaPrompt = `
+    You are an expert academic analyst. Based on the following exam name, generate a concise "persona document" that will guide another AI in writing study notes.
+
+    **Exam Name:** "${exam_name}"
+
+    **Your Task:** Return a single, valid JSON object with the following fields:
+    - "audience_level": A short description of the target audience (e.g., "Undergraduate, 2nd Year," "Post-graduate, highly competitive," "High School, foundational").
+    - "key_focus_areas": An array of concepts or skill types that are CRITICAL for this exam level (e.g., ["Numerical problem-solving", "Deep theoretical proofs", "Practical applications", "Memorization of key formulas"]).
+    - "writing_style": A directive for the writing tone (e.g., "Highly technical and precise, use formal language," "Conceptual and intuitive, use analogies").
+    
+    **Example for "GATE Electronics":**
+    {
+      "audience_level": "Post-graduate engineering, highly competitive and technical.",
+      "key_focus_areas": ["Rapid problem-solving", "In-depth understanding of core theorems", "Application of formulas to complex circuits", "Numerical accuracy"],
+      "writing_style": "Assume strong foundational knowledge. Be dense, technical, and focus on examinable points. Use formal, textbook-level language."
+    }
+
+    **Example for "CBSE Class 12 Physics":**
+    {
+      "audience_level": "High school senior, focus on core concepts and board exam patterns.",
+      "key_focus_areas": ["Clear definition of terms", "Step-by-step derivation of key formulas", "Solving standard textbook problems", "Understanding of key experiments"],
+      "writing_style": "Clear, simple language. Use relatable analogies. Assume no prior knowledge beyond the previous class level."
+    }
+`;
+
+const personaResult = await personaModel.generateContent({
+    contents: [{ role: 'user', parts: [{ text: personaPrompt }] }]
+});
+
+const examPersona = JSON.parse(personaResult.response.candidates[0].content.parts[0].text);
     
     const model = await getVertexAIModel('gemini-2.5-flash');
 
@@ -81,7 +117,8 @@ export async function POST(request) {
       
       Reference Material: Provided as multimodal input (text and images).
       
-      **UNBREAKABLE RULE: AUDIENCE AWARENESS IS CRITICAL.** The "Exam" context is your primary guide. An outline for "Class 10th Boards" must be simpler and more focused on fundamentals than an outline for "UPSC Mains" or "GATE Electronics". You MUST adjust the depth and complexity of the outline sections accordingly.
+      **UNBREAKABLE RULE: AUDIENCE AWARENESS IS CRITICAL.** The "Exam" context is your primary guide. An outline for "Class 10th Boards" must be simpler and more focused on fundamentals than an outline for "UPSC Mains" or "GATE Electronics". You MUST adjust the depth and complexity of the outline sections accordingly. Your guide for this is the following Exam Persona:
+      ${JSON.stringify(examPersona)}
       
       **TASK:**
       Based on ALL the provided context, create a detailed, structured outline for a comprehensive chapter on the specific sub-topic. 
@@ -115,7 +152,8 @@ export async function POST(request) {
       - Main Chapter Topic: "${day_topic}"
       - Specific Sub-Topic to Write About: "${sub_topic_text}"
       
-      **UNBREAKABLE RULE #1: AUDIENCE IS EVERYTHING.** The "Exam" context is your most important filter. A note for "Class 10th Physics" MUST be simpler, use more basic analogies, and avoid complex graphs compared to a note for "Undergraduate Quantum Mechanics". You must tailor the depth, examples, and tone to this specific audience.
+      **UNBREAKABLE RULE #1: AUDIENCE IS EVERYTHING.** The "Exam" context is your most important filter. A note for "Class 10th Physics" MUST be simpler, use more basic analogies, and avoid complex graphs compared to a note for "Undergraduate Quantum Mechanics". You must tailor the depth, examples, and tone to this specific audience.  Your primary filter for tone, depth, and examples is this Exam Persona:
+      ${JSON.stringify(examPersona)}
       
       **Chapter Outline You MUST Follow Exactly:**
       ---
