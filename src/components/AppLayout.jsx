@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { AppShell, Burger, Group, NavLink, Text, Menu, Avatar, rem, UnstyledButton, ActionIcon, Stack, Title, Paper, SimpleGrid, Box } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLoading } from '@/context/LoadingContext';
 import supabase from '@/lib/supabaseClient';
@@ -191,6 +191,7 @@ export default function AppLayout({ children, session }) {
     const pathname = usePathname();
 
     const { profile, isLoading: isProfileLoading, startTour } = useOnboarding();
+    const isDesktop = useMediaQuery('(min-width: 768px)'); 
 
 // REPLACE the useEffect in AppLayout.jsx with this
 useEffect(() => {
@@ -200,14 +201,15 @@ useEffect(() => {
         !isProfileLoading && 
         profile && 
         !profile.has_completed_onboarding &&
-        pathname === firstStep.route // Only start the tour if we are on the correct starting page
+        pathname === firstStep.route &&// Only start the tour if we are on the correct starting page
+        isDesktop 
     ) {
         const timer = setTimeout(() => {
             startTour();
         }, 1000);
         return () => clearTimeout(timer);
     }
-}, [isProfileLoading, profile, startTour, pathname]); // Add pathname to dependency array
+}, [isProfileLoading, profile, startTour, pathname, isDesktop]); // Add pathname to dependency array
 
     const handleNavigation = (path) => {
         if (pathname === path || path === '#') return;
