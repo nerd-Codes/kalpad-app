@@ -1,48 +1,44 @@
-// src/components/QuestTimeline.jsx
+// /src/components/QuestTimeline.jsx
 "use client";
 
 import { useEffect, useRef } from 'react'; 
 import { Timeline, Text, Box, Group, Button } from '@mantine/core';
-// --- FIX: Import the necessary icons ---
-import { IconCircleCheck, IconCircleDashed, IconCircle, IconVideo, IconBellRinging } from '@tabler/icons-react';
+import { IconCircleCheck, IconCircleDashed, IconCircle, IconVideo, IconBellRinging, IconEyeOff } from '@tabler/icons-react';
 import { isToday, isPast, format } from 'date-fns';
 import { TimelineDayCard } from './TimelineDayCard';
 import classes from './QuestTimeline.module.css';
 
-// --- FIX: The component now accepts the new props ---
 export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCurating, onNoteGenerated, isReadOnly = false, isInApp, onScheduleReminders, isNewUserTourActive = false }) {
-    // For read-only view, we treat today as just another day.
     const todayIndex = isReadOnly ? -1 : planTopics.findIndex(topic => isToday(new Date(topic.date)));
     const itemRefs = useRef({});
 
+    const visibilityHorizon = todayIndex + 2;
+
     useEffect(() => {
         if (todayIndex !== -1 && itemRefs.current[todayIndex]) {
-            // Use a short timeout to ensure the DOM has fully rendered and the card is expanded
             setTimeout(() => {
                 itemRefs.current[todayIndex].scrollIntoView({
                     behavior: 'smooth',
-                    block: 'center' // This centers the item nicely in the viewport
+                    block: 'center'
                 });
-            }, 500); // 500ms delay is robust
+            }, 500);
         }
-    }, [todayIndex]); // Run only when todayIndex changes (i.e., on initial load)
+    }, [todayIndex]);
+
+    const topicsToRender = isReadOnly ? planTopics : planTopics.slice(0, visibilityHorizon + 1);
 
     return (
         <Timeline 
             active={todayIndex} 
             bulletSize={24} 
             lineWidth={2}
-            styles={{
-                item: { '&::before': { backgroundColor: 'rgba(255, 255, 255, 1)' } },
-            }}
+            styles={{ item: { '&::before': { backgroundColor: 'rgba(255, 255, 255, 1)' } } }}
         >
-            {planTopics.map((dayTopic, index) => {
+            {topicsToRender.map((dayTopic, index) => {
                 const dayDate = new Date(dayTopic.date);
-                 // For read-only view, all days are treated as "past" for styling and expansion.
                 const isPastDay = isReadOnly || (isPast(dayDate) && !isToday(dayDate));
                 const isToday_ = !isReadOnly && isToday(dayDate);
-
-
+                const isFutureDay = !isPastDay && !isToday_;
 
                 const totalSubs = dayTopic.sub_topics?.length || 0;
                 const completedSubs = dayTopic.sub_topics?.filter(s => s.completed).length || 0;
@@ -57,82 +53,122 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
                     bulletIcon = <IconCircleCheck size={14} />;
                     if (progress === 1) bulletColor = 'var(--mantine-color-brandGreen-5)';
                     else if (progress > 0) bulletColor = 'var(--mantine-color-yellow-5)';
-                    else bulletColor = 'var(--mantine-color-gray-7)'; // Use gray for incomplete past/public days
-                } else {
+                    else bulletColor = 'var(--mantine-color-gray-7)';
+                } else { // Future Day
                     bulletIcon = <IconCircle size={14} />;
                     bulletColor = 'var(--mantine-color-gray-7)';
                 }
 
                 const itemClassName = index === todayIndex - 1 ? classes.pulsingLine : '';
                 const bulletWrapperClassName = isToday_ ? classes.waveWrapper : classes.bullet;
+                
+                let itemOpacity = 1.0;
+                if (isFutureDay) {
+                    const distance = index - todayIndex;
+                    itemOpacity = 1.0 - (distance * 0.3);
+                }
 
                 return (
                     <Timeline.Item
                         ref={el => itemRefs.current[index] = el}
-                        key={dayTopic.id || index} // Use index as fallback key for public plans
+                        key={dayTopic.id || index}
                         title={`Day ${dayTopic.day}: ${dayTopic.topic_name}`}
                         className={itemClassName}
                         lineVariant={index < todayIndex ? 'solid' : 'dashed'}
                         bullet={
-                          <div
-                            className={bulletWrapperClassName}
-                            style={{ backgroundColor: bulletColor }}
-                          >
+                          <div className={bulletWrapperClassName} style={{ backgroundColor: bulletColor }}>
                             {bulletIcon}
                           </div>
                         }
+                        style={{ opacity: itemOpacity, transition: 'opacity 0.5s ease' }}
                     >
                         <Text c="dimmed" size="sm">{format(dayDate, "EEEE, MMMM d")}</Text>
                         
-                        {/* --- FIX: The new "Find Lectures" button is rendered conditionally here --- */}
-                         {isToday_ && !isReadOnly && (
-                            <Group mt="md">
-                                {isInApp && (
+                        {/* Today's Buttons and Card (Always Expanded) */}
+                        {isToday_ && (
+                            <div id={isNewUserTourActive ? 'quest-timeline-today' : undefined}>
+                                <Group mt="md">
+                                    {isInApp && (
+                                        <Button
+                                            variant="light"
+                                            color="teal"
+                                            size="xs"
+                                            leftSection={<IconBellRinging size={16} />}
+                                            onClick={onScheduleReminders}
+                                        >
+                                            Set Today's Reminders
+                                        </Button>
+                                    )}
                                     <Button
+                                        id={isNewUserTourActive ? 'lecture-scout-button' : undefined}
                                         variant="light"
-                                        color="teal"
+                                        color="red"
                                         size="xs"
-                                        leftSection={<IconBellRinging size={16} />}
-                                        onClick={onScheduleReminders}
+                                        leftSection={<IconVideo size={16} />}
+                                        onClick={onFindLectures}
+                                        loading={isCurating}
                                     >
-                                        Set Today's Reminders
+                                        Find Lectures
                                     </Button>
-                                )}
-                                <Button
-                                    id={isNewUserTourActive ? 'lecture-scout-button' : undefined}
-                                    variant="light"
-                                    color="red"
-                                    size="xs"
-                                    leftSection={<IconVideo size={16} />}
-                                    onClick={onFindLectures}
-                                    loading={isCurating}
-                                >
-                                    Find Lectures
-                                </Button>
-                            </Group>
+                                </Group>
+                                <Box mt="md">
+                                    <TimelineDayCard 
+                                        plan={plan}
+                                        dayTopic={dayTopic} 
+                                        onUpdate={onUpdate} 
+                                        isInitiallyCollapsed={false} // Today is NEVER collapsed
+                                        onNoteGenerated={onNoteGenerated}
+                                        isReadOnly={isReadOnly}
+                                        isNewUserTourActive={isNewUserTourActive}
+                                    />
+                                </Box>
+                            </div>
                         )}
 
-                        {(isToday_ || isPastDay) && (
-                            <div id={isToday_ && isNewUserTourActive ? 'quest-timeline-today' : undefined}>
+                        {/* Past Day's Card (Collapsed by Default) */}
+                        {isPastDay && (
                             <Box mt="md">
                                 <TimelineDayCard 
                                     plan={plan}
                                     dayTopic={dayTopic} 
-                                    onUpdate={onUpdate} 
-                                    onUpdateCompletion={onUpdate}
-                                    isInitiallyCollapsed={isReadOnly ? false : isPastDay} // Always expanded for public
+                                    onUpdate={onUpdate}
+                                    isInitiallyCollapsed={true} // Past days are ALWAYS collapsed by default
                                     onNoteGenerated={onNoteGenerated}
-                                    isReadOnly={isReadOnly} // Pass the prop down
+                                    isReadOnly={isReadOnly}
+                                    isNewUserTourActive={isNewUserTourActive}
                                 />
                             </Box>
-                            </div>
-                                
                         )}
 
-                        {!isPastDay && !isToday_ && <Text size="xs" c="dimmed" mt="xs">This day is upcoming.</Text>}
+                        {/* Future days have NO card content. */}
+                        {isFutureDay && (
+                            <Text size="xs" c="dimmed" mt="xs">This day is upcoming.</Text>
+                        )}
                     </Timeline.Item>
                 );
             })}
+
+            {/* The final "Focus on Today" Message */}
+            {!isReadOnly && 
+            // Condition 1: There are topics beyond the visible horizon.
+            (planTopics.length > visibilityHorizon + 1) &&
+            // Condition 2: Today is NOT the last day of the plan.
+            (todayIndex < planTopics.length - 1) && (
+                <Timeline.Item
+                    title="Focus on Today"
+                    bullet={
+                        <div className={classes.bullet} style={{ backgroundColor: 'var(--mantine-color-dark-2)' }}>
+                            <IconEyeOff size={14} />
+                        </div>
+                    }
+                    styles={{ itemTitle: { color: 'var(--mantine-color-gray-6)' } }}
+                >
+                    <Text c="dimmed" size="sm">
+                        Win the day. The future will take care of itself.
+                        Complete today's tasks and any past backlogs to reveal what's next.
+                    </Text>
+                </Timeline.Item>
+            )}
         </Timeline>
     );
 }

@@ -72,6 +72,7 @@ export default function NewPlanPage() {
     const router = useRouter();
     const strategyReportRef = useRef(null);
     const planContainerRef = useRef(null);
+    const planScrollDivRef = useRef(null);
     const [opened, { toggle }] = useDisclosure(false);
 
     // --- MODIFICATION: States updated for streaming UI ---
@@ -108,6 +109,7 @@ export default function NewPlanPage() {
     // --- ADD THIS STATE for the selected plan mode ---
     const [planMode, setPlanMode] = useState('default'); 
     const [showSaveNudge, setShowSaveNudge] = useState(false);
+    const [highlightSave, setHighlightSave] = useState(false);
 
     useEffect(() => {
         // This effect triggers ONLY when the modal transitions from OPENED to CLOSED.
@@ -182,6 +184,34 @@ export default function NewPlanPage() {
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); });
     }, []);
+
+    useEffect(() => {
+    if (plan.length === 1 && planContainerRef.current) { /* ... */ }
+}, [plan.length]);
+
+// ADD THIS NEW, SUPERIOR useEffect
+    useEffect(() => {
+        // This effect runs every time a new item is added to the plan array.
+        if (isGenerating && planScrollDivRef.current) {
+            const scrollDiv = planScrollDivRef.current;
+            // Scroll to the bottom of the div to keep the latest item in view.
+            scrollDiv.scrollTop = scrollDiv.scrollHeight;
+        }
+    }, [plan.length, isGenerating]); // Depends on plan.length and isGenerating
+
+    // ADD THIS NEW useEffect to the component
+useEffect(() => {
+    if (highlightSave) {
+        const saveButtonElement = document.getElementById('save-plan-button');
+        if (saveButtonElement) {
+            saveButtonElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        // The highlight will be applied via a CSS class.
+        // We can remove the highlight after the animation finishes to be clean.
+        const timer = setTimeout(() => setHighlightSave(false), 3000); // Pulse for 3 seconds
+        return () => clearTimeout(timer);
+    }
+}, [highlightSave]);
 
 
     const sanitizeText = (text) => {
@@ -272,6 +302,10 @@ export default function NewPlanPage() {
         if (isPaused) {
             resumeTour();
         }
+
+        if (plan.length > 0) { // Only highlight if a plan was actually generated
+        setHighlightSave(true);
+    }
     }
 };
 
@@ -735,22 +769,24 @@ return (
             {strategy && (isGenerating || plan.length > 0) && (
                 <GlassCard mt="xl" ref={planContainerRef}>
                     <Group justify="space-between" mb="lg">
-    <Title order={2}>{isGenerating && plan.length === 0 ? "Building Your Quest..." : "Your Generated Plan"}</Title>
-    {!isGenerating && plan.length > 0 && (
-        // --- DEFINITIVE FIX: Add a relative Group for positioning and the glow effect ---
-        <Group style={{ position: 'relative' }} className={showSaveNudge ? nudgeClasses.glowEffect : ''}>
-                    {/* --- Conditionally render the nudge --- */}
-                    {showSaveNudge && <SavePlanNudge />}
-                    
-                    <Button id="save-plan-button" onClick={handleSavePlan} loading={isSaving} disabled={saveSuccess} color="brandGreen">
-                        {saveSuccess ? 'Saved!' : 'Save & View Plan'}
-                    </Button>
+                <Title order={2}>
+                    {isGenerating ? "Building Your Quest..." : "Your Generated Plan"}
+                </Title>
+            {!isGenerating && plan.length > 0 && (
+                // --- DEFINITIVE FIX: Add a relative Group for positioning and the glow effect ---
+                <Group style={{ position: 'relative' }} className={`${showSaveNudge ? nudgeClasses.glowEffect : ''} ${highlightSave ? nudgeClasses.pulseEffect : ''}`}>
+                            {/* --- Conditionally render the nudge --- */}
+                            {showSaveNudge && <SavePlanNudge />}
+                            
+                            <Button id="save-plan-button" onClick={handleSavePlan} loading={isSaving} disabled={saveSuccess} color="brandGreen">
+                                {saveSuccess ? 'Saved!' : 'Save & View Plan'}
+                            </Button>
+                        </Group>
+                    )}
                 </Group>
-            )}
-        </Group>
                     
                     {plan.length > 0 ? (
-                        <div style={{ maxHeight: '80vh', overflowY: 'auto', paddingRight: '1rem' }}>
+                        <div ref={planScrollDivRef} style={{ maxHeight: '80vh', overflowY: 'auto', paddingRight: '1rem' }}>
                             {plan.map((item, index) => (
                                 <Paper key={index} p="lg" mb="md" withBorder radius="md" style={{ borderLeft: `5px solid ${getDayDifficultyColor(item.day_difficulty)}`}}>
                                     <Group justify="space-between">
