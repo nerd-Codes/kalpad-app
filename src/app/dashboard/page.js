@@ -327,7 +327,6 @@ const handleResetOnboarding = async () => {
 </Stack>
 
 
-
                 </Stack>
             )}
         </Container>

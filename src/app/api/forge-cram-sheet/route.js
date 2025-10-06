@@ -141,7 +141,7 @@ export async function POST(request) {
 
                 // --- Step 4: The "Synthesizer" Agent (Iterative Reduce Step) ---
                 streamUpdate('status', { title: 'Synthesizing knowledge into a Cram Sheet...' });
-                const synthesizerModel = await getVertexAIModel('gemini-2.5-pro');
+                const synthesizerModel = await getVertexAIModel('gemini-2.5-flash');
 
                 let finalCramSheet = `\n\n`; // Initial title
                 
