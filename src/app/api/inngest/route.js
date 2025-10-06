@@ -139,7 +139,7 @@ const curationPipeline = inngest.createFunction(
                     
                     // AGENT 1: The Research Strategist
                     const searchKeywords = await step.run(`agent-1-generate-keywords${stepIdSuffix}`, async () => {
-                        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite", generationConfig: { responseMimeType: "application/json" } });
+                        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
                         const prompt = `You are an expert Research Strategist for an AI study platform. Your sole task is to generate a diverse set of expert-level YouTube search queries for a specific academic topic.
                             Context:
                             - Overall Exam Name: "${subTopic.exam_name}"
@@ -174,7 +174,7 @@ const curationPipeline = inngest.createFunction(
                         if (fullTranscript) {
                         // Step 2 (NEW): Run the "Smart Snippet" Agent to extract the golden passage
                         const smartSnippet = await step.run(`agent-3.5-get-snippet-for-${candidate.id}`, async () => {
-                            const model = await getVertexAIModel("gemini-2.5-flash-lite");
+                            const model = await getVertexAIModel("gemini-2.5-flash");
                             const prompt = `You are an AI pre-processor. Your sole function is to analyze a raw video transcript and extract the single most academically relevant and information-dense passage related to a specific topic. Aggressively ignore all filler, introductions, and promotions.
                                 - Overall Exam Name: "${subTopic.exam_name}"
                                 - Target Academic Topic: "${cleanTopic}"
@@ -193,7 +193,7 @@ const curationPipeline = inngest.createFunction(
                         });
                         if (smartSnippet) {
                             const analysis = await step.run(`agent-3-verify-${candidate.id}`, async () => {
-                                const model = await getVertexAIModel("gemini-2.5-flash-lite", { responseMimeType: "application/json" });
+                                const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
                                  const prompt = `You are a meticulous Verification Analyst for an AI study platform. Your task is to act as a strict quality gate. Analyze the provided "smart snippet" to determine if it is a high-quality, relevant educational resource for the given sub-topic.
                                     - Overall Exam Name: "${subTopic.exam_name}"
                                     - Specific Sub-Topic: "${subTopic.sub_topic_text}"
