@@ -13,6 +13,8 @@ const getTopicsFromSyllabus = (syllabus) => {
   return syllabus.split('\n').filter(line => line.trim() !== '');
 };
 
+let userRequest = '';
+
 // --- CHANGE 1: THE NEW "BRUTAL HONESTY" CONSTITUTION ---
 const KalPad_Constitution = `
   **Your Core Principles for Plan Generation:**
@@ -455,6 +457,9 @@ export async function POST(request) {
 
         2.  **Literal Reporting (Report Locally):** While your thinking is global, your reporting must be local. The final **'estimated_coverage' percentage** that you output MUST be a direct and literal measure of how much of the user-provided "Full Syllabus" text will be covered by the plan. **Do not** calculate coverage against the entire subject in your knowledge base; calculate it ONLY against the specific text the user has given you. This is a non-negotiable reporting requirement.
 
+        **USER REQUEST MANDATE:**
+        -Check for any special request by the user and classify that in you output as specified.
+
         **CRITICAL JSON SCHEMA (Return ONLY this object and nothing else):**
         {
           "estimated_coverage": <A brutally honest integer based on your calculation in Step 3>,
@@ -476,7 +481,9 @@ export async function POST(request) {
               "topic": "Topic Name",
               "justification": "The specific reason for skipping this topic (e.g., 'Highly specialized and a disproportionate time investment for its likely exam weightage.')."
             }
-          ]
+          ],
+
+          "user_request": <Any special user request>
         }
         `;
         // --- VERTEX AI MIGRATION: UPDATE GENERATE CONTENT CALL SYNTAX ---
@@ -487,6 +494,8 @@ export async function POST(request) {
         // --- VERTEX AI MIGRATION: UPDATE RESPONSE PARSING SYNTAX ---
         const triageResponseText = triageResult.response.candidates[0].content.parts[0].text;
         const triageData = JSON.parse(triageResponseText);
+
+        userRequest = triageData.user_request || "No special requests.";
         const { communicatorPersona } = getModeSpecificCommunicator(planMode, {
           triageData,
           studyHoursPerDay // Pass any additional context the communicator might need
@@ -529,6 +538,8 @@ export async function POST(request) {
 
               **  MODE-SPECIFIC PLANNING DIRECTIVE (UNBREAKABLE):**
                 ${plannerDirectives}
+                
+                **Also, acknowledge any special request made by the user. Here it is: "${userRequest}"**
 
               **CRITICAL JSON SCHEMA:** Return a JSON array of objects. Each object represents a month and MUST have these keys:
               - "month": (number) The month number in the sequence (e.g., 1, 2, 3).
@@ -549,6 +560,9 @@ export async function POST(request) {
                   - Month to Plan: ${monthData.month}
                   - This Month's Goals: "${monthData.goals}"
                   - This Month's Main Focus Topics: "${monthData.main_focus_topics.join(', ')}"
+
+                  **USER MANDATE (Highest Priority):**
+                  User Request: "${userRequest}"
 
                 **  MODE-SPECIFIC PLANNING DIRECTIVE (UNBREAKABLE):**
                 ${plannerDirectives}
@@ -573,6 +587,9 @@ export async function POST(request) {
               - Overall Strategy: ${strategy.overall_approach}
               - Full Syllabus: """${syllabus}"""
               - Total Duration: ${daysLeft} days.
+
+              **USER MANDATE (Highest Priority):**
+                  User Request: "${userRequest}"
 
               **  MODE-SPECIFIC PLANNING DIRECTIVE (UNBREAKABLE):**
                 ${plannerDirectives}
@@ -607,6 +624,9 @@ export async function POST(request) {
               - Topics to Emphasize: You MUST give special focus and adequate time to these topics: ${JSON.stringify(strategy.emphasized_topics)}
               - De-prioritized Topics: These topics MUST be included in the plan, but you must cover them in a highly condensed format (e.g., merging them with other topics or dedicating a single, focused day to them): ${JSON.stringify(strategy.deprioritized_topics)}
               - UNBREAKABLE RULE: FORBIDDEN TOPICS: You are strictly forbidden from planning any of the following topics. EXCLUDE THESE: ${JSON.stringify(strategy.skipped_topics)}
+
+              **USER MANDATE (Highest Priority):**
+                  User Request: "${userRequest}"
 
               **  MODE-SPECIFIC PLANNING DIRECTIVE (UNBREAKABLE):**
                 ${plannerDirectives}
