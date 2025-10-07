@@ -170,10 +170,22 @@ const examPersona = JSON.parse(personaResult.response.candidates[0].content.part
       5.  **Formatting:** Use beautiful, clean Markdown. Use LaTeX for all mathematical equations ($...$ for inline, $$...$$ for block-level).
       6.  **No Redundant Titles:** Your response must NOT repeat the main topic or sub-topic as a title. Begin directly with the first point of the outline (e.g., "### I. Introduction...").
 
-      **LATEX STYLE GUIDE (UNBREAKABLE RULES FOR KATEX COMPATIBILITY):**
-      - **For Matrices:** ALWAYS use the capitalized version: \`\\begin{Vmatrix}\` ... \`\\end{Vmatrix}\`.
-      - **Special Characters:** Inside any math block, you MUST escape standalone percentage signs like this: \`\\%\`.
-      - **Clarity:** Ensure all brackets and delimiters are correctly matched.
+      **LATEX STYLE GUIDE (THESE ARE UNBREAKABLE LAWS FOR KATEX COMPATIBILITY):**
+    
+    1.  **DELIMITERS:** You MUST use \`$ ... $\` for inline math and \`$$ ... $$\` for display math. You are FORBIDDEN from using \`\\[ ... \\]\` or \`\\( ... \\)\`.
+    
+    2.  **ENVIRONMENTS:** You are RESTRICTED to ONLY the following environments: \`{matrix}\`, \`{pmatrix}\`, \`{bmatrix}\`, \`{Vmatrix}\`, \`{vmatrix}\`, \`{align}\`, \`{aligned}\`, \`{cases}\`. You are STRICTLY FORBIDDEN from using unsupported environments like \`{equation}\`, \`{eqnarray}\`, or \`{gather}\`.
+    
+    3.  **COMMANDS:** Do not use exotic or non-standard packages/commands. Stick to common, vanilla LaTeX commands.
+    
+    4.  **SPECIAL CHARACTERS:** Inside any math block ($ or $$), you MUST escape the following characters with a backslash:
+        -   Percent sign: \`\\% \`
+        -   Underscore: \`\\_ \`
+        -   Ampersand: \`\\& \` (Except inside an \`{align}\` environment)
+
+    5.  **CLARITY AND CORRECTNESS:**
+        -   Ensure all brackets, braces, and parentheses are correctly matched and closed.
+        -   NEVER nest a display math block ($$) inside another display math block.
     
      **ILLUSTRATION & DIAGRAMS (STRICT GUIDELINES):**
       Your goal is to be a brilliant author, not just a graph generator.
