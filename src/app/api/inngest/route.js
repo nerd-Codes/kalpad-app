@@ -322,7 +322,7 @@ const scripterAgent = inngest.createFunction(
 
             if (placeholderData.engine === 'matplotlib') {
                 const imageUrl = await step.run(`generate-quickchart-url-for-${placeholderData.description.slice(0, 20)}`, async () => {
-                    const model = await getVertexAIModel("gemini-2.5-flash-lite", { responseMimeType: "application/json" });
+                    const model = await getVertexAIModel("gemini-2.5-pro", { responseMimeType: "application/json" });
                     const prompt = `You are an expert data visualization designer creating a chart for QuickChart.io. Your sole task is to convert a natural language description into a valid, aesthetically pleasing, and polished QuickChart JSON configuration.
 
                         Description: "${placeholderData.description}"
@@ -410,15 +410,13 @@ const scripterAgent = inngest.createFunction(
 );
 
 const svgRendererAgent = inngest.createFunction(
-    // Correct event-driven signature
     { id: "illustrator-agent-svg-renderer", concurrency: 1 },
     { event: 'notes/svg.render.requested' },
     async ({ event, step }) => {
-        const { note_id, user_id, engine, description, placeholder_text } = event.data;
+        const { note_id, user_id, description, placeholder_text } = event.data;
 
-        // Step 1: Generate the script from the description
-        const script = await step.run(`generate-mermaid-script`, async () => {
-        const model = await getVertexAIModel("gemini-2.5-flash-lite");
+        const rawScript = await step.run(`generate-mermaid-script`, async () => {
+        const model = await getVertexAIModel("gemini-2.5-pro");
         const prompt = `
             You are an expert script generator for Mermaid.js diagrams. Convert the natural language description into a valid, complete script. Respond ONLY with the raw script code.
             
@@ -431,55 +429,61 @@ const svgRendererAgent = inngest.createFunction(
             3.  Flowchart Declaration: Always start the script with \`graph TD;\`.
             4.  Do not add comments, markdown, explanations, or any other text.
         `;
-        const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+            const result = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }]
+            });
+            return result.response.candidates[0].content.parts[0].text.trim();
         });
-        return result.response.candidates[0].content.parts[0].text.trim();
-    });
 
+        if (!rawScript) {
+            throw new Error(`AI failed to generate a script.`);
+        }
+
+        // --- THIS IS THE DEFINITIVE FIX: SANITIZE THE AI OUTPUT ---
+        const scriptMatch = rawScript.match(/```(?:mermaid)?([\s\S]*?)```/);
+        const script = scriptMatch ? scriptMatch[1].trim() : rawScript.trim();
+        
         if (!script) {
-            throw new Error(`AI failed to generate a valid script for engine: ${engine}`);
+            throw new Error(`AI output was empty after sanitization.`);
         }
+        // --- END OF FIX ---
 
-
-         const imageUrl = await step.run(`render-mermaid-diagram`, async () => {
-        const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), `kalpad-render-mermaid-`));
-        const inputFile = path.join(tempDir, `input.mmd`);
-        const outputFile = path.join(tempDir, `output.png`);
-        
-        await fs.writeFile(inputFile, script);
-
-        try {
-            // --- DEFINITIVE FIX V3: Use the modern, bundled 'mmdc' binary ---
-            const mmdcPath = path.resolve('./bin/mmdc');
-            const command = `"${mmdcPath}" -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`;
-            
-            execSync(command);
-
-        } catch (execError) {
-            // The fallback is now for local dev where `mmdc` might be in the global PATH
-            console.log("Bundled mmdc failed, attempting fallback to system PATH...");
-            try {
-                execSync(`mmdc -i "${inputFile}" -o "${outputFile}" -b transparent --theme dark`);
-            } catch (fallbackError) {
-                await fs.rm(tempDir, { recursive: true, force: true });
-                throw new Error(`Failed to execute mmdc renderer using both bundled binary and system PATH.`);
+        const imageUrl = await step.run('render-mermaid-via-microservice', async () => {
+            const forgeUrl = process.env.MERMAID_FORGE_URL;
+            if (!forgeUrl) {
+                throw new Error("MERMAID_FORGE_URL environment variable is not set.");
             }
-        }
-        
-        const imageContent = await fs.readFile(outputFile);
-        const storagePath = `generated-illustrations/${note_id}-mermaid-${Date.now()}.png`;
-        
-        const { error: uploadError } = await supabaseAdmin.storage
-            .from('generated-illustrations')
-            .upload(storagePath, imageContent, { contentType: 'image/png', upsert: true });
-        
-        await fs.rm(tempDir, { recursive: true, force: true });
-        if (uploadError) { throw new Error(`Supabase upload error: ${uploadError.message}`); }
-        
-        const { data: { publicUrl } } = supabaseAdmin.storage.from('generated-illustrations').getPublicUrl(storagePath);
-        return publicUrl;
-    });
+
+            const response = await fetch(`${forgeUrl}/render`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                // We now send the sanitized 'script', not the 'rawScript'
+                body: JSON.stringify({ script: script }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`Mermaid Forge service failed: ${errorData.error || response.statusText}`);
+            }
+
+            // 2. The response body is the raw SVG content.
+            const svgContent = await response.text();
+
+            // 3. Upload the resulting SVG to Supabase Storage.
+            const storagePath = `generated-illustrations/${note_id}-mermaid-${Date.now()}.svg`;
+            
+            const { error: uploadError } = await supabaseAdmin.storage
+                .from('generated-illustrations')
+                .upload(storagePath, svgContent, { contentType: 'image/svg+xml', upsert: true });
+
+            if (uploadError) {
+                throw new Error(`Supabase upload error: ${uploadError.message}`);
+            }
+            
+            // 4. Return the public URL.
+            const { data: { publicUrl } } = supabaseAdmin.storage.from('generated-illustrations').getPublicUrl(storagePath);
+            return publicUrl;
+        });
 
         if (!imageUrl) {
             throw new Error(`Failed to generate and upload image URL for ${engine}`);
