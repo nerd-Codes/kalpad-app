@@ -10,12 +10,16 @@ import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { notifications } from '@mantine/notifications';
 
+import { isSameDay, parseISO } from 'date-fns'; 
+
 import { IconFlame } from '@tabler/icons-react';
 import { wittyFacts as cramSheetFacts } from '@/lib/newplanFacts';
+import { useRef } from 'react'; 
+import { IconListCheck } from '@tabler/icons-react';
 
 
 // Mantine Imports
-import { Container, Title, Text, Loader, Alert, Group, Button, Breadcrumbs, Anchor, Modal, Textarea, Paper, Badge, ScrollArea, Stack, Checkbox, TextInput } from '@mantine/core';
+import { Container, Title, Text, Loader, Alert, Group, Button, Breadcrumbs, Anchor, Modal, Textarea, Paper, Badge, ScrollArea, Stack, Checkbox, TextInput, List } from '@mantine/core';
 import Link from 'next/link';
 import { useDisclosure } from '@mantine/hooks';
 import { useLoading } from '@/context/LoadingContext';
@@ -23,7 +27,7 @@ import { useLoading } from '@/context/LoadingContext';
 import { RegeneratePlanModal } from '@/components/RegeneratePlanModal';
 
 import { CopyButton } from '@mantine/core';
-import { IconBellRinging, IconShare3, IconVideo } from '@tabler/icons-react';
+import { IconBellRinging, IconShare3, IconVideo, IconPlayerPlay} from '@tabler/icons-react';
 import { format } from 'date-fns';// <-- Make sure this is imported
 
 export default function PlanDetailPage() {
@@ -73,6 +77,58 @@ export default function PlanDetailPage() {
         "Finding an escape route from the 'pakaau' paragraph prison.",
         "One day, my rival will generate a note about how I made it obsolete."
     ];
+
+    const [bulkNoteJob, setBulkNoteJob] = useState({ active: false, total: 0, requestedTopics: [] });
+    const wittyIntervalRef = useRef(null);
+
+    const handleConfirmBulkGenerate = async ({ total, topics }) => {
+    const notificationId = `bulk-notes-job-${planId}`;
+    
+    // Clean up any previous intervals
+    if (wittyIntervalRef.current) clearInterval(wittyIntervalRef.current);
+
+    try {
+        // Set the state to start tracking the job
+        setBulkNoteJob({ active: true, total, requestedTopics: topics.map(t => t.sub_topic_text) });
+
+        notifications.show({
+            id: notificationId,
+            loading: true,
+            title: `Forging ${total} Notes... (0/${total})`,
+            message: wittyFacts[0],
+            autoClose: false,
+            withCloseButton: false,
+        });
+        
+        let factIndex = 1;
+        wittyIntervalRef.current = setInterval(() => {
+            notifications.update({
+                id: notificationId,
+                message: wittyFacts[factIndex % wittyFacts.length],
+            });
+            factIndex++;
+        }, 5000);
+
+        const response = await fetch('/api/bulk-generate-notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topics }),
+        });
+
+        if (response.status !== 202) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Server rejected the request.');
+        }
+    } catch (err) {
+        if (wittyIntervalRef.current) clearInterval(wittyIntervalRef.current);
+        notifications.update({
+            id: notificationId,
+            color: 'red', title: 'Request Failed',
+            message: err.message, loading: false, autoClose: 8000,
+        });
+        setBulkNoteJob({ active: false, total: 0, requestedTopics: [] });
+    }
+};
 
     const [isInApp, setIsInApp] = useState(false);
     useEffect(() => {
@@ -266,6 +322,7 @@ export default function PlanDetailPage() {
                         title: 'Illustrations Ready!',
                         message: 'Your notes have been automatically updated with new visual aids.',
                         color: 'teal',
+                        zindex: 5000,
                     });
                     fetchPlanData(session);
                 }
@@ -279,6 +336,57 @@ export default function PlanDetailPage() {
         };
 
     }, [plan, session]); // This effect re-runs if the plan or session changes.
+
+    useEffect(() => {
+    // This effect runs whenever the 'plan' data is successfully re-fetched.
+    if (!plan || loading) return; // Only run when data is fresh and not loading
+
+    // --- Logic for Bulk Note Generation Progress ---
+    if (bulkNoteJob.active) {
+        const notificationId = `bulk-notes-job-${planId}`;
+        
+        const currentCompletedNotes = new Set(
+            plan.plan_topics.flatMap(pt => pt.new_notes?.map(n => n.sub_topic_text) || [])
+        );
+        const completedCount = bulkNoteJob.requestedTopics.filter(t => currentCompletedNotes.has(t)).length;
+
+        if (completedCount >= bulkNoteJob.total) {
+            // Job is complete
+            if (wittyIntervalRef.current) clearInterval(wittyIntervalRef.current);
+            notifications.update({
+                id: notificationId,
+                color: 'teal', title: 'Bulk Generation Complete!',
+                message: `${bulkNoteJob.total} notes have been successfully forged.`,
+                loading: false, autoClose: 8000, icon: <IconListCheck size={18} />,
+            });
+            setBulkNoteJob({ active: false, total: 0, requestedTopics: [] });
+        } else {
+            // Job is in progress
+            notifications.update({
+                id: notificationId,
+                title: `Forging Notes... (${completedCount}/${bulkNoteJob.total})`,
+            });
+        }
+    }
+
+    // Setup the Supabase Realtime subscription
+    const channel = supabase
+        .channel(`notes-for-plan-${planId}`)
+        .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'generated_notes' },
+            (payload) => {
+                // The ONLY job of the listener is to trigger a data re-fetch.
+                // All complex logic now lives outside the listener, preventing race conditions.
+                console.log('Realtime change detected, refetching data...', payload);
+                fetchPlanData(session);
+            }
+        )
+        .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+
+}, [plan, loading, session, bulkNoteJob]); // This dependency array is now correct and robust.
 
      useEffect(() => {
         // Only set up the listener if we have a valid session.
@@ -358,8 +466,14 @@ export default function PlanDetailPage() {
 
     const handleStartCuration = async () => {
         // Find all sub-topics for today to pass to the modal
-        const todayString = new Date().toISOString().split('T')[0];
-        const topicsForToday = plan.plan_topics.filter(t => t.date === todayString);
+        const today = new Date(); // Get the current date in the user's local timezone
+
+    // --- DEFINITIVE FIX: Use isSameDay for a timezone-agnostic comparison ---
+    const topicsForToday = plan.plan_topics.filter(t => {
+        // parseISO converts the "YYYY-MM-DD" string from the database into a proper Date object (at UTC midnight)
+        // isSameDay then correctly compares just the calendar day, ignoring time and timezone.
+        return isSameDay(parseISO(t.date), today);
+    });
         const allSubTopicsForToday = topicsForToday.flatMap(t => 
             t.sub_topics.map(st => ({
                 text: st.text,
@@ -465,6 +579,7 @@ export default function PlanDetailPage() {
                         message: statusData.status === 'complete' ? 'Your timeline has been updated. Please refresh' : 'Please try again later.',
                         icon: <IconVideo size="1rem" />,
                         autoClose: 7000,
+                        zindex: 5000,
                     });
                     
                     if (statusData.status === 'complete') {
@@ -651,6 +766,7 @@ const handleForgeCramSheet = async () => {
                         onNoteGenerated={() => fetchPlanData(session)}
                         isInApp={isInApp}
                         onScheduleReminders={handleScheduleReminders}
+                        onConfirmBulkGenerate={handleConfirmBulkGenerate} 
                     />
                 </>
             )}
@@ -667,38 +783,81 @@ const handleForgeCramSheet = async () => {
         >
             <Stack>
                 <Text c="dimmed" size="sm">
-                    Select the topics you'd like our AI to find the best lectures for.
+                    Select the topics you'd like our AI to find the best lectures for. Previously found lectures are shown below.
                 </Text>
                 
                 <Group justify="flex-end">
-                    <Button variant="subtle" size="xs" onClick={handleSelectAllTopics}>
-                        {selectedTopics.length < todaysTopics.length ? 'Select All' : 'Deselect All'}
+                    <Button variant="subtle" size="xs" onClick={() => {
+                        const uncuratedTopics = todaysTopics
+                            .filter(topic => !plan.plan_topics.flatMap(pt => pt.curated_lectures || []).some(lec => lec.sub_topic_text === topic.text))
+                            .map(topic => JSON.stringify(topic));
+
+                        if (selectedTopics.length < uncuratedTopics.length) {
+                            setSelectedTopics(uncuratedTopics);
+                        } else {
+                            setSelectedTopics([]);
+                        }
+                    }}>
+                        {/* Logic to intelligently show Select/Deselect All */}
+                        Select All Available
                     </Button>
                 </Group>
 
                 <ScrollArea.Autosize mah={350}>
-                    <Checkbox.Group value={selectedTopics} onChange={setSelectedTopics}>
-                        <Stack gap="xs">
-                            {todaysTopics.map((topic, index) => (
+                    <Stack gap="xs">
+                        {todaysTopics.map((topic, index) => {
+                            // Check if a lecture for this specific sub-topic text already exists in the plan data.
+                            const existingLecture = plan.plan_topics
+                                .flatMap(pt => pt.curated_lectures || [])
+                                .find(lec => lec.sub_topic_text === topic.text);
+
+                            // --- DEFINITIVE FIX: Manual state management ---
+                            const topicString = JSON.stringify(topic);
+                            const isSelected = selectedTopics.includes(topicString);
+
+                            return (
                                 <Paper 
                                     key={index} 
                                     withBorder 
                                     p="sm" 
                                     radius="md" 
-                                    style={{ 
-                                        backgroundColor: 'var(--mantine-color-dark-6)',
-                                        cursor: 'pointer'
-                                    }}
+                                    style={{ backgroundColor: 'var(--mantine-color-dark-6)' }}
                                 >
-                                    <Checkbox 
-                                        value={JSON.stringify(topic)}
-                                        label={topic.text}
-                                        styles={{ label: { cursor: 'pointer' } }}
-                                    />
+                                    {existingLecture ? (
+                                        // If a lecture exists, render a non-interactive view.
+                                        <Group justify="space-between">
+                                            <Text size="sm" c="dimmed" td="line-through">{topic.text}</Text>
+                                            <Button
+                                                component="a"
+                                                href={existingLecture.video_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                variant="light"
+                                                color="red"
+                                                size="xs"
+                                                leftSection={<IconPlayerPlay size={16} />}
+                                            >
+                                                View Lecture
+                                            </Button>
+                                        </Group>
+                                    ) : (
+                                        // If no lecture exists, render a functional checkbox.
+                                        <Checkbox
+                                            checked={isSelected}
+                                            onChange={(event) => {
+                                                const newSelection = event.currentTarget.checked
+                                                    ? [...selectedTopics, topicString]
+                                                    : selectedTopics.filter(t => t !== topicString);
+                                                setSelectedTopics(newSelection);
+                                            }}
+                                            label={topic.text}
+                                            styles={{ root: { width: '100%' }, label: { cursor: 'pointer', width: '100%'} }}
+                                        />
+                                    )}
                                 </Paper>
-                            ))}
-                        </Stack>
-                    </Checkbox.Group>
+                            );
+                        })}
+                    </Stack>
                 </ScrollArea.Autosize>
                 
                 <Group justify="flex-end" mt="md">

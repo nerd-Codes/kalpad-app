@@ -98,7 +98,7 @@ const curationPipeline = inngest.createFunction(
             try {
                 // AGENT 0.5: The Topic Distiller
                 const cleanTopic = await step.run(`agent-0.5-distill-topic-${subTopic.text.slice(0, 25)}`, async () => {
-                const model = await getVertexAIModel("gemini-2.5-flash-lite"); // Use a specific model version for stability
+                const model = await getVertexAIModel("gemini-2.5-flash"); // Use a specific model version for stability
                 const prompt = `You are a Topic Distiller. Your one job is to read the following instructional text and extract the core, searchable academic concept.
                     Context: 
                     The overall exam is "${subTopic.exam_name}".    
@@ -236,7 +236,7 @@ const curationPipeline = inngest.createFunction(
         const finalCuration = await step.run("agent-5-cohesion-and-curation", async () => {
             if (allVerifiedVideos.length === 0) return [];
 
-            const model = await getVertexAIModel("gemini-2.5-flash-lite", { responseMimeType: "application/json" });
+            const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
             const prompt = `You are a master Curation Agent. Select the single best YouTube video for each sub-topic from a list of verified candidates. Prioritize cohesion.
                 Today's Full Learning Context: ${cohesion_context.join(', ')}
                 Verified Video Candidates (JSON): ${JSON.stringify(allVerifiedVideos)}
@@ -321,67 +321,106 @@ const scripterAgent = inngest.createFunction(
             }
 
             if (placeholderData.engine === 'matplotlib') {
-                const imageUrl = await step.run(`generate-quickchart-url-for-${placeholderData.description.slice(0, 20)}`, async () => {
-                    const model = await getVertexAIModel("gemini-2.5-pro", { responseMimeType: "application/json" });
-                    const prompt = `You are an expert data visualization designer creating a chart for QuickChart.io. Your sole task is to convert a natural language description into a valid, aesthetically pleasing, and polished QuickChart JSON configuration.
+                // --- Step 1 (NEW): Generate Python Code ---
+                // This step's job is to create the Python code for our Foundry service.
+                const imageUrl = await step.run(`atomic-generate-and-render-plot-for-${placeholderData.description.slice(0, 20)}`, async () => {
+         // We use a powerful model for code generation to ensure high quality.
+                    const model = await getVertexAIModel("gemini-2.5-pro");
+                    
+                    const prompt = `
+    You are an expert Python data scientist. Your sole task is to write a **complete, self-contained, and executable Python script** to generate a plot based on a natural language description.
 
-                        Description: "${placeholderData.description}"
+    **Description:** "${placeholderData.description}"
 
-                        **DESIGN & BRAND GUIDELINES (UNBREAKABLE RULES):**
-                        1.  **Theme:** The chart MUST be dark-themed to match the app. All text (titles, labels, ticks) must be white or light gray.
-                        2.  **Brand Color:** The primary dataset's line color MUST be our brand purple: 'rgb(138, 86, 248)'.
-                        3.  **Data:** Generate a plausible dataset of 20-40 points for the description.
-                        4.  **Polish:** The line must be smooth (tension: 0.4). Grid lines should be subtle, semi-transparent gray lines. The axes must start from the origin (beginAtZero: true). Points on the line should be invisible (pointRadius: 0).
-                        
-                        CRITICAL JSON SCHEMA (Return ONLY a valid JSON object, without any markdown wrappers):
-                        {
-                          "type": "line",
-                          "data": {
-                            "labels": [/* x-axis labels */],
-                            "datasets": [{
-                              "label": "y_label",
-                              "data": [/* y-axis data */],
-                              "fill": false,
-                              "borderColor": "rgb(138, 86, 248)",
-                              "borderWidth": 2,
-                              "pointRadius": 0,
-                              "tension": 0.4
-                            }]
-                          },
-                          "options": {
-                            "title": { "display": true, "text": "title", "fontColor": "white", "fontSize": 16 },
-                            "legend": { "display": false },
-                            "scales": {
-                               "xAxes": [{ 
-                                   "scaleLabel": { "display": true, "labelString": "x_label", "fontColor": "white", "fontSize": 12 }, 
-                                   "ticks": { "fontColor": "rgb(200, 200, 200)", "beginAtZero": true },
-                                   "gridLines": { "color": "rgba(255, 255, 255, 0.1)" }
-                               }],
-                               "yAxes": [{ 
-                                   "scaleLabel": { "display": true, "labelString": "y_label", "fontColor": "white", "fontSize": 12 }, 
-                                   "ticks": { "fontColor": "rgb(200, 200, 200)", "beginAtZero": true },
-                                   "gridLines": { "color": "rgba(255, 255, 255, 0.1)" }
-                               }]
-                            }
-                          }
-                        }
-                           UNBREAKABLE RULE: Your entire response must be ONLY the raw JSON object, starting with '{' and ending with '}'. Do not wrap it in \`\`\`json or any other text.
-                        `;
-                    const result = await model.generateContent({
-                        contents: [{ role: 'user', parts: [{ text: prompt }] }]
-                    });
-                    let rawResponse = result.response.candidates[0].content.parts[0].text;
-                    const jsonMatch = rawResponse.match(/```json\n([\s\S]*?)\n```|({[\s\S]*})/);
-                    const jsonString = jsonMatch ? (jsonMatch[1] || jsonMatch[2]) : rawResponse;
-                    const chartConfig = JSON.parse(jsonString.trim());
-                    const encodedChart = encodeURIComponent(JSON.stringify(chartConfig));
-                    return `https://quickchart.io/chart?bkg=rgb(26,27,30)&c=${encodedChart}`;
-                });
+    **EXECUTION ENVIRONMENT (UNBREAKABLE RULES):**
+    - Your script will be executed with \`exec()\`.
+    - A Matplotlib Figure object is pre-defined for you and available in the global scope as the variable \`fig\`.
+    - An in-memory image buffer is available as the variable \`img_buffer\`.
+    - You MUST perform your own imports.
+    - You MUST define any constants you need.
+    - You MUST conclude your script with a call to save the plot: \`fig.savefig(img_buffer, format='png', bbox_inches='tight')\`.
 
-                // Immediately replace the placeholder with the final image tag for matplotlib plots
-                updatedMarkdown = updatedMarkdown.replace(placeholder, `![${placeholderData.description}](${imageUrl})`);
+    **ALLOWED LIBRARIES:**
+    You can import and use any of the following:
+    - \`matplotlib.pyplot as plt\`
+    - \`numpy as np\`
+    - \`pandas as pd\`
+    - \`seaborn as sns\`
+    - \`scipy\`
+    - \`sympy\`
+    - \`mpmath\`
 
-            } else if (placeholderData.engine === 'mermaid') {
+    **CRITICAL OUTPUT FORMAT:**
+    - Your response MUST be ONLY the raw Python code. Do not wrap it in \`\`\`python or any other markdown.
+
+    **GOOD EXAMPLE SCRIPT (for a description 'A simple sine wave'):**
+    # 1. Import necessary libraries
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    # 2. Create an axes object from the provided 'fig'
+    ax = fig.add_subplot(111)
+
+    # 3. Generate data and plot on the axes
+    x = np.linspace(0, 2 * np.pi, 200)
+    y = np.sin(x)
+    ax.plot(x, y)
+
+    # 4. Add styling and labels
+    ax.set_title('Sine Wave')
+    ax.set_xlabel('Angle [rad]')
+    ax.set_ylabel('sin(x)')
+    ax.grid(True)
+    
+    # 5. Save the final figure to the buffer (MANDATORY)
+    fig.savefig(img_buffer, format='png', bbox_inches='tight')
+`;
+
+                const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+        });
+        let rawResponse = result.response.candidates[0].content.parts[0].text.trim();
+        const codeMatch = rawResponse.match(/```(?:python)?([\s\S]*?)```/);
+        const pythonCode = codeMatch ? codeMatch[1].trim() : rawResponse;
+
+        // --- 2. Call the Matplotlib Foundry Microservice (Renderer) ---
+        const foundryUrl = process.env.MATPLOTLIB_FOUNDRY_URL;
+        if (!foundryUrl) {
+            throw new Error("MATPLOTLIB_FOUNDRY_URL is not set.");
+        }
+
+        const response = await fetch(`${foundryUrl}/plot`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: pythonCode }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            // This throw is CRITICAL. It fails the step and triggers a full retry.
+            throw new Error(`Matplotlib Foundry service failed: ${errorData.error || response.statusText}`);
+        }
+
+        // --- 3. Upload the resulting image ---
+        const imageBlob = await response.blob();
+        const storagePath = `generated-illustrations/${note_id}-matplotlib-${Date.now()}.png`;
+        
+        const { error: uploadError } = await supabaseAdmin.storage
+            .from('generated-illustrations')
+            .upload(storagePath, imageBlob, { contentType: 'image/png', upsert: true });
+
+        if (uploadError) {
+            throw new Error(`Supabase upload error for Matplotlib plot: ${uploadError.message}`);
+        }
+        
+        const { data: { publicUrl } } = supabaseAdmin.storage.from('generated-illustrations').getPublicUrl(storagePath);
+        return publicUrl;
+    });
+
+    // The rest of the logic remains the same
+    updatedMarkdown = updatedMarkdown.replace(placeholder, `![${placeholderData.description}](${imageUrl})`);
+
+} else if (placeholderData.engine === 'mermaid') {
                 await step.sendEvent("dispatch-svg-render-job", {
                     name: 'notes/svg.render.requested',
                     data: {

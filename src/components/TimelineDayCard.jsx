@@ -9,6 +9,12 @@ import { FullscreenNoteViewer } from './FullscreenNoteViewer';
 import { differenceInCalendarDays } from 'date-fns';
 import Link from 'next/link';
 
+import { Modal, ScrollArea, List, Paper } from '@mantine/core';
+// --- ADD the ShimmerButton import ---
+import { ShimmerButton } from './landing/ShimmerButton';
+// --- ADD these icons ---
+import { IconNotes, IconListCheck } from '@tabler/icons-react';
+
 import { QuizSetupModal } from './QuizSetupModal';
 import { QuizRunner } from './QuizRunner';
 import { QuizResults } from './QuizResults';
@@ -42,7 +48,7 @@ const getSubTopicTypeColor = (type) => {
 };
 
 
-export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan', isReadOnly = false, isNewUserTourActive = false }) {
+export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan', isReadOnly = false, isNewUserTourActive = false, onConfirmBulkGenerate }) {
      const { setIsLoading } = useLoading();
 
     const [generatingNotesFor, setGeneratingNotesFor] = useState(null);
@@ -54,6 +60,12 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
     const [noteToView, setNoteToView] = useState(null); 
     // This will eventually open the FullscreenNoteViewer.jsx modal.
     // For now, setting this state is the goal.
+
+    const [bulkNoteModalOpened, { open: openBulkNoteModal, close: closeBulkNoteModal }] = useDisclosure(false);
+    const [bulkNoteSelection, setBulkNoteSelection] = useState([]);
+    const [isBulkGenerating, setIsBulkGenerating] = useState(false);
+    const [bulkJob, setBulkJob] = useState({ active: false, total: 0, completed: 0 });
+    
 
     // --- DEFINITIVE FIX #1: LOCAL STATE MANAGEMENT ---
     // The card now manages its own sub-topics for an instantaneous UI response.
@@ -203,6 +215,86 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
     }
 };
 
+
+    const handleConfirmBulkGenerate = async () => {
+        if (bulkNoteSelection.length === 0) return;
+        
+        setIsBulkGenerating(true);
+        closeBulkNoteModal();
+
+        const totalToGenerate = bulkNoteSelection.length;
+        let completedCount = 0;
+
+        const notificationId = `bulk-notes-${dayTopic.id}`;
+        notifications.show({
+            id: notificationId,
+            loading: true,
+            title: `Generating ${totalToGenerate} Notes... (0/${totalToGenerate})`,
+            message: 'Starting the note forge...',
+            autoClose: false,
+            withCloseButton: false,
+        });
+
+        // Use a simple, robust for...of loop to process tasks sequentially.
+        for (const subTopicText of bulkNoteSelection) {
+            try {
+                // Call our existing, single-note generation API endpoint.
+                const response = await fetch('/api/generate-notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        plan_topic_id: dayTopic.id,
+                        sub_topic_text: subTopicText,
+                        exam_name: plan.exam_name, 
+                        day_topic: dayTopic.topic_name,
+                    }),
+                });
+
+                if (!response.ok) {
+                    // If one note fails, we log it and continue to the next.
+                    console.error(`Failed to generate note for "${subTopicText}"`);
+                    notifications.show({
+                        color: 'red',
+                        title: 'Note Generation Failed',
+                        message: `Could not generate notes for "${subTopicText}".`,
+                    });
+                } else {
+                    completedCount++;
+                    notifications.update({
+                        id: notificationId,
+                        title: `Generating Notes... (${completedCount}/${totalToGenerate})`,
+                        message: `Successfully forged note for "${subTopicText}"`,
+                    });
+                }
+                
+                // CRITICAL: After each API call, successful or not, trigger a full data refetch.
+                // This is exactly what the single-note button does.
+                if (onNoteGenerated) {
+                    await onNoteGenerated();
+                }
+
+                // Add a small delay between calls to be safe.
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+            } catch (err) {
+                console.error(`A critical error occurred during bulk generation for "${subTopicText}":`, err);
+            }
+        }
+
+        // Final completion notification.
+        notifications.update({
+            id: notificationId,
+            loading: false,
+            color: 'teal',
+            title: 'Bulk Generation Complete',
+            message: `Finished generating ${completedCount} of ${totalToGenerate} requested notes.`,
+            autoClose: 5000,
+        });
+
+        setIsBulkGenerating(false);
+        setBulkNoteSelection([]);
+    };
+
 return (
     <>
         {viewMode === 'dashboard' && (
@@ -226,6 +318,13 @@ return (
                 style={{ borderLeft: `5px solid ${getDayDifficultyColor(dayTopic.day_difficulty)}`}}
             >
                 <Stack gap="md">
+                    <Button
+                        variant="light"
+                        leftSection={<IconNotes size={16} />}
+                        onClick={openBulkNoteModal}
+                    >
+                        Generate Multiple Notes
+                    </Button>
                     <Group justify="space-between">
                         <Title order={4} ff="Lexend, sans-serif" className={classes.dayTitle}>
                             {dayTopic.topic_name}
@@ -379,6 +478,56 @@ return (
             onClose={() => setNoteToView(null)} 
             onUpdate={onUpdate}
         />
+
+        <Modal
+            opened={bulkNoteModalOpened}
+            onClose={closeBulkNoteModal}
+            title={<Title order={3} ff="Lexend, sans-serif">Bulk Note Generation</Title>}
+            centered
+            size="lg"
+        >
+            <Stack>
+                <Text c="dimmed" size="sm">
+                    Select the topics for which you want to generate AI-powered notes. Notes that already exist are disabled.
+                </Text>
+                
+                <ScrollArea.Autosize mah={300}>
+                    <Stack gap="xs">
+                        {internalSubTopics.map((subTopic, index) => {
+                            const existingNote = dayTopic.new_notes?.find(n => n.sub_topic_text === subTopic.text);
+                            const isSelected = bulkNoteSelection.includes(subTopic.text);
+
+                            return (
+                                <Paper key={index} withBorder p="sm" radius="md" style={{ backgroundColor: 'var(--mantine-color-dark-6)' }}>
+                                    <Checkbox
+                                        disabled={!!existingNote}
+                                        checked={isSelected || !!existingNote}
+                                        onChange={(event) => {
+                                            const newSelection = event.currentTarget.checked
+                                                ? [...bulkNoteSelection, subTopic.text]
+                                                : bulkNoteSelection.filter(t => t !== subTopic.text);
+                                            setBulkNoteSelection(newSelection);
+                                        }}
+                                        label={subTopic.text}
+                                    />
+                                </Paper>
+                            );
+                        })}
+                    </Stack>
+                </ScrollArea.Autosize>
+
+                <Group justify="flex-end" mt="md">
+                    <Button variant="default" onClick={closeBulkNoteModal}>Cancel</Button>
+                        <ShimmerButton 
+                            onClick={handleConfirmBulkGenerate} 
+                            disabled={bulkNoteSelection.length === 0 || isBulkGenerating}
+                            loading={isBulkGenerating}
+                        >
+                            Generate ({bulkNoteSelection.length}) Note{bulkNoteSelection.length !== 1 ? 's' : ''}
+                        </ShimmerButton>
+                </Group>
+            </Stack>
+        </Modal>
     </>
 );
 }

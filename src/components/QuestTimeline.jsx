@@ -8,9 +8,21 @@ import { isToday, isPast, format } from 'date-fns';
 import { TimelineDayCard } from './TimelineDayCard';
 import classes from './QuestTimeline.module.css';
 
-export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCurating, onNoteGenerated, isReadOnly = false, isInApp, onScheduleReminders, isNewUserTourActive = false }) {
-    const todayIndex = isReadOnly ? -1 : planTopics.findIndex(topic => isToday(new Date(topic.date)));
+export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCurating, onNoteGenerated, isReadOnly = false, isInApp, onScheduleReminders, isNewUserTourActive = false, onConfirmBulkGenerate }) {
+    // 1. Determine the plan's overall status.
+    const isPlanFinished = isPast(new Date(plan.exam_date)) && !isToday(new Date(plan.exam_date));
+    
+    // 2. The todayIndex is only relevant for active plans.
+    const todayIndex = (isReadOnly || isPlanFinished) ? -1 : planTopics.findIndex(topic => isToday(new Date(topic.date)));
+    
     const itemRefs = useRef({});
+
+    // 3. The topics to render depend entirely on the plan's status.
+    // If the plan is finished or in read-only mode, we show ALL topics.
+    // Otherwise, we apply the "Fog of War" slice.
+    const topicsToRender = (isReadOnly || isPlanFinished) 
+        ? planTopics 
+        : planTopics.slice(0, todayIndex + 3); // todayIndex + 2 days future = slice up to index + 3
 
     const visibilityHorizon = todayIndex + 2;
 
@@ -25,7 +37,6 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
         }
     }, [todayIndex]);
 
-    const topicsToRender = isReadOnly ? planTopics : planTopics.slice(0, visibilityHorizon + 1);
 
     return (
         <Timeline 
@@ -120,6 +131,7 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
                                         onNoteGenerated={onNoteGenerated}
                                         isReadOnly={isReadOnly}
                                         isNewUserTourActive={isNewUserTourActive}
+                                        onConfirmBulkGenerate={onConfirmBulkGenerate}
                                     />
                                 </Box>
                             </div>
@@ -136,6 +148,7 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
                                     onNoteGenerated={onNoteGenerated}
                                     isReadOnly={isReadOnly}
                                     isNewUserTourActive={isNewUserTourActive}
+                                    onConfirmBulkGenerate={onConfirmBulkGenerate}
                                 />
                             </Box>
                         )}
@@ -149,11 +162,7 @@ export function QuestTimeline({ plan, planTopics, onUpdate, onFindLectures, isCu
             })}
 
             {/* The final "Focus on Today" Message */}
-            {!isReadOnly && 
-            // Condition 1: There are topics beyond the visible horizon.
-            (planTopics.length > visibilityHorizon + 1) &&
-            // Condition 2: Today is NOT the last day of the plan.
-            (todayIndex < planTopics.length - 1) && (
+                {!isReadOnly && !isPlanFinished && planTopics.length > todayIndex + 3 && (
                 <Timeline.Item
                     title="Focus on Today"
                     bullet={
