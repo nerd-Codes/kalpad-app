@@ -171,6 +171,24 @@ export async function POST(request) {
 
                         3.  **Be Ruthlessly Concise:** Every word on this sheet must be high-yield. Use clear headings ('##', '###'), bullet points for definitions and concepts, and LaTeX for all formulas. Do not add conversational text, introductions, or conclusions. Jump straight to the critical information.
 
+
+                         **LATEX STYLE GUIDE (THESE ARE UNBREAKABLE LAWS FOR KATEX COMPATIBILITY):**
+                            
+                            1.  **DELIMITERS:** You MUST use \`$ ... $\` for inline math and \`$$ ... $$\` for display math. You are FORBIDDEN from using \`\\[ ... \\]\` or \`\\( ... \\)\`.
+                            
+                            2.  **ENVIRONMENTS:** You are RESTRICTED to ONLY the following environments: \`{matrix}\`, \`{pmatrix}\`, \`{bmatrix}\`, \`{Vmatrix}\`, \`{vmatrix}\`, \`{align}\`, \`{aligned}\`, \`{cases}\`. You are STRICTLY FORBIDDEN from using unsupported environments like \`{equation}\`, \`{eqnarray}\`, or \`{gather}\`.
+                            
+                            3.  **COMMANDS:** Do not use exotic or non-standard packages/commands. Stick to common, vanilla LaTeX commands.
+                            
+                            4.  **SPECIAL CHARACTERS:** Inside any math block ($ or $$), you MUST escape the following characters with a backslash:
+                                -   Percent sign: \`\\% \`
+                                -   Underscore: \`\\_ \`
+                                -   Ampersand: \`\\& \` (Except inside an \`{align}\` environment)
+                        
+                            5.  **CLARITY AND CORRECTNESS:**
+                                -   Ensure all brackets, braces, and parentheses are correctly matched and closed.
+                                -   NEVER nest a display math block ($$) inside another display math block.
+
                         **Your ONLY output should be a single, complete, beautifully formatted Markdown document.**
                         `;
 
