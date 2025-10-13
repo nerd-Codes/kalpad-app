@@ -455,7 +455,7 @@ const svgRendererAgent = inngest.createFunction(
         const { note_id, user_id, description, placeholder_text } = event.data;
 
         const rawScript = await step.run(`generate-mermaid-script`, async () => {
-        const model = await getVertexAIModel("gemini-2.5-pro");
+        const model = await getVertexAIModel("gemini-2.5-flash");
         const prompt = `
             You are an expert script generator for Mermaid.js diagrams. Convert the natural language description into a valid, complete script. Respond ONLY with the raw script code.
             
