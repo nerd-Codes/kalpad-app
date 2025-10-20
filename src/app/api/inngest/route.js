@@ -25,259 +25,247 @@ const supabaseAdmin = createClient(
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-function selectBestCaption(captionTracks) {
-    for (const lang of preferredLangs) {
-        const track = captionTracks.find(ct => ct.languageCode === lang);
-        if (track) return track.baseUrl;
-    }
-    // Fallback: pick first available
-    return captionTracks.length > 0 ? captionTracks[0].baseUrl : null;
-}
-
-export async function getTranscript(videoId) {
-    try {
-        // Step 1: Create an Innertube client — start with top preference
-        const youtube = await Innertube.create({
-            lang: preferredLangs[0].split('-')[0], // 'en'
-            location: 'IN',
-            retrieve_player: false
-        });
-
-        // Step 2: Get video info
-        const info = await youtube.getInfo(videoId);
-
-        // Step 3a: Try the built-in transcript method first
-        const transcriptData = await info.getTranscript();
-
-        if (transcriptData?.transcript?.content?.body?.initial_segments) {
-            return transcriptData.transcript.content.body.initial_segments
-                .map(segment => segment.snippet.text)
-                .join(' ');
-        }
-
-        // Step 3b: If transcript not found, manually check caption track list
-        const captions = info.captions?.caption_tracks;
-        if (captions?.length) {
-            const bestTrackUrl = selectBestCaption(captions);
-            if (bestTrackUrl) {
-                const res = await fetch(bestTrackUrl + '&fmt=json3');
-                const json = await res.json();
-                return json.events
-                    ?.filter(event => event.segs)
-                    ?.map(event => event.segs.map(seg => seg.utf8).join(' '))
-                    ?.join(' ') || null;
-            }
-        }
-
-        console.warn(`[Transcript] No transcript available for ${videoId}`);
-        return null;
-
-    } catch (error) {
-        console.error(`[Transcript] Failed to fetch transcript for ${videoId}:`, error.message);
-        return null;
-    }
-}
-
 // --- The Main Curation Function ---
 const curationPipeline = inngest.createFunction(
-    { id: "lecture-scout-pipeline", concurrency: { limit: 5 } },
+    { id: "lecture-scout-curriculum-assembler-v1", name: "Lecture Scout Curriculum Assembler", concurrency: 2 },
     { event: "lecture-scout/curation.requested" },
     async ({ event, step }) => {
-        const { job_id, user_id, sub_topics_to_curate, cohesion_context, user_timezone } = event.data;
+        const { job_id, user_id, sub_topics_to_curate, all_todays_topics, user_timezone } = event.data;
+        const scoutUrl = process.env.LECTURE_SCOUT_URL;
+        if (!scoutUrl) throw new Error("LECTURE_SCOUT_URL is not configured.");
 
         await step.run("update-job-status-to-inprogress", async () => {
-            await supabaseAdmin
-                .from('curation_jobs')
-                .update({ status: 'in_progress' })
-                .eq('id', job_id);
+            await supabaseAdmin.from('curation_jobs').update({ status: 'in_progress' }).eq('id', job_id);
         });
 
-        let allVerifiedVideos = []; // This will hold results for the final cohesion step
+        // --- AGENT 1: Broad Search Query Generation ---
+        const searchQueries = await step.run("agent-1-generate-search-queries", async () => {
+            const model = await getVertexAIModel("gemini-2.5-flash-lite", { responseMimeType: "application/json" });
+            const prompt = `
+                You are an expert Research Strategist for an AI-powered study platform. Your sole task is to generate a diverse and intelligent set of YouTube search queries to build a pool of high-quality lecture candidates.
 
-        const topicProcessingPromises = sub_topics_to_curate.map(async (subTopic) => {
-            try {
-                // AGENT 0.5: The Topic Distiller
-                const cleanTopic = await step.run(`agent-0.5-distill-topic-${subTopic.text.slice(0, 25)}`, async () => {
-                const model = await getVertexAIModel("gemini-2.5-flash"); // Use a specific model version for stability
-                const prompt = `You are a Topic Distiller. Your one job is to read the following instructional text and extract the core, searchable academic concept.
-                    Context: 
-                    The overall exam is "${subTopic.exam_name}".    
-                    Instructional Text: "${subTopic.text}"
-                    CRITICAL: Respond with ONLY the clean, concise topic name. Do not add any other words.`;
-                const result = await model.generateContent({
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }]
-                });
-                // The model is not supposed to return JSON, so we get the text directly
-                return result.response.candidates[0].content.parts[0].text.trim();
-            });
-                            
-            // Now that we HAVE cleanTopic, we can safely define the suffix
-            const stepIdSuffix = `-${cleanTopic.slice(0, 25).replace(/\s/g, '_')}`;
+                **CONTEXT:**
+                - **Student's Topics for Today:**
+                - ${sub_topics_to_curate.map(t => t.text).join('\n  - ')}
+                - **Overall Daily Theme:** "${all_todays_topics.join(', ')}"
+                - **User's Region (for context):** "${user_timezone}"
 
-                // AGENT 0: The Librarian (Cache Check)
-                const cacheHit = await step.run(`agent-0-cache-check${stepIdSuffix}`, async () => {
-                    const { embedding } = await genAI.getGenerativeModel({ model: "text-embedding-004" }).embedContent(cleanTopic);
-                    const { data: matches, error } = await supabaseAdmin.rpc('match_lectures', {
-                        query_embedding: embedding.values, match_threshold: 0.95, match_count: 1
-                    });
-                    if (error || !matches || !matches.length) return null;
-                    return matches[0];
-                });
+                **YOUR DIRECTIVE:**
+                Generate a JSON array of 5 to 7 unique and high-quality search queries. The goal is to cast a wide but intelligent net. Your queries MUST include a mix of the following types:
+                1.  **Broad Theme Queries:** Create 1-2 queries for the "Overall Daily Theme" to find comprehensive, long-form lectures (e.g., "Operating Systems full course lecture", "Introduction to Quantum Mechanics").
+                2.  **Specific Sub-Topic Queries:** For each of the "Student's Topics for Today," create a precise query. Add clarifying keywords like "tutorial," "explained," "derivation," or "example problems."
+                3.  **Regional/Contextual Queries:** Create 1-2 queries that incorporate regional context based on the user's location, if relevant (e.g., "GATE CSE Operating Systems lecture", "CBSE Class 12 Physics tutorial").
+                4.  **Conceptual Queries:** Create 1-2 queries aimed at finding visual or intuitive explanations (e.g., "Heisenberg Uncertainty Principle explained visually").
 
-                if (cacheHit) {
-                    await step.run(`record-cache-hit${stepIdSuffix}`, async () => {
-                         const { error } = await supabaseAdmin.from('curated_lectures').upsert({
-                            plan_topic_id: subTopic.plan_topic_id, sub_topic_text: subTopic.text,
-                            video_url: cacheHit.video_url, title: cacheHit.title, channel_name: cacheHit.channel_name,
-                            relevance_score: 100, justification: "High-confidence match from existing knowledge base.", embedding: cacheHit.embedding
-                        });
-                        if (error) throw new Error(`DB Upsert Error (Cache Hit): ${error.message}`);
-                    });
-                    console.log(`[Job ${job_id}] Cache HIT for: "${subTopic.text}"`);
-                } else {
-                    console.log(`[Job ${job_id}] Cache MISS for: "${cleanTopic}". Starting full pipeline...`);
-                    
-                    // AGENT 1: The Research Strategist
-                    const searchKeywords = await step.run(`agent-1-generate-keywords${stepIdSuffix}`, async () => {
-                        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
-                        const prompt = `You are an expert Research Strategist for an AI study platform. Your sole task is to generate a diverse set of expert-level YouTube search queries for a specific academic topic.
-                            Context:
-                            - Overall Exam Name: "${subTopic.exam_name}"
-                            - Today's Main Topic: "${subTopic.day_topic}"
-                            - Distilled Sub-Topic: "${cleanTopic}"
-                            - User Region: "${user_timezone}"
-
-                            Your Instructions:
-                        1.  Generate 3 distinct search queries.
-                        2.  Queries should range from foundational (e.g., "introduction to X") to specific (e.g., "solving Y type problems") to conceptual (e.g., "visual explanation of Z").
-                        3.  Do NOT simply repeat the sub-topic name. Add keywords like "tutorial," "explained," "example," "lecture," "for beginners," or relevant technical terms.
-                        4. The user is in the '${user_timezone}' region. Prioritize search queries that include regional context, such as 'for CBSE Class 10' or 'in Hindi'.
-                        CRITICAL JSON SCHEMA (Return ONLY a valid JSON array of strings):
-                        ["query 1", "query 2", "query 3"]`;
-                        const result = await model.generateContent(prompt);
-                        return JSON.parse(result.response.text());
-                    });
-
-                    // AGENT 2: The Search & Filter Drone
-                    const videoCandidates = await step.run(`agent-2-search-youtube${stepIdSuffix}`, async () => {
-                        const yt = await Innertube.create();
-                        const searchResults = await yt.search(searchKeywords[0], { sort_by: 'relevance' });
-                        return searchResults.videos
-                            .filter(v => v.duration && v.duration.seconds > 180 && v.duration.seconds < 5400)
-                            .slice(0, 3).map(v => ({ id: v.id, title: v.title?.text, channel: v.author?.name }));
-                    });
-
-                    // AGENT 3: The Verification Analyst
-                    let verifiedVideosForTopic = [];
-                    for (const candidate of videoCandidates) {
-                        const fullTranscript = await step.run(`get-full-transcript-for-${candidate.id}`, () => getTranscript(candidate.id));
-                        if (fullTranscript) {
-                        // Step 2 (NEW): Run the "Smart Snippet" Agent to extract the golden passage
-                        const smartSnippet = await step.run(`agent-3.5-get-snippet-for-${candidate.id}`, async () => {
-                            const model = await getVertexAIModel("gemini-2.5-flash");
-                            const prompt = `You are an AI pre-processor. Your sole function is to analyze a raw video transcript and extract the single most academically relevant and information-dense passage related to a specific topic. Aggressively ignore all filler, introductions, and promotions.
-                                - Overall Exam Name: "${subTopic.exam_name}"
-                                - Target Academic Topic: "${cleanTopic}"
-
-                                Full Video Transcript:
-                                """
-                                ${fullTranscript}
-                                """
-
-                                Your Task: Read the transcript, identify the core educational segment for the topic, and extract a single, contiguous block of text approximately 1000 words long. Return ONLY the raw text of this passage.`;
-                            
-                            const result = await model.generateContent({
-                                contents: [{ role: 'user', parts: [{ text: prompt }] }]
-                            });
-                            return result.response.candidates[0].content.parts[0].text.trim();
-                        });
-                        if (smartSnippet) {
-                            const analysis = await step.run(`agent-3-verify-${candidate.id}`, async () => {
-                                const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
-                                 const prompt = `You are a meticulous Verification Analyst for an AI study platform. Your task is to act as a strict quality gate. Analyze the provided "smart snippet" to determine if it is a high-quality, relevant educational resource for the given sub-topic.
-                                    - Overall Exam Name: "${subTopic.exam_name}"
-                                    - Specific Sub-Topic: "${subTopic.sub_topic_text}"
-                                    **Curated Smart Snippet:**
-                                    """
-                                    ${smartSnippet}
-                                    """
-                                    Your Instructions:
-                                    1.  Read the smart snippet and assess its relevance to the specific sub-topic.
-                                    2.  Evaluate the quality: Is the language clear? Is it a tutorial/lecture or just a discussion? Is it too basic or too advanced?
-                                    3.  Based on your analysis, provide a relevance score from 1 to 100.
-                                    4.  Provide a concise, one-sentence justification for your score.
-                                    CRITICAL: A video is high quality if the accent and context are appropriate for a user in '${user_timezone}'. A video in Hindi or with an Indian accent is strongly preferred. Penalize the score for heavy Western accents.
-                                    CRITICAL JSON SCHEMA (Return ONLY a single, valid JSON object):
-                                    { "relevance_score": number, "justification": "A one-sentence explanation of your reasoning." }`;
-                                const result = await model.generateContent({
-                                    contents: [{ role: 'user', parts: [{ text: prompt }] }]
-                                });
-                                return JSON.parse(result.response.candidates[0].content.parts[0].text);
-                            });
-
-                            if (analysis && analysis.relevance_score > 60) {
-                                verifiedVideosForTopic.push({ ...candidate, ...analysis, subTopicText: subTopic.text });
-                            }
-                        }
-                    }
-                    
-                    }
-                    // Add this topic's verified results to the master list for the final cohesion step
-                    allVerifiedVideos.push(...verifiedVideosForTopic);
+                **CRITICAL JSON SCHEMA:**
+                Your entire output MUST be a single, valid JSON object with one key: "queries".
+                {
+                "queries": [
+                    "query 1",
+                    "query 2",
+                    "query 3",
+                    "query 4",
+                    "query 5"
+                ]
                 }
-            } catch (error) {
-                console.error(`[Job ${job_id}] FAILED to process sub-topic "${subTopic.text}":`, error);
-            }
+                `;
+            const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+            const data = JSON.parse(result.response.candidates[0].content.parts[0].text);
+            return data.queries;
         });
 
-        await Promise.all(topicProcessingPromises);
+        // --- AGENT 2: Microservice Orchestrator (Search & Fetch Transcripts) ---
+        const transcriptPool = await step.run("agent-2-fetch-video-pool", async () => {
+            let allCandidates = new Map();
+            for (const query of searchQueries) {
+                const response = await fetch(`${scoutUrl}/search`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query }),
+                });
+                if (response.ok) {
+                    const videos = await response.json();
+                    videos.forEach(v => allCandidates.set(v.id, v));
+                }
+            }
 
-        // --- AGENT 5: The Cohesion Agent (Meta-Analysis) ---
-        const finalCuration = await step.run("agent-5-cohesion-and-curation", async () => {
-            if (allVerifiedVideos.length === 0) return [];
+            const uniqueVideos = Array.from(allCandidates.values());
+            const transcriptResults = [];
+            
+            await Promise.all(uniqueVideos.slice(0, 10).map(async (video) => { // Process up to 10 unique videos
+                try {
+                    const response = await fetch(`${scoutUrl}/getTranscript`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ videoId: video.id }),
+                    });
+                    if (response.ok) {
+                        const { full_transcript } = await response.json();
+                        if (full_transcript) transcriptResults.push({ ...video, full_transcript });
+                    }
+                } catch (e) { console.warn(`Skipping transcript for ${video.id}:`, e.message); }
+            }));
+            return transcriptResults;
+        });
 
-            const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
-            const prompt = `You are a master Curation Agent. Select the single best YouTube video for each sub-topic from a list of verified candidates. Prioritize cohesion.
-                Today's Full Learning Context: ${cohesion_context.join(', ')}
-                Verified Video Candidates (JSON): ${JSON.stringify(allVerifiedVideos)}
-                Instructions:
-                1. Review all candidates.
-                2. For each unique sub-topic, select the single BEST video.
-                3. Cohesion Rule: If multiple candidates for different topics are from the same highly-rated channel, STRONGLY prefer selecting them to create a consistent learning experience.
-                CRITICAL JSON SCHEMA: Return an array of objects: [{ "subTopicText": "...", "id": "...", "title": "...", "channel": "...", "relevance_score": ... }]`;
-            const result = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: prompt }] }]
+        if (transcriptPool.length === 0) {
+            await step.run("update-job-status-to-error-no-videos", async () => {
+                await supabaseAdmin.from('curation_jobs').update({ status: 'error' }).eq('id', job_id);
             });
+            return { message: "Failed: No videos with transcripts were found to analyze." };
+        }
+
+        // --- AGENT 3: Transcript Indexer AI ---
+        const indexedVideos = await step.run("agent-3-index-transcripts", async () => {
+            const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
+            const userTopics = sub_topics_to_curate.map(t => t.text);
+            
+            const indexingPromises = transcriptPool.map(video => {
+                const prompt = `
+                    You are an AI Academic Indexer. Your task is to analyze a video transcript and act as a strict, intelligent filter. You will determine which of a user's specific study topics are covered in the video, how well they are covered, and provide a concise summary of the explanation.
+
+                    **CONTEXT:**
+                    - **User's Full List of Topics for Today:**
+                    ${JSON.stringify(userTopics)}
+                    - **Video Title:** "${video.title}"
+
+                    **SOURCE MATERIAL:**
+                    - **Video Transcript (first 25,000 characters):**
+                    """
+                    ${video.full_transcript.substring(0, 25000)}...
+                    """
+
+                    **YOUR TASK (Execute with precision):**
+                    1.  Read the user's full list of topics.
+                    2.  Read the video transcript and title.
+                    3.  For EACH topic in the user's list, determine if it is substantively discussed in the transcript.
+                    4.  If a topic is discussed, you MUST generate an object for it in the output array. If it is NOT discussed, you MUST NOT include it in the output.
+
+                    **CRITICAL JSON SCHEMA:**
+                    Your entire output MUST be a single, valid JSON object with one key: "topic_analysis". This key must be an array of objects.
+                    For each topic found in the transcript, the object MUST contain:
+                    - **"topic_name":** The exact string of the topic from the user's list.
+                    - **"relevance_score":** An integer from 1 to 100.
+                        - (90-100): A deep, thorough explanation with examples. The core focus of the video.
+                        - (70-89): A solid, clear explanation, but perhaps not the main focus.
+                        - (50-69): The topic is mentioned and explained, but briefly or at a surface level.
+                        - (<50): The topic is only mentioned in passing; do NOT include it in the output.
+                    - **"summary":** A single, concise sentence summarizing the video's explanation of THAT specific topic (e.g., "The video explains the photoelectric effect by detailing Einstein's equation and the concept of light quanta.").
+
+                    **EXAMPLE OUTPUT:**
+                    {
+                    "topic_analysis": [
+                        {
+                        "topic_name": "The Photoelectric Effect",
+                        "relevance_score": 95,
+                        "summary": "The video provides a detailed derivation of Einstein's photoelectric equation and uses an animated experiment to explain the concept of work function."
+                        },
+                        {
+                        "topic_name": "Wave-Particle Duality",
+                        "relevance_score": 75,
+                        "summary": "The transcript discusses wave-particle duality as the foundational context for the photoelectric effect but doesn't cover other experiments like electron diffraction."
+                        }
+                    ]
+                    }
+                    `;
+                return model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
+                    .then(result => {
+                        const analysis = JSON.parse(result.response.candidates[0].content.parts[0].text);
+                        return { id: video.id, title: video.title, channel: video.channel, topic_analysis: analysis.topic_analysis || [] };
+                    })
+                    .catch(e => ({ id: video.id, title: video.title, channel: video.channel, topic_analysis: [] }));
+            });
+            return Promise.all(indexingPromises);
+        });
+
+        // --- AGENT 4: Master Curator AI ---
+        const finalCuration = await step.run("agent-4-master-curator", async () => {
+            const model = await getVertexAIModel("gemini-2.5-flash-lite", { responseMimeType: "application/json" });
+            const userTopics = sub_topics_to_curate.map(t => t.text);
+            const prompt = `
+                You are a Master Curator AI, an expert in pedagogy and information design. Your task is to assemble the perfect, most efficient video playlist for a student's study session from a pre-analyzed pool of candidates.
+
+                **CONTEXT:**
+                - **Student's Full List of Topics for Today:**
+                ${JSON.stringify(userTopics)}
+
+                - **Available Video Candidates and Their Indexed Topic Coverage:**
+                ${JSON.stringify(indexedVideos.map(v => ({ id: v.id, title: v.title, channel: v.channel, topic_analysis: v.topic_analysis })))}
+
+                **YOUR DIRECTIVE (This is a combinatorial optimization problem):**
+                Select the OPTIMAL and SMALLEST set of videos to achieve the highest quality coverage across all of the student's topics.
+
+                **YOUR UNBREAKABLE RULES OF CURATION:**
+                1.  **Prioritize "Power Videos":** A single video that covers multiple topics with a high score (e.g., >80) is DRAMATICALLY more valuable than multiple separate videos. Your primary goal is to find these long-form, comprehensive lectures.
+                2.  **Maximize Total Score:** The final combination of videos you select should aim to maximize the sum of the 'relevance_score' for all of the user's topics.
+                3.  **Avoid Redundancy:** Do not select two different videos to explain the same topic unless they both have exceptionally high scores (>90) and clearly offer different perspectives (e.g., one is a theoretical lecture, the other is a problem-solving session).
+                4.  **Be Ruthless:** If a topic is only covered with a low score (<60) by all available videos, do not hesitate to omit it. It is better to recommend nothing than to recommend a poor-quality resource.
+
+                **CRITICAL JSON OUTPUT SCHEMA:**
+                Your entire output MUST be a single, valid JSON array. Each object in the array represents a video you have selected. The object MUST contain:
+                - **"id":** The video's unique ID.
+                - **"title":** The video's title.
+                - **"channel":** The video's channel name.
+                - **"relevance_score":** The AVERAGE relevance score for the topics this video covers from the user's list.
+                - **"relevant_topics":** A JSON array of strings, listing the EXACT topic names from the user's list that this video should be watched for.
+
+                **EXAMPLE OUTPUT:**
+                [
+                {
+                    "id": "abc-123",
+                    "title": "Quantum Mechanics Full Chapter Lecture (MIT)",
+                    "channel": "MIT OpenCourseWare",
+                    "relevance_score": 92,
+                    "relevant_topics": [
+                    "The Photoelectric Effect",
+                    "Wave-Particle Duality",
+                    "Heisenberg Uncertainty Principle"
+                    ]
+                },
+                {
+                    "id": "def-456",
+                    "title": "Practice Problems: The Photoelectric Effect",
+                    "channel": "Physics-is-Fun",
+                    "relevance_score": 95,
+                    "relevant_topics": [
+                    "The Photoelectric Effect"
+                    ]
+                }
+                ]
+                `;
+            const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
             return JSON.parse(result.response.candidates[0].content.parts[0].text);
         });
-
-        // --- FINAL STEP: Index and Save ONLY the final, cohesive selections ---
-        for (const finalVideo of finalCuration) {
-            const subTopicData = sub_topics_to_curate.find(st => st.text === finalVideo.subTopicText);
-            if (subTopicData) {
-                 await step.run(`final-save-${finalVideo.id}`, async () => {
-                    const contentToIndex = `Title: ${finalVideo.title}\nChannel: ${finalVideo.channel}`;
-                    const { embedding } = await genAI.getGenerativeModel({ model: "text-embedding-004" }).embedContent(contentToIndex);
-                    const { data: insertedData, error } = await supabaseAdmin.from('curated_lectures').upsert({
-                        plan_topic_id: subTopicData.plan_topic_id, sub_topic_text: finalVideo.subTopicText,
-                        video_url: `https://www.youtube.com/watch?v=${finalVideo.id}`, title: finalVideo.title, channel_name: finalVideo.channel,
-                        relevance_score: finalVideo.relevance_score, justification: "Selected by Cohesion Agent.", embedding: embedding.values,
-                    }).select().single();
-                    if (error) { throw new Error(`DB Upsert Error: ${error.message}`); }
-                    if (!insertedData) { throw new Error("Upsert returned no data."); }
-                    console.log(`[Job ${job_id}] Cohesion Agent SAVED lecture for: "${finalVideo.subTopicText}"`);
-                 });
+        
+        // --- AGENT 5: Final Save Loop ---
+        await step.run("agent-5-save-curation", async () => {
+            let topicsCompletedInJob = 0;
+            for (const finalVideo of finalCuration) {
+                if (!finalVideo.relevant_topics) continue;
+                for (const topicName of finalVideo.relevant_topics) {
+                    const subTopicData = sub_topics_to_curate.find(st => st.text === topicName);
+                    if (subTopicData) {
+                        const { error } = await supabaseAdmin.from('curated_lectures').upsert({
+                            plan_topic_id: subTopicData.plan_topic_id,
+                            sub_topic_text: topicName,
+                            video_url: `https://www.youtube.com/watch?v=${finalVideo.id}`,
+                            title: finalVideo.title,
+                            channel_name: finalVideo.channel,
+                            relevance_score: 100, // Score from the curator is the new truth
+                            justification: `Covers topic: ${topicName}`,
+                        });
+                        if (error) console.error(`DB Upsert Error for ${topicName}:`, error.message);
+                        else topicsCompletedInJob++;
+                    }
+                }
             }
-            await step.run(`final-update-progress-for-${finalVideo.id}`, async () => {
-                await supabaseAdmin.rpc('increment_completed_topics', { job_id_param: job_id });
-            });
-        }
+            // Update progress in a single call at the end
+            await supabaseAdmin.rpc('increment_completed_topics', { job_id_param: job_id, increment_value: topicsCompletedInJob });
+        });
 
         await step.run("update-job-status-to-complete", async () => {
             await supabaseAdmin.from('curation_jobs').update({ status: 'complete' }).eq('id', job_id);
         });
 
-        return { message: `Curation job ${job_id} completed.` };
+        return { message: `Lecture Scout v3 job ${job_id} completed successfully.` };
     }
 );
 

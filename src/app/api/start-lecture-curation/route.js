@@ -1,4 +1,4 @@
-// src/app/api/start-lecture-curation/route.js
+// /src/app/api/start-lecture-curation/route.js
 
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
@@ -7,51 +7,57 @@ import { inngest } from '@/lib/inngest';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    }
+
     try {
-        const supabase = createRouteHandlerClient({ cookies });
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-        
-        // --- THIS IS THE FIX ---
-        // We now accept the new, more precise payload from the frontend modal.
-        const { plan_id, topics_to_curate, all_todays_topics, timezone } = await request.json();
+        // 1. Receive the FULL, rich payload from the client.
+        const payload = await request.json();
+        const { plan_id, topics_to_curate, all_todays_topics, timezone } = payload;
 
-        if (!plan_id) {
-            return new Response(JSON.stringify({ error: 'Plan ID is required' }), { status: 400 });
-        }
-        if (!topics_to_curate || topics_to_curate.length === 0) {
-            return new Response(JSON.stringify({ message: 'No topics were selected for curation.' }), { status: 200 });
+        if (!plan_id || !topics_to_curate || !all_todays_topics) {
+            return new Response(JSON.stringify({ error: 'Missing required payload fields.' }), { status: 400 });
         }
 
-        // The total number of topics for the job is now based on the user's specific selection.
-        const { data: job, error: jobError } = await supabase
+        // 2. Create the job record in the database.
+        const { data: jobData, error: jobError } = await supabase
             .from('curation_jobs')
             .insert({
                 plan_id: plan_id,
                 status: 'pending',
-                total_topics: topics_to_curate.length, // Use the length of the selected topics
+                total_topics: topics_to_curate.length,
+                completed_topics: 0
             })
-            .select()
+            .select('id')
             .single();
 
         if (jobError) throw jobError;
 
-        // The Inngest job is now sent with the complete contextual payload.
+        // 3. Send the COMPLETE event to Inngest, passing all necessary data.
         await inngest.send({
             name: 'lecture-scout/curation.requested',
             data: {
-                job_id: job.id,
-                user_id: session.user.id,
-                sub_topics_to_curate: topics_to_curate, // The user's specific selection
-                cohesion_context: all_todays_topics,   // All of today's topics for the meta-analysis
-                user_timezone: timezone,               // The user's timezone for regional results
-            },
+                job_id: jobData.id,
+                sub_topics_to_curate: topics_to_curate,
+                all_todays_topics: all_todays_topics, // <-- This is the critical piece
+                user_timezone: timezone,
+            }
+        });
+        
+        // 4. Respond to the client with the job ID so it can start polling.
+        return new Response(JSON.stringify({ job_id: jobData.id }), {
+            status: 202, // 202 Accepted
+            headers: { 'Content-Type': 'application/json' },
         });
 
-        return new Response(JSON.stringify({ status: 'Job initiated', job_id: job.id }), { status: 202 });
-
     } catch (error) {
-        console.error("Error starting curation job:", error);
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+        console.error("Error starting lecture curation job:", error);
+        return new Response(JSON.stringify({ error: 'Failed to start curation job.', details: error.message }), {
+            status: 500,
+        });
     }
-} 
+}
