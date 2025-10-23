@@ -377,7 +377,7 @@ export async function POST(request) {
     async start(controller) {
       const startHeartbeat = (interval = 15000) => { // Send a beat every 15 seconds
       const heartbeatInterval = setInterval(() => {
-              streamUpdate('status', 'The AI is still thinking... crafting the perfect week.');
+              console.log('status', 'The AI is still thinking... crafting the perfect week.');
           }, interval);
           return () => clearInterval(heartbeatInterval); // Return a function to stop the heartbeat
       };
