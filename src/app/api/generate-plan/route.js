@@ -375,6 +375,13 @@ export async function POST(request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      const startHeartbeat = (interval = 15000) => { // Send a beat every 15 seconds
+      const heartbeatInterval = setInterval(() => {
+              streamUpdate('status', 'The AI is still thinking... crafting the perfect week.');
+          }, interval);
+          return () => clearInterval(heartbeatInterval); // Return a function to stop the heartbeat
+      };
+
       const streamUpdate = (type, message) => {
           try {
               const payload = JSON.stringify({ type, data: { message } });
@@ -668,8 +675,18 @@ export async function POST(request) {
               }
             `;
             
+            let stopHeartbeat;
+            try {
+                // 1. Start the heartbeat in parallel.
+                stopHeartbeat = startHeartbeat();
+
+                // 2. Make the long-running AI call. The heartbeat will keep the connection alive.
+                const weekResult = await plannerModel.generateContent({ contents: [{ role: 'user', parts: [{ text: weeklyBatchPrompt }] }] });
+                
+                // 3. IMPORTANT: Stop the heartbeat immediately after the AI responds.
+                stopHeartbeat();
             
-            const weekResult = await plannerModel.generateContent({ contents: [{ role: 'user', parts: [{ text: weeklyBatchPrompt }] }] });
+            
             const weekPlanObject = JSON.parse(weekResult.response.candidates[0].content.parts[0].text);
             let weekPlanArray = weekPlanObject.weekly_plan || [];
 
@@ -701,6 +718,15 @@ export async function POST(request) {
                 if (dayPlan.topic_name) { plannedTopicsList.push(dayPlan.topic_name); }
                 controller.enqueue(encoder.encode(JSON.stringify({ type: 'plan_topic', data: dayPlan }) + '\n---\n'));
             }
+
+            } catch (error) {
+                // Ensure the heartbeat is stopped even if the AI call fails.
+                if (stopHeartbeat) stopHeartbeat();
+                console.error(`Error generating plan for Week ${weekData.week}:`, error);
+                // Optionally, stream an error for this specific week and continue
+                streamUpdate('error', `Failed to generate plan for Week ${weekData.week}. Continuing...`);
+            }
+   
         }
         
         controller.close();
