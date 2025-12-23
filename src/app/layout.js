@@ -5,7 +5,6 @@ import { Providers } from "@/components/Providers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { headers } from 'next/headers'; // Import the headers function
-import ServiceWorkerRegistry from '@/components/ServiceWorkerRegistry';
 import Script from 'next/script'; 
 
 import { Inter, Lexend } from "next/font/google";
@@ -54,7 +53,6 @@ export default function RootLayout({ children }) {
       <body>
         {/* Pass the determined variant and color scheme to the Providers */}
         <Providers variant={layoutVariant} colorScheme={colorScheme}>
-          <ServiceWorkerRegistry />
             {children}
         </Providers>
         {/* --- MANUAL REGISTRATION SCRIPT --- */}
