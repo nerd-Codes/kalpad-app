@@ -55,21 +55,6 @@ export default function RootLayout({ children }) {
         <Providers variant={layoutVariant} colorScheme={colorScheme}>
             {children}
         </Providers>
-        {/* --- MANUAL REGISTRATION SCRIPT --- */}
-        <Script id="sw-register" strategy="afterInteractive">
-          {`
-            if ('serviceWorker' in navigator) {
-              window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/service-worker.js')
-                  .then(function(registration) {
-                    console.log('✅ Bare Metal SW Registered with scope:', registration.scope);
-                  }, function(err) {
-                    console.error('❌ SW Registration Failed:', err);
-                  });
-              });
-            }
-          `}
-        </Script>
         <Analytics />
         <SpeedInsights />
       </body>
