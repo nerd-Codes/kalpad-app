@@ -57,21 +57,6 @@ export default function RootLayout({ children }) {
         </Providers>
         <Analytics />
         <SpeedInsights />
-        <Script id="register-sw" strategy="afterInteractive">
-          {`
-            if ('serviceWorker' in navigator) {
-              window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js')
-                  .then(function(registration) {
-                    console.log('✅ KalPad SW Registered:', registration.scope);
-                  })
-                  .catch(function(err) {
-                    console.error('❌ SW Registration Failed:', err);
-                  });
-              });
-            }
-          `}
-        </Script>
       </body>
     </html>
   );
