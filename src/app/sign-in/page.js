@@ -1,6 +1,6 @@
 // src/app/sign-in/page.js
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Added useEffect
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabaseClient';
 import { useDisclosure } from '@mantine/hooks';
@@ -19,6 +19,16 @@ export default function SignInPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // --- ARCHITECTURAL CHANGE: User Agent State ---
+  const [isAndroidApp, setIsAndroidApp] = useState(false);
+
+  useEffect(() => {
+    // Detect if we are running inside the KalPad Android Shell
+    if (typeof window !== 'undefined' && navigator.userAgent.includes('KalPad-Android-App')) {
+        setIsAndroidApp(true);
+    }
+  }, []);
 
   const handleEmailSignIn = async (e) => {
     e.preventDefault();
@@ -70,11 +80,15 @@ export default function SignInPage() {
 
             <ForgotPasswordModal opened={forgotModalOpened} onClose={closeForgotModal} />
 
-            <Divider label="Or" labelPosition="center" my="lg" />
-
-            <Button fullWidth variant="default" leftSection={<IconBrandGoogle size={18} />} onClick={handleGoogleSignIn}>
-                Sign in with Google
-            </Button>
+            {/* --- ARCHITECTURAL CHANGE: Hide Google Sign-In in Android App --- */}
+            {!isAndroidApp && (
+                <>
+                    <Divider label="Or" labelPosition="center" my="lg" />
+                    <Button fullWidth variant="default" leftSection={<IconBrandGoogle size={18} />} onClick={handleGoogleSignIn}>
+                        Sign in with Google
+                    </Button>
+                </>
+            )}
         </GlassCard>
     </Container>
   );
