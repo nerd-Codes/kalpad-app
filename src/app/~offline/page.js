@@ -1,3 +1,6 @@
+// src/app/~offline/page.js
+"use client"; // <--- THIS IS CRITICAL
+
 import React from "react";
 import { Container, Title, Text, Button } from "@mantine/core";
 
