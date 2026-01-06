@@ -2,150 +2,129 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-// --- MODIFICATION: ADDED NEW MANTINE COMPONENTS & ICONS ---
-import { Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, Stack, Title, ActionIcon, Tooltip, Menu } from '@mantine/core';
-import { IconPencilPlus, IconBrain, IconPlayerPlay, IconClock, IconEye, IconChevronsDown } from '@tabler/icons-react';
+import { Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, Stack, Title, ActionIcon, Menu, Modal, ScrollArea, Paper } from '@mantine/core';
+import { 
+    IconPencilPlus, IconBrain, IconPlayerPlay, IconClock, IconEye, 
+    IconChevronsDown, IconListCheck, IconDotsVertical,
+} from '@tabler/icons-react';
 import { FullscreenNoteViewer } from './FullscreenNoteViewer';
 import { differenceInCalendarDays } from 'date-fns';
 import Link from 'next/link';
 
-import { Modal, ScrollArea, List, Paper } from '@mantine/core';
-// --- ADD the ShimmerButton import ---
+// --- IMPORTS FOR KALPAD OS DESIGN SYSTEM ---
+import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from './landing/ShimmerButton';
-// --- ADD these icons ---
-import { IconNotes, IconListCheck } from '@tabler/icons-react';
 
+// --- LOGIC IMPORTS ---
 import { QuizSetupModal } from './QuizSetupModal';
 import { QuizRunner } from './QuizRunner';
 import { QuizResults } from './QuizResults';
-
 import { notifications } from '@mantine/notifications';
-import 'katex/dist/katex.min.css';
 import { useDisclosure } from '@mantine/hooks';
-import { GlassCard } from './GlassCard';
 import { useLoading } from '@/context/LoadingContext';
-import classes from './TimelineDayCard.module.css';
+import { useGuest } from '@/context/GuestContext';
 
-// --- MODIFICATION: ADDED HELPER FUNCTIONS FOR DYNAMIC BADGE COLORS ---
-const getDayDifficultyColor = (difficulty) => {
-    switch (difficulty?.toLowerCase()) {
-        case 'easy': return 'green';
-        case 'medium': return 'yellow';
-        case 'hard': return 'orange';
-        case 'intense': return 'red';
-        default: return 'gray';
-    }
+// --- VISUAL CONSTANTS ---
+const DIFFICULTY_CONFIG = {
+    easy: { color: '#34C759', bg: 'rgba(52, 199, 89, 0.1)' },    
+    medium: { color: '#FF9500', bg: 'rgba(255, 149, 0, 0.1)' },  
+    hard: { color: '#FF3B30', bg: 'rgba(255, 59, 48, 0.1)' },    
+    intense: { color: '#AF52DE', bg: 'rgba(175, 82, 222, 0.1)' },
+    default: { color: '#8E8E93', bg: 'rgba(142, 142, 147, 0.1)' }
 };
 
-const getSubTopicTypeColor = (type) => {
-    switch (type?.toLowerCase()) {
-        case 'concept': return 'blue';
-        case 'problem-solving': return 'grape';
-        case 'derivation': return 'cyan';
-        case 'review': return 'teal';
-        default: return 'gray';
-    }
+const TYPE_COLORS = {
+    concept: 'blue',
+    'problem-solving': 'violet',
+    derivation: 'cyan',
+    review: 'teal',
+    default: 'gray'
 };
 
-
-export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan', isReadOnly = false, isNewUserTourActive = false, onConfirmBulkGenerate }) {
-     const { setIsLoading } = useLoading();
+export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan', isReadOnly = false, onConfirmBulkGenerate, isGuestMode = false }) {
+    const { setIsLoading } = useLoading();
+    const { guestArtifact, updateGuestNote } = useGuest();
 
     const [generatingNotesFor, setGeneratingNotesFor] = useState(null);
     const [noteError, setNoteError] = useState('');
     
-    // --- MODIFICATION: RENAMED `opened` to avoid conflict, simplified state ---
+    // Default open unless explicitly told otherwise
     const [detailsOpened, { toggle: toggleDetails }] = useDisclosure(!isInitiallyCollapsed);
-    // --- NEW STATE & LOGIC FOR THE FULLSCREEN VIEWER (PREPARATION FOR PHASE 3) ---
     const [noteToView, setNoteToView] = useState(null); 
-    // This will eventually open the FullscreenNoteViewer.jsx modal.
-    // For now, setting this state is the goal.
 
     const [bulkNoteModalOpened, { open: openBulkNoteModal, close: closeBulkNoteModal }] = useDisclosure(false);
     const [bulkNoteSelection, setBulkNoteSelection] = useState([]);
     const [isBulkGenerating, setIsBulkGenerating] = useState(false);
-    const [bulkJob, setBulkJob] = useState({ active: false, total: 0, completed: 0 });
-    
 
-    // --- DEFINITIVE FIX #1: LOCAL STATE MANAGEMENT ---
-    // The card now manages its own sub-topics for an instantaneous UI response.
+    // --- LOCAL STATE MANAGEMENT ---
     const [internalSubTopics, setInternalSubTopics] = useState(dayTopic.sub_topics || []);
 
-    // --- DEFINITIVE FIX #2: SYNCHRONIZATION EFFECT ---
-    // This effect ensures that if the parent's data changes (e.g., on a full refresh),
-    // our local state is updated to match, preventing stale data.
     useEffect(() => {
         setInternalSubTopics(dayTopic.sub_topics || []);
     }, [dayTopic.sub_topics]);
 
     const allTopicsCompleted = dayTopic.sub_topics?.every(sub => sub.completed) && dayTopic.sub_topics?.length > 0;
+    
+    const diffConfig = DIFFICULTY_CONFIG[dayTopic.day_difficulty?.toLowerCase()] || DIFFICULTY_CONFIG.default;
 
-     const handleCheckboxChange = (subTopicIndex, isChecked) => {
+    // --- LOGIC HANDLERS ---
+    const handleCheckboxChange = (subTopicIndex, isChecked) => {
         if (isReadOnly) return;
-
-        // 1. Create the new state array for an immediate update.
-        const newSubTopics = internalSubTopics.map((sub, index) => {
-            if (index === subTopicIndex) {
-                return { ...sub, completed: isChecked };
-            }
-            return sub;
-        });
-
-        // 2. Update the local state INSTANTLY. This is the optimistic UI update.
+        const newSubTopics = internalSubTopics.map((sub, index) => 
+            index === subTopicIndex ? { ...sub, completed: isChecked } : sub
+        );
         setInternalSubTopics(newSubTopics);
-
-        // 3. Call the parent's onUpdate function in the background to sync the change.
         onUpdate(dayTopic.id, { sub_topics: newSubTopics });
     };
-    
-      const handleGenerateNotes = async (subTopicText) => {
-        // --- RESTORED: ENGAGE THE GLOBAL PAGE LOADER ---
+
+    const handleGenerateNotes = async (subTopicText) => {
+        if (isGuestMode) {
+             const currentNotes = guestArtifact?.generatedNotes || [];
+             if (currentNotes.length >= 1) {
+                 notifications.show({ title: 'Guest Limit', message: 'Sign up to generate unlimited notes.', color: 'orange' });
+                 return;
+             }
+        }
+
         setIsLoading(true); 
-        setGeneratingNotesFor(subTopicText); // Keep per-button loader
+        setGeneratingNotesFor(subTopicText);
         setNoteError('');
         try {
             const response = await fetch('/api/generate-notes', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-is-guest': isGuestMode ? 'true' : 'false'
+                },
                 body: JSON.stringify({
-                    plan_topic_id: dayTopic.id,
+                    plan_topic_id: isGuestMode ? 0 : dayTopic.id,
                     sub_topic_text: subTopicText,
-                    exam_name: dayTopic.exam_name, 
+                    exam_name: isGuestMode ? plan.exam_name : dayTopic.exam_name, 
                     day_topic: dayTopic.topic_name,
                 }),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to generate notes.');
-            }
-            
-            // This is now guaranteed to work because the prop is received.
-            if (onNoteGenerated) {
-                await onNoteGenerated();
-            }
+            if (!response.ok) throw new Error((await response.json()).error);
+            const data = await response.json();
 
-            notifications.show({
-                title: 'Note Generated & Synced!',
-                message: 'Your new study note is ready and has been added to your timeline.',
-                color: 'teal',
-            });
+            if (isGuestMode) {
+                 updateGuestNote(dayTopic.day, subTopicText, data.note.notes_markdown);
+                 notifications.show({ title: 'Sample Note Forged', message: 'Sign up to save.', color: 'teal' });
+            } else {
+                if (onNoteGenerated) await onNoteGenerated();
+                notifications.show({ title: 'Note Synced', message: 'Added to your dossier.', color: 'teal' });
+            }
 
         } catch (err) {
-            notifications.show({
-                title: 'Note Generation Failed',
-                message: err.message,
-                color: 'red',
-            });
+            notifications.show({ title: 'Error', message: err.message, color: 'red' });
             setNoteError(err.message);
         } finally {
-            // --- RESTORED: DISENGAGE ALL LOADERS ---
             setIsLoading(false);
             setGeneratingNotesFor(null);
         }
     };
 
-     // --- DEFINITIVE UPGRADE: NEW STATE FOR THE SMART QUIZ FLOW ---
+    // Quiz Logic
     const [quizSetupOpened, { open: openQuizSetup, close: closeQuizSetup }] = useDisclosure(false);
     const [quizQuestions, setQuizQuestions] = useState(null);
     const [quizResults, setQuizResults] = useState(null);
@@ -154,9 +133,7 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
     const [quizConfig, setQuizConfig] = useState(null);
 
     const handleStartQuiz = async (config) => {
-        setIsGeneratingQuiz(true);
-        setQuizConfig(config);
-        closeQuizSetup();
+        setIsGeneratingQuiz(true); setQuizConfig(config); closeQuizSetup();
         try {
             const response = await fetch('/api/generate-quiz', {
                 method: 'POST',
@@ -164,18 +141,13 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                 body: JSON.stringify({ plan_topic_id: dayTopic.id, ...config }),
             });
             if (!response.ok) throw new Error((await response.json()).error);
-            const data = await response.json();
-            setQuizQuestions(data.questions);
-        } catch (err) {
-            notifications.show({ title: 'Failed to generate quiz', message: err.message, color: 'red' });
-        } finally {
-            setIsGeneratingQuiz(false);
-        }
+            setQuizQuestions((await response.json()).questions);
+        } catch (err) { notifications.show({ title: 'Error', message: err.message, color: 'red' }); } 
+        finally { setIsGeneratingQuiz(false); }
     };
     
     const handleSubmitQuiz = async (attempts) => {
-        setIsEvaluatingQuiz(true);
-        setQuizQuestions(null); // Close the runner
+        setIsEvaluatingQuiz(true); setQuizQuestions(null);
         try {
              const response = await fetch('/api/evaluate-quiz-submission', {
                 method: 'POST',
@@ -183,351 +155,340 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                 body: JSON.stringify({ plan_topic_id: dayTopic.id, attempts, quiz_mode: quizConfig.quiz_mode }),
             });
              if (!response.ok) throw new Error((await response.json()).error);
-             const results = await response.json();
-             setQuizResults(results);
-        } catch (err) {
-             notifications.show({ title: 'Failed to evaluate quiz', message: err.message, color: 'red' });
-        } finally {
-            setIsEvaluatingQuiz(false);
-        }
+             setQuizResults(await response.json());
+        } catch (err) { notifications.show({ title: 'Error', message: err.message, color: 'red' }); } 
+        finally { setIsEvaluatingQuiz(false); }
     };
 
-    const daysLeft = differenceInCalendarDays(new Date(plan.exam_date), new Date());
-    let color = 'brandGreen';
-    if (daysLeft < 7) color = 'red';
-    else if (daysLeft < 14) color = 'yellow';
-
-    const handleSetReminder = (subTopicText) => {
-    if (window.Android && typeof window.Android.setReminder === 'function') {
-        const reminderTime = new Date().getTime() + 60 * 1000;
-        
-        const reminderDetails = {
-            title: dayTopic.topic_name,
-            message: `Time to start: ${subTopicText}`,
-            timestamp: reminderTime,
-        };
-        
-        // --- DEFINITIVE FIX: Use JSON.stringify for proper logging ---
-        console.log("Sending reminder to native:", JSON.stringify(reminderDetails));
-        window.Android.setReminder(JSON.stringify(reminderDetails));
-    } else {
-        alert("This feature is only available in the KalPad Android app.");
-    }
-};
-
-
+    // Bulk Logic
     const handleConfirmBulkGenerate = async () => {
         if (bulkNoteSelection.length === 0) return;
-        
-        setIsBulkGenerating(true);
-        closeBulkNoteModal();
-
-        const totalToGenerate = bulkNoteSelection.length;
+        setIsBulkGenerating(true); closeBulkNoteModal();
         let completedCount = 0;
-
         const notificationId = `bulk-notes-${dayTopic.id}`;
-        notifications.show({
-            id: notificationId,
-            loading: true,
-            title: `Generating ${totalToGenerate} Notes... (0/${totalToGenerate})`,
-            message: 'Starting the note forge...',
-            autoClose: false,
-            withCloseButton: false,
-        });
+        notifications.show({ id: notificationId, loading: true, title: `Forging Notes...`, message: 'Starting...', autoClose: false, withCloseButton: false });
 
-        // Use a simple, robust for...of loop to process tasks sequentially.
         for (const subTopicText of bulkNoteSelection) {
             try {
-                // Call our existing, single-note generation API endpoint.
                 const response = await fetch('/api/generate-notes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        plan_topic_id: dayTopic.id,
-                        sub_topic_text: subTopicText,
-                        exam_name: plan.exam_name, 
-                        day_topic: dayTopic.topic_name,
-                    }),
+                    body: JSON.stringify({ plan_topic_id: dayTopic.id, sub_topic_text: subTopicText, exam_name: plan.exam_name, day_topic: dayTopic.topic_name }),
                 });
-
-                if (!response.ok) {
-                    // If one note fails, we log it and continue to the next.
-                    console.error(`Failed to generate note for "${subTopicText}"`);
-                    notifications.show({
-                        color: 'red',
-                        title: 'Note Generation Failed',
-                        message: `Could not generate notes for "${subTopicText}".`,
-                    });
-                } else {
+                if (response.ok) {
                     completedCount++;
-                    notifications.update({
-                        id: notificationId,
-                        title: `Generating Notes... (${completedCount}/${totalToGenerate})`,
-                        message: `Successfully forged note for "${subTopicText}"`,
-                    });
+                    notifications.update({ id: notificationId, title: `Forging... (${completedCount}/${bulkNoteSelection.length})`, message: `Done: ${subTopicText}` });
                 }
-                
-                // CRITICAL: After each API call, successful or not, trigger a full data refetch.
-                // This is exactly what the single-note button does.
-                if (onNoteGenerated) {
-                    await onNoteGenerated();
-                }
-
-                // Add a small delay between calls to be safe.
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-            } catch (err) {
-                console.error(`A critical error occurred during bulk generation for "${subTopicText}":`, err);
-            }
+                if (onNoteGenerated) await onNoteGenerated();
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            } catch (err) { console.error(err); }
         }
-
-        // Final completion notification.
-        notifications.update({
-            id: notificationId,
-            loading: false,
-            color: 'teal',
-            title: 'Bulk Generation Complete',
-            message: `Finished generating ${completedCount} of ${totalToGenerate} requested notes.`,
-            autoClose: 5000,
-        });
-
-        setIsBulkGenerating(false);
-        setBulkNoteSelection([]);
+        notifications.update({ id: notificationId, loading: false, color: 'teal', title: 'Done', message: `Forged ${completedCount} notes.`, autoClose: 5000 });
+        setIsBulkGenerating(false); setBulkNoteSelection([]);
     };
 
-return (
-    <>
-        {viewMode === 'dashboard' && (
-            <Group justify="space-between">
-                <Link href={`/plan/${plan.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <Title order={3} style={{ cursor: 'pointer' }}>{plan.exam_name}</Title>
-                </Link>
-                <Badge color={color} variant="light">{daysLeft > 0 ? `${daysLeft} days left` : 'Exam Day!'}</Badge>
-            </Group>
-        )}
+    const daysLeft = differenceInCalendarDays(new Date(plan.exam_date), new Date());
+    let badgeColor = 'green';
+    if (daysLeft < 7) badgeColor = 'red';
+    else if (daysLeft < 14) badgeColor = 'yellow';
 
-        {isInitiallyCollapsed && (
-            <Button variant="subtle" size="xs" onClick={toggleDetails} mb="xs">
-                {detailsOpened ? 'Hide Details' : 'Show Details'}
-            </Button>
-        )}
+    // --- RENDER ---
+    return (
+        <Box mb="lg" style={{ position: 'relative' }}>
+            
+            {/* Dashboard Header Context */}
+            {viewMode === 'dashboard' && (
+                <Group justify="space-between" mb="xs" align="center">
+                    {!isGuestMode ? (
+                        <Link href={`/plan/${plan.id}`} style={{ textDecoration: 'none' }}>
+                            <Title order={3} className="apple-text-gradient" style={{ cursor: 'pointer', fontSize: '1.25rem' }}>
+                                {plan.exam_name}
+                            </Title>
+                        </Link>
+                    ) : (
+                        <Title order={3} className="apple-text-gradient" style={{ fontSize: '1.25rem' }}>{plan.exam_name}</Title>
+                    )}
+                    <Badge color={badgeColor} variant="light" size="lg">{daysLeft > 0 ? `${daysLeft}d left` : 'EXAM DAY'}</Badge>
+                </Group>
+            )}
 
-        <Collapse in={detailsOpened}>
-            <GlassCard withBorder 
-                className={classes.cardRoot}
-                style={{ borderLeft: `5px solid ${getDayDifficultyColor(dayTopic.day_difficulty)}`}}
+            {/* --- CARD ROOT --- */}
+            {/* We moved Collapse INSIDE the card so the header is always visible */}
+            <GlassCard 
+                p={0} 
+                style={{ 
+                    overflow: 'hidden', 
+                    borderLeft: `6px solid ${diffConfig.color}`, // Difficulty Color Stripe
+                    transition: 'all 0.3s ease'
+                }}
             >
-                <Stack gap="md">
-                    <Button
-                        variant="light"
-                        leftSection={<IconNotes size={16} />}
-                        onClick={openBulkNoteModal}
-                    >
-                        Generate Multiple Notes
-                    </Button>
-                    <Group justify="space-between">
-                        <Title order={4} ff="Lexend, sans-serif" className={classes.dayTitle}>
-                            {dayTopic.topic_name}
-                        </Title>
-                        <Group gap="xs">
-                            <Badge className={classes.badge} color="gray" variant="light" size="sm" leftSection={<IconClock size={14} style={{ marginRight: '-0.2rem' }} />}>
-                                {dayTopic.study_hours} hrs
-                            </Badge>
-                            <Badge className={classes.badge} color={getDayDifficultyColor(dayTopic.day_difficulty)} size="sm" variant="light">
-                                {dayTopic.day_difficulty}
-                            </Badge>
+                {/* 1. Header Section (Always Visible) */}
+                <Box 
+                    p={{ base: 'md', sm: 'xl' }} 
+                    onClick={toggleDetails} // Whole header is clickable to toggle
+                    style={{ 
+                        background: `linear-gradient(to right, ${diffConfig.bg} 0%, transparent 100%)`,
+                        borderBottom: detailsOpened ? '1px solid var(--glass-border)' : 'none', // Conditional border
+                        cursor: 'pointer'
+                    }}
+                >
+                    <Stack gap="sm">
+                        <Group justify="space-between" align="start">
+                            {/* Left: Day & Title */}
+                            <Stack gap={4} style={{ flex: 1 }}>
+                                <Group gap="xs">
+                                    <Badge 
+                                        size="sm" 
+                                        variant="outline" 
+                                        color="gray" 
+                                        style={{ borderColor: 'rgba(255,255,255,0.2)' }}
+                                    >
+                                        DAY {dayTopic.day}
+                                    </Badge>
+                                    <Badge 
+                                        size="sm" 
+                                        variant="filled" 
+                                        color={dayTopic.day_difficulty?.toLowerCase() === 'easy' ? 'green' : dayTopic.day_difficulty?.toLowerCase() === 'medium' ? 'yellow' : 'red'}
+                                        style={{ color: '#000' }}
+                                    >
+                                        {dayTopic.day_difficulty}
+                                    </Badge>
+                                </Group>
+                                <Title 
+                                    order={3} 
+                                    style={{ 
+                                        fontFamily: 'var(--font-lexend)', 
+                                        letterSpacing: '-0.02em', 
+                                        lineHeight: 1.2,
+                                        fontSize: '1.5rem'
+                                    }}
+                                >
+                                    {dayTopic.topic_name}
+                                </Title>
+                            </Stack>
+
+                            {/* Right: Actions */}
+                            <Group visibleFrom="sm">
+                                {!isReadOnly && !isGuestMode && (
+                                    // STOP PROPAGATION on button click so it doesn't toggle collapse
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                        <Button 
+                                            variant="light" 
+                                            color="violet"
+                                            size="xs" 
+                                            leftSection={<IconListCheck size={16} />}
+                                            onClick={openBulkNoteModal}
+                                            style={{ boxShadow: '0 2px 10px rgba(139, 92, 246, 0.2)' }}
+                                        >
+                                            Bulk Actions
+                                        </Button>
+                                    </div>
+                                )}
+                                <ActionIcon variant="transparent" color="gray">
+                                    <IconChevronsDown size={20} style={{ transform: detailsOpened ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                                </ActionIcon>
+                            </Group>
                         </Group>
-                    </Group>
 
-                    <Text c="dimmed" size="sm" mt={-12}>
-                        {dayTopic.day_summary}
-                    </Text>
-                    
-                    <Stack gap="sm" mt="xs">
-                        {internalSubTopics.map((subTopic, index) => {
-                            const v2_note = dayTopic.new_notes?.find(n => n.sub_topic_text === subTopic.text);
-                            const v1_note = (index === 0 && dayTopic.generated_notes) ? { notes_markdown: dayTopic.generated_notes, sub_topic_text: subTopic.text } : null;
-                            const existingNote = v2_note || v1_note;
-                            const lecture = dayTopic.curated_lectures?.find(l => l.sub_topic_text === subTopic.text);
-
-                            return (
-                                <Box key={index}>
-                                    <Group justify="space-between" wrap="nowrap" align="flex-start">
-                                        <Box sx={{ flex: 1 }}>
-                                            <Checkbox
-                                                readOnly={isReadOnly}
-                                                checked={subTopic.completed}
-                                                onChange={(event) => handleCheckboxChange(index, event.currentTarget.checked)}
-                                                label={
-                                                    <Text
-                                                        className={classes.subTopicText}
-                                                        td={!isReadOnly && subTopic.completed ? 'line-through' : 'none'}
-                                                        c={!isReadOnly && subTopic.completed ? 'dimmed' : 'inherit'}
-                                                    >
-                                                        {subTopic.text}
-                                                    </Text>
-                                                }
-                                            />
-                                        </Box>
-                                        
-                                        {!isReadOnly && (
-                                            <div id={index === 0 && isNewUserTourActive ? 'quest-timeline-today' : undefined}>
-                                            <Menu shadow="md" width={200} position="bottom-end">
-                                                <Menu.Target>
-                                                    <ActionIcon 
-                                                        variant="light" 
-                                                        color="gray"
-                                                        size="lg"
-                                                        loading={generatingNotesFor === subTopic.text}
-                                                    >
-                                                        <IconChevronsDown size={18} />
-                                                    </ActionIcon>
-                                                </Menu.Target>
-                                                <Menu.Dropdown>
-                                                    {existingNote ? (
-                                                        <Menu.Item
-                                                            leftSection={<IconEye size={16} />}
-                                                            onClick={() => setNoteToView({ ...existingNote, sub_topic: subTopic, day_topic: dayTopic, exam_name: plan.exam_name })}
-                                                        >
-                                                            View Note
-                                                        </Menu.Item>
-                                                    ) : (
-                                                        <Menu.Item
-                                                            leftSection={<IconPencilPlus size={16} />}
-                                                            onClick={() => handleGenerateNotes(subTopic.text)}
-                                                        >
-                                                            Generate Note
-                                                        </Menu.Item>
-                                                    )}
-                                                    {lecture && (
-                                                        <>
-                                                            <Menu.Divider />
-                                                            <Menu.Item
-                                                                color="red"
-                                                                leftSection={<IconPlayerPlay size={16} />}
-                                                                component="a" href={lecture.video_url} target="_blank" rel="noopener noreferrer"
-                                                            >
-                                                                Watch Lecture
-                                                            </Menu.Item>
-                                                        </>
-                                                    )}
-                                                    {/* <Menu.Item
-                                                        leftSection={<IconClock size={16} />}
-                                                        onClick={() => handleSetReminder(subTopic.text)}
-                                                    >
-                                                        Remind Me (in 1 min)
-                                                    </Menu.Item> */}
-                                                </Menu.Dropdown>
-                                            </Menu>
-                                            </div>
-                                        )}
-                                    </Group>
-                                    <Group gap="xs" mt={4} ml={isReadOnly ? 0 : 30}>
-                                        <Badge className={classes.badge} size="xs" variant="light" color={getSubTopicTypeColor(subTopic.type)}>{subTopic.type}</Badge>
-                                        <Badge className={classes.badge} size="xs" variant="light" color={getDayDifficultyColor(subTopic.difficulty)}>{subTopic.difficulty}</Badge>
-                                    </Group>
-                                </Box>
-                            )
-                        })}
+                        {/* Summary Text (Visible if expanded OR if you want a preview) */}
+                         <Collapse in={detailsOpened}>
+                             <Text size="sm" c="dimmed" style={{ maxWidth: '90%', lineHeight: 1.5 }}>
+                                {dayTopic.day_summary}
+                            </Text>
+                         </Collapse>
                     </Stack>
-                    
-                    {!isReadOnly && allTopicsCompleted && (
-                        <GlassCard mt="md">
-                            <Text fw={500} mb="sm">Daily Mission Complete!</Text>
-                            <Group>
-                                <Button 
-                                    color="brandGreen" 
-                                    leftSection={<IconBrain size={16}/>} 
+                </Box>
+
+                {/* 2. The Task List (Collapsible) */}
+                <Collapse in={detailsOpened}>
+                    <Box p={{ base: 'md', sm: 'xl' }}>
+                        <Stack gap="md">
+                            {internalSubTopics.map((subTopic, index) => {
+                                // Guest Logic for existing note detection
+                                const guestNote = isGuestMode ? guestArtifact?.generatedNotes?.find(n => n.sub_topic_text === subTopic.text) : null;
+                                const v2_note = dayTopic.new_notes?.find(n => n.sub_topic_text === subTopic.text);
+                                const v1_note = (index === 0 && dayTopic.generated_notes) ? { notes_markdown: dayTopic.generated_notes, sub_topic_text: subTopic.text } : null;
+                                
+                                const existingNote = isGuestMode ? guestNote : (v2_note || v1_note);
+                                const lecture = dayTopic.curated_lectures?.find(l => l.sub_topic_text === subTopic.text);
+
+                                return (
+    // 1. ADDED: onClick handler to the whole row & pointer cursor
+    <Group 
+        key={index}
+        align="flex-start" 
+        wrap="nowrap" 
+        onClick={() => !isReadOnly && handleCheckboxChange(index, !subTopic.completed)}
+        style={{ 
+            padding: '12px', 
+            borderRadius: '12px', 
+            backgroundColor: 'rgba(255,255,255,0.03)',
+            border: '1px solid transparent',
+            transition: 'background 0.2s',
+            cursor: isReadOnly ? 'default' : 'pointer' // Cursor feedback
+        }}
+        className="hover:bg-white/5 hover:border-white/10"
+    >
+        {/* 2. MODIFIED: Checkbox is now 'readOnly' and clicks pass through to the Group via pointerEvents: 'none' */}
+        <Checkbox
+            checked={subTopic.completed}
+            readOnly
+            color="green"
+            radius="xl"
+            size="md"
+            iconColor="white"
+            styles={{ root: { marginTop: 2, pointerEvents: 'none' } }} 
+        />
+        
+        <Stack gap={4} style={{ flex: 1 }}>
+            <Text 
+                size="md" 
+                fw={500}
+                td={subTopic.completed ? 'line-through' : 'none'}
+                c={subTopic.completed ? 'dimmed' : 'bright'}
+                style={{ transition: 'color 0.2s' }}
+            >
+                {subTopic.text}
+            </Text>
+            <Group gap="xs">
+                <Badge size="xs" variant="dot" color={TYPE_COLORS[subTopic.type?.toLowerCase()] || 'gray'}>
+                    {subTopic.type}
+                </Badge>
+                {existingNote && <Badge size="xs" variant="filled" color="teal">Note Ready</Badge>}
+            </Group>
+        </Stack>
+
+        {/* Action Menu */}
+        {!isReadOnly && (
+            // 3. ADDED: Stop propagation so clicking menu doesn't toggle the checkbox
+            <div onClick={(e) => e.stopPropagation()}>
+                <Menu shadow="md" width={200} position="bottom-end">
+                    <Menu.Target>
+                        <ActionIcon variant="subtle" color="gray" size="md">
+                            <IconDotsVertical size={18} />
+                        </ActionIcon>
+                    </Menu.Target>
+                    <Menu.Dropdown style={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E' }}>
+                        {existingNote ? (
+                            <Menu.Item 
+                                leftSection={<IconEye size={16} />}
+                                onClick={() => setNoteToView({ ...existingNote, sub_topic: subTopic, day_topic: dayTopic, exam_name: plan.exam_name })}
+                            >
+                                Read Note
+                            </Menu.Item>
+                        ) : (
+                            <Menu.Item 
+                                leftSection={<IconPencilPlus size={16} />}
+                                onClick={() => handleGenerateNotes(subTopic.text)}
+                            >
+                                Forge Note
+                            </Menu.Item>
+                        )}
+                        {lecture && (
+                            <>
+                                <Menu.Divider />
+                                <Menu.Item color="red" leftSection={<IconPlayerPlay size={16} />} component="a" href={lecture.video_url} target="_blank">
+                                    Watch Lecture
+                                </Menu.Item>
+                            </>
+                        )}
+                    </Menu.Dropdown>
+                </Menu>
+            </div>
+        )}
+    </Group>
+);
+                            })}
+                        </Stack>
+                    </Box>
+
+                    {/* 3. Footer (Quiz CTA) */}
+                    {!isReadOnly && !isGuestMode && allTopicsCompleted && (
+                        <Box 
+                            p="md" 
+                            style={{ 
+                                borderTop: '1px solid var(--glass-border)',
+                                backgroundColor: 'rgba(52, 199, 89, 0.05)' // Subtle Green Tint
+                            }}
+                        >
+                            <Group justify="center">
+                                <ShimmerButton 
                                     onClick={openQuizSetup}
                                     loading={isGeneratingQuiz || isEvaluatingQuiz}
+                                    style={{ width: '100%' }}
                                 >
-                                    {isGeneratingQuiz ? 'Building...' : isEvaluatingQuiz ? 'Evaluating...' : 'Take a Smart Quiz'}
-                                </Button>
+                                    <Group gap="xs" justify="center">
+                                        <IconBrain size={18} />
+                                        <span>Start Daily Smart Quiz</span>
+                                    </Group>
+                                </ShimmerButton>
                             </Group>
-                        </GlassCard>
+                        </Box>
                     )}
-                    
-                    {noteError && <Alert color="red" title="Note Generation Error" mt="md">{noteError}</Alert>}
-                </Stack>
+                </Collapse>
             </GlassCard>
-        </Collapse>
 
-        {/* --- Modals are unchanged --- */}
-        <QuizSetupModal
-            opened={quizSetupOpened}
-            onClose={closeQuizSetup}
-            onStartQuiz={handleStartQuiz}
-            isLoading={isGeneratingQuiz}
-        />
-        {quizQuestions && (
-            <QuizRunner 
-                questions={quizQuestions} 
-                onClose={() => setQuizQuestions(null)}
-                onSubmit={handleSubmitQuiz}
-            />
-        )}
-        {quizResults && (
-            <QuizResults
-                results={quizResults}
-                onClose={() => setQuizResults(null)}
-                onRetake={() => { setQuizResults(null); openQuizSetup(); }}
-            />
-        )}
-        <FullscreenNoteViewer 
-            noteData={noteToView} 
-            onClose={() => setNoteToView(null)} 
-            onUpdate={onUpdate}
-        />
+            {/* --- MODALS --- */}
+            <QuizSetupModal opened={quizSetupOpened} onClose={closeQuizSetup} onStartQuiz={handleStartQuiz} isLoading={isGeneratingQuiz} />
+            {quizQuestions && <QuizRunner questions={quizQuestions} onClose={() => setQuizQuestions(null)} onSubmit={handleSubmitQuiz} />}
+            {quizResults && <QuizResults results={quizResults} onClose={() => setQuizResults(null)} onRetake={() => { setQuizResults(null); openQuizSetup(); }} />}
+            <FullscreenNoteViewer noteData={noteToView} onClose={() => setNoteToView(null)} onUpdate={onUpdate} />
 
-        <Modal
-            opened={bulkNoteModalOpened}
-            onClose={closeBulkNoteModal}
-            title={<Title order={3} ff="Lexend, sans-serif">Bulk Note Generation</Title>}
-            centered
-            size="lg"
-        >
-            <Stack>
-                <Text c="dimmed" size="sm">
-                    Select the topics for which you want to generate AI-powered notes. Notes that already exist are disabled.
-                </Text>
-                
-                <ScrollArea.Autosize mah={300}>
-                    <Stack gap="xs">
-                        {internalSubTopics.map((subTopic, index) => {
-                            const existingNote = dayTopic.new_notes?.find(n => n.sub_topic_text === subTopic.text);
-                            const isSelected = bulkNoteSelection.includes(subTopic.text);
-
-                            return (
-                                <Paper key={index} withBorder p="sm" radius="md" style={{ backgroundColor: 'var(--mantine-color-dark-6)' }}>
-                                    <Checkbox
-                                        disabled={!!existingNote}
-                                        checked={isSelected || !!existingNote}
-                                        onChange={(event) => {
-                                            const newSelection = event.currentTarget.checked
-                                                ? [...bulkNoteSelection, subTopic.text]
-                                                : bulkNoteSelection.filter(t => t !== subTopic.text);
-                                            setBulkNoteSelection(newSelection);
+            {/* Bulk Modal */}
+            <Modal
+                opened={bulkNoteModalOpened}
+                onClose={closeBulkNoteModal}
+                title="Bulk Note Forge"
+                centered
+                size="md"
+                styles={{ 
+                    content: { backgroundColor: '#1C1C1E', border: '1px solid #2C2C2E', borderRadius: '16px' },
+                    header: { backgroundColor: 'transparent' },
+                    title: { fontFamily: 'var(--font-lexend)', fontWeight: 600 }
+                }}
+            >
+                <Stack>
+                    <Text size="sm" c="dimmed">Select topics to auto-generate notes for.</Text>
+                    <ScrollArea.Autosize mah={300}>
+                        <Stack gap="xs">
+                            {internalSubTopics.map((sub, i) => {
+                                const exists = isGuestMode ? guestArtifact?.generatedNotes?.find(n => n.sub_topic_text === sub.text) : dayTopic.new_notes?.find(n => n.sub_topic_text === sub.text);
+                                const isSelected = bulkNoteSelection.includes(sub.text);
+                                return (
+                                    <Paper 
+                                        key={i} 
+                                        p="sm" 
+                                        withBorder 
+                                        style={{ 
+                                            backgroundColor: exists ? 'rgba(255,255,255,0.02)' : isSelected ? 'rgba(191, 90, 242, 0.1)' : 'transparent',
+                                            borderColor: isSelected ? '#BF5AF2' : 'var(--glass-border)',
+                                            cursor: exists ? 'default' : 'pointer'
                                         }}
-                                        label={subTopic.text}
-                                    />
-                                </Paper>
-                            );
-                        })}
-                    </Stack>
-                </ScrollArea.Autosize>
-
-                <Group justify="flex-end" mt="md">
-                    <Button variant="default" onClick={closeBulkNoteModal}>Cancel</Button>
-                        <ShimmerButton 
-                            onClick={handleConfirmBulkGenerate} 
-                            disabled={bulkNoteSelection.length === 0 || isBulkGenerating}
-                            loading={isBulkGenerating}
-                        >
-                            Generate ({bulkNoteSelection.length}) Note{bulkNoteSelection.length !== 1 ? 's' : ''}
-                        </ShimmerButton>
-                </Group>
-            </Stack>
-        </Modal>
-    </>
-);
+                                        onClick={() => !exists && setBulkNoteSelection(prev => prev.includes(sub.text) ? prev.filter(t => t !== sub.text) : [...prev, sub.text])}
+                                    >
+                                        <Group>
+                                            <Checkbox 
+                                                checked={isSelected || !!exists} 
+                                                readOnly 
+                                                color="green" // Also Green here
+                                                radius="xl"
+                                                disabled={!!exists}
+                                            />
+                                            <Text size="sm" c={exists ? 'dimmed' : 'bright'}>{sub.text}</Text>
+                                        </Group>
+                                    </Paper>
+                                )
+                            })}
+                        </Stack>
+                    </ScrollArea.Autosize>
+                    <Group justify="flex-end">
+                        <Button variant="default" onClick={closeBulkNoteModal}>Cancel</Button>
+                        <Button color="violet" onClick={handleConfirmBulkGenerate} loading={isBulkGenerating} disabled={bulkNoteSelection.length === 0}>
+                            Start Forge ({bulkNoteSelection.length})
+                        </Button>
+                    </Group>
+                </Stack>
+            </Modal>
+        </Box>
+    );
 }

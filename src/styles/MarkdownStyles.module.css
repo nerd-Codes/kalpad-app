@@ -1,56 +1,176 @@
 /* src/styles/MarkdownStyles.module.css */
 
+/* --- ROOT TYPOGRAPHY --- */
 .markdown {
-  font-size: var(--mantine-font-size-md);
-  line-height: 1.7;
-  color: var(--mantine-color-gray-4);
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  font-size: 1.125rem; /* 18px for better readability */
+  line-height: 1.75;   /* Relaxed line height */
+  color: #E5E5E5;      /* Soft white, easier on eyes than pure white */
+  font-weight: 300;    /* Slightly lighter weight for elegance */
 }
 
+/* --- HEADINGS --- */
 .markdown h1,
 .markdown h2,
 .markdown h3,
-.markdown h4 {
-  font-family: var(--mantine-font-family-headings);
-  color: var(--mantine-color-white);
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
-  line-height: 1.3;
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-family: var(--font-lexend), sans-serif;
+  color: #FFFFFF;
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
+.markdown h1 {
+  font-size: 2.5rem;
+  background: linear-gradient(135deg, #FFFFFF 0%, #A1A1AA 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.markdown h2 {
+  font-size: 1.75rem;
+  color: #F5F5F7;
+}
+
+.markdown h3 {
+  font-size: 1.4rem;
+  color: #D4D4D8;
+}
+
+/* --- TEXT ELEMENTS --- */
 .markdown p {
-  margin-bottom: 1em;
+  margin-bottom: 1.5em;
 }
 
 .markdown strong {
-  color: var(--mantine-color-gray-2);
+  font-weight: 700;
+  color: #FFFFFF;
 }
 
+.markdown em {
+  font-style: italic;
+  color: #A1A1AA;
+}
+
+.markdown a {
+  color: #A78BFA; /* Brand Purple */
+  text-decoration: none;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.3);
+  transition: all 0.2s ease;
+}
+
+.markdown a:hover {
+  color: #BF5AF2;
+  border-bottom-color: #BF5AF2;
+}
+
+/* --- LISTS --- */
 .markdown ul,
 .markdown ol {
-  padding-left: 2em;
-  margin-bottom: 1em;
+  padding-left: 1.5em;
+  margin-bottom: 1.5em;
 }
 
+.markdown li {
+  margin-bottom: 0.5em;
+  padding-left: 0.5em;
+}
+
+.markdown li::marker {
+  color: #A78BFA; /* Purple bullets */
+}
+
+/* --- BLOCKQUOTES (The "Insight" Look) --- */
 .markdown blockquote {
-  margin-left: 0;
-  padding-left: 1.5em;
-  border-left: 4px solid var(--mantine-color-brandPurple-8);
-  color: var(--mantine-color-gray-5);
+  margin: 2em 0;
+  padding: 1.5em;
+  background: rgba(191, 90, 242, 0.05); /* Very subtle purple tint */
+  border-left: 4px solid #BF5AF2;
+  border-radius: 0 12px 12px 0;
+  color: #D4D4D8;
   font-style: italic;
 }
 
+/* --- CODE BLOCKS (The "Glass Console") --- */
 .markdown pre {
-  background-color: #0d0d0d !important; /* Override inline styles from highlighter */
-  padding: 1em !important;
-  border-radius: var(--mantine-radius-md);
-  font-size: 0.9em;
-  border: 1px solid var(--mantine-color-dark-4);
+  background-color: #161618 !important; /* Slightly lighter than bg */
+  padding: 1.5em !important;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 2em 0;
+  overflow-x: auto;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
-.markdown code:not(pre > code) {
-  background-color: var(--mantine-color-dark-5);
-  padding: 0.2em 0.4em;
-  border-radius: var(--mantine-radius-sm);
+.markdown code {
+  font-family: 'Fira Code', monospace;
   font-size: 0.9em;
-  color: var(--mantine-color-brandGreen-3);
+}
+
+/* Inline Code */
+.markdown :not(pre) > code {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #BF5AF2;
+  padding: 0.2em 0.4em;
+  border-radius: 6px;
+}
+
+/* --- TABLES --- */
+.markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2em 0;
+  font-size: 0.95em;
+}
+
+.markdown th {
+  text-align: left;
+  padding: 1em;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.markdown td {
+  padding: 1em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #D4D4D8;
+}
+
+/* --- MATH (KaTeX Adjustments) --- */
+.markdown .katex {
+  font-size: 1.1em;
+  color: #E5E5E5;
+}
+
+.markdown .katex-display {
+  margin: 2em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 1em 0;
+}
+
+/* --- IMAGES & MEDIA --- */
+.markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  margin: 2em auto;
+  display: block;
+}
+
+.markdown hr {
+  border: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  margin: 3em 0;
 }

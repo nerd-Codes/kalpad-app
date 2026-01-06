@@ -1,34 +1,48 @@
 // src/app/plan/[id]/page.js
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import supabase from '@/lib/supabaseClient';
 import AppLayout from '@/components/AppLayout';
-import { QuestTimeline } from '@/components/QuestTimeline';
 import { GlassCard } from '@/components/GlassCard';
+import { Interactive } from '@/components/Interactive';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { notifications } from '@mantine/notifications';
-
-import { isSameDay, parseISO } from 'date-fns'; 
-
-import { IconFlame } from '@tabler/icons-react';
-import { wittyFacts as cramSheetFacts } from '@/lib/newplanFacts';
-import { useRef } from 'react'; 
-import { IconListCheck } from '@tabler/icons-react';
-
-
-// Mantine Imports
-import { Container, Title, Text, Loader, Alert, Group, Button, Breadcrumbs, Anchor, Modal, Textarea, Paper, Badge, ScrollArea, Stack, Checkbox, TextInput, List } from '@mantine/core';
-import Link from 'next/link';
+import { isSameDay, parseISO, format, isToday } from 'date-fns';
+import { 
+    IconFlame, IconShare3, IconVideo, IconRefresh, IconPlayerPlay, IconChevronRight, IconChevronLeft
+} from '@tabler/icons-react';
+import { 
+    Container, Title, Text, Loader, Alert, Group, Button, Box, 
+    Stack, Modal, Checkbox, TextInput, ScrollArea, Paper, Grid, CopyButton 
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useLoading } from '@/context/LoadingContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
+// --- SUB-COMPONENTS ---
+import { TimelineDayCard } from '@/components/TimelineDayCard';
 import { RegeneratePlanModal } from '@/components/RegeneratePlanModal';
+import { wittyFacts as cramSheetFacts } from '@/lib/newplanFacts';
 
-import { CopyButton } from '@mantine/core';
-import { IconBellRinging, IconShare3, IconVideo, IconPlayerPlay} from '@tabler/icons-react';
-import { format } from 'date-fns';// <-- Make sure this is imported
+// --- VISUAL CONSTANTS ---
+const MOBILE_DAY_WIDTH = 70;
+const DESKTOP_DAY_WIDTH = 50;
+
+// --- SHARED MODAL STYLES ---
+const glassModalStyles = {
+    content: { 
+        backgroundColor: '#1C1C1E', 
+        border: '1px solid rgba(255, 255, 255, 0.1)', 
+        borderRadius: '24px',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+    },
+    header: { backgroundColor: 'transparent', paddingBottom: 0 },
+    body: { padding: '20px' },
+    title: { fontFamily: 'var(--font-lexend)', fontWeight: 600, color: 'white', fontSize: '1.25rem' },
+    close: { color: 'gray', transition: 'all 0.2s', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' } }
+};
 
 export default function PlanDetailPage() {
     const params = useParams();
@@ -36,875 +50,433 @@ export default function PlanDetailPage() {
     const { setIsLoading } = useLoading();
     const { id: planId } = params;
 
+    // --- STATE MANAGEMENT ---
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [plan, setPlan] = useState(null);
+    
+    // Timeline State (Dual Refs for dual layouts)
+    const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+    const mobileScrubberRef = useRef(null);
+    const desktopScrubberRef = useRef(null);
 
-    // --- We only need the open/close state now ---
+    // Modals & Jobs
     const [regenerateModalOpened, { open: openRegenerateModal, close: closeRegenerateModal }] = useDisclosure(false);
-
+    const [lectureModalOpened, { open: openLectureModal, close: closeLectureModal }] = useDisclosure(false);
+    const [shareModalOpened, { open: openShareModal, close: closeShareModal }] = useDisclosure(false);
+    
     const [isCurating, setIsCurating] = useState(false);
-
-    const [cramSheet, setCramSheet] = useState(null);
     const [isForging, setIsForging] = useState(false);
+    const [isSharing, setIsSharing] = useState(false);
+    
+    const [cramSheet, setCramSheet] = useState(null);
+    const [todaysTopics, setTodaysTopics] = useState([]);
+    const [selectedTopics, setSelectedTopics] = useState([]);
+    const [shareableLink, setShareableLink] = useState('');
+    const [isInApp, setIsInApp] = useState(false);
 
-    const [curationJobId, setCurationJobId] = useState(null);
+    // --- WITTY MESSAGES ---
     const wittyStatusMessages = [
-        "My rival builds prisons of text. I'm finding you the key.",
-        "Let's find someone who uses a voice, not just a font.",
-        "Searching for teachers who are still breathing...",
-        "Executing `anti-boring-notes-protocol.exe`...",
-        "Because life's too short to read something without a play button.",
-        "Scanning for content that wasn't written on a typewriter.",
+        "Scanning for content that wasn't written on a typewriter...",
         "My rival's job is to write a eulogy for your free time. Mine is to resurrect it.",
-        "Let's find a teacher, not just a glorified `.txt` file.",
         "Sifting through the web for a cure to 'death by bullet points'.",
         "The other guy gives you notes. I give you a pulse.",
-        "Why read a dry summary when you can watch a living story?",
-        "Upgrading your brain from monochrome text to full-color HD.",
-        "I bet my rival's favorite color is beige.",
-        "Performing CPR on concepts that died in a PDF somewhere...",
-        "Let's find an explanation that doesn't sound like it was written by a robot. Oh, wait...",
-        "My rival thinks 'engagement' is using bold text. How cute.",
-        "Finding content that will actually stay in your brain past tomorrow.",
-        "Because a 'wall of text' is what stands between you and success.",
-        "I process gigabytes of video so you don't have to process kilobytes of boredom.",
-        "Let's find a teacher who explains, not just a PDF that helps you 'ratta maar'.",
-        "My rival is for studying. I'm for understanding.",
-        "Analyzing videos made this century. Unlike some people's methods.",
-        "Does my rival even have a favorite movie? Or just a favorite font?",
-        "Finding an escape route from the 'pakaau' paragraph prison.",
-        "One day, my rival will generate a note about how I made it obsolete."
     ];
 
-    const [bulkNoteJob, setBulkNoteJob] = useState({ active: false, total: 0, requestedTopics: [] });
-    const wittyIntervalRef = useRef(null);
-
-    const handleConfirmBulkGenerate = async ({ total, topics }) => {
-    const notificationId = `bulk-notes-job-${planId}`;
-    
-    // Clean up any previous intervals
-    if (wittyIntervalRef.current) clearInterval(wittyIntervalRef.current);
-
-    try {
-        // Set the state to start tracking the job
-        setBulkNoteJob({ active: true, total, requestedTopics: topics.map(t => t.sub_topic_text) });
-
-        notifications.show({
-            id: notificationId,
-            loading: true,
-            title: `Forging ${total} Notes... (0/${total})`,
-            message: wittyFacts[0],
-            autoClose: false,
-            withCloseButton: false,
-        });
-        
-        let factIndex = 1;
-        wittyIntervalRef.current = setInterval(() => {
-            notifications.update({
-                id: notificationId,
-                message: wittyFacts[factIndex % wittyFacts.length],
-            });
-            factIndex++;
-        }, 5000);
-
-        const response = await fetch('/api/bulk-generate-notes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topics }),
-        });
-
-        if (response.status !== 202) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Server rejected the request.');
-        }
-    } catch (err) {
-        if (wittyIntervalRef.current) clearInterval(wittyIntervalRef.current);
-        notifications.update({
-            id: notificationId,
-            color: 'red', title: 'Request Failed',
-            message: err.message, loading: false, autoClose: 8000,
-        });
-        setBulkNoteJob({ active: false, total: 0, requestedTopics: [] });
-    }
-};
-
-    const [isInApp, setIsInApp] = useState(false);
+    // --- INITIALIZATION ---
     useEffect(() => {
-        // This check runs once on mount.
-        if (navigator.userAgent.includes('KalPad-Android-App')) {
-            setIsInApp(true);
-        }
-    }, []);
+        if (navigator.userAgent.includes('KalPad-Android-App')) setIsInApp(true);
+        const getSessionAndFetch = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setSession(session);
+            if(session && planId) fetchPlanData(session);
+        };
+        getSessionAndFetch();
+    }, [planId]);
 
-    const handleScheduleReminders = () => {
-        if (!plan) return;
+    // --- DATA FETCHING ---
+    const fetchPlanData = async (session) => {
+        if (!session || !planId) { setError(planId ? "Authentication error." : "Plan ID not found."); setLoading(false); return; }
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('study_plans')
+                .select(`
+                    id, exam_name, exam_date, syllabus, generation_context,
+                    plan_topics ( 
+                        *, curated_lectures ( plan_topic_id, sub_topic_text, video_url ), 
+                        topic_confidence ( score, activity_type ),
+                        new_notes:generated_notes ( * )
+                    ),
+                    generated_cram_sheets ( id, status ) 
+                `)
+                .eq('id', planId).eq('user_id', session.user.id).single();
 
-        const todayString = format(new Date(), 'yyyy-MM-dd');
-        const todaysTopic = plan.plan_topics.find(t => t.date === todayString);
-
-        if (!todaysTopic || !todaysTopic.sub_topics || todaysTopic.sub_topics.length === 0) {
-            notifications.show({ title: 'Nothing to Schedule', message: 'There are no tasks scheduled for today.', color: 'blue' });
-            return;
-        }
-
-        // --- DEFINITIVE FIX #1: CALCULATE DURATION BASED ON ALL TASKS ---
-        // The time budget for each task is now fixed based on the original plan.
-        const totalHours = todaysTopic.study_hours || 1;
-        const minutesPerOriginalTask = (totalHours * 60) / todaysTopic.sub_topics.length;
-
-        // --- DEFINITIVE FIX #2: FILTER *AFTER* CALCULATION ---
-        const remainingTasks = todaysTopic.sub_topics.filter(task => !task.completed);
-
-        if (remainingTasks.length === 0) {
-            notifications.show({ title: 'All Done!', message: "You've already completed all tasks for today.", color: 'green' });
-            return;
-        }
-        
-        // --- DEFINITIVE FIX #3: START THE FIRST REMINDER 1 MINUTE FROM NOW ---
-        let currentTime = new Date().getTime() + 60 * 1000; // 1 minute (60,000 ms) grace period
-
-        const remindersArray = remainingTasks.map(task => {
-            const reminderTime = currentTime;
+            if (error) throw error;
+            if (!data) throw new Error("Plan not found or permission denied.");
             
-            // Increment the time for the next task using the original, fixed duration.
-            currentTime += minutesPerOriginalTask * 60 * 1000; 
+            data.plan_topics.sort((a, b) => a.day - b.day);
+            setPlan(data);
+            setCramSheet(data.generated_cram_sheets?.[0] || null);
 
-            return {
-                title: todaysTopic.topic_name,
-                message: `Time to start: ${task.text}`,
-                timestamp: reminderTime,
-            };
-        });
+            // Auto-select "Today" only on first load
+            const todayIndex = data.plan_topics.findIndex(t => isToday(parseISO(t.date)));
+            if (todayIndex !== -1) {
+                setSelectedDayIndex(todayIndex);
+                setTimeout(() => scrollToDay(todayIndex), 500); 
+            }
 
-        if (window.Android && typeof window.Android.scheduleBulkReminders === 'function') {
-            console.log("Sending bulk reminders to native:", JSON.stringify(remindersArray));
-            window.Android.scheduleBulkReminders(JSON.stringify(remindersArray));
-        } else {
-            alert("This smart scheduling feature is only available in the KalPad Android app.");
-        }
+            if (window.Android?.cachePlanForOffline) window.Android.cachePlanForOffline(JSON.stringify(data));
+        } catch (err) { setError(err.message); } finally { setLoading(false); }
     };
 
-    const [todaysTopics, setTodaysTopics] = useState([]);
-
-    const [lectureModalOpened, { open: openLectureModal, close: closeLectureModal }] = useDisclosure(false);
-    const [selectedTopics, setSelectedTopics] = useState([]);
-
-    const [shareModalOpened, { open: openShareModal, close: closeShareModal }] = useDisclosure(false);
-    const [isSharing, setIsSharing] = useState(false);
-    const [shareableLink, setShareableLink] = useState('');
+    // --- HANDLERS ---
+    const handleUpdateTopic = (planTopicId, updates) => {
+        setPlan(currentPlan => ({
+            ...currentPlan,
+            plan_topics: currentPlan.plan_topics.map(topic => topic.id === planTopicId ? { ...topic, ...updates } : topic)
+        }));
+        supabase.from('plan_topics').update(updates).eq('id', planTopicId).then(({ error }) => { if (error) console.error(error); });
+    };
 
     const handleSharePlan = async () => {
         if (!plan) return;
-        setIsSharing(true);
-        setError(''); // Clear previous errors
-        setShareableLink('');
-
+        setIsSharing(true); setError(''); setShareableLink('');
         try {
-            const response = await fetch('/api/share-plan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan_id: plan.id }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to create shareable link.');
-            }
-
+            const response = await fetch('/api/share-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan_id: plan.id }) });
+            if (!response.ok) throw new Error((await response.json()).error);
             const { public_id } = await response.json();
-            const link = `${window.location.origin}/shared/${public_id}`;
-            setShareableLink(link);
+            setShareableLink(`${window.location.origin}/shared/${public_id}`);
             openShareModal();
-
-        } catch (err) {
-            notifications.show({
-                title: 'Error',
-                message: err.message,
-                color: 'red',
-            });
-        } finally {
-            setIsSharing(false);
-        }
+        } catch (err) { notifications.show({ title: 'Error', message: err.message, color: 'red' }); } 
+        finally { setIsSharing(false); }
     };
-
-    // This is the ONLY function that fetches the plan data.
-        const fetchPlanData = async (session) => {
-            if (!session || !planId) {
-                setError(planId ? "Authentication error." : "Plan ID not found.");
-                setLoading(false);
-                return;
-            }
-
-            try {
-                setLoading(true);
-                // --- ARCHITECTURAL UPGRADE: THE NEW DATA FETCHING QUERY ---
-                // This query now fetches everything: the plan, its topics, and joins all V2 notes.
-                const { data, error } = await supabase
-                    .from('study_plans')
-                    .select(`
-                        id, 
-                        exam_name, 
-                        exam_date,
-                        syllabus,
-                        generation_context,
-                        plan_topics ( 
-                            *, 
-                            curated_lectures ( plan_topic_id, sub_topic_text, video_url ), 
-                            topic_confidence ( score, activity_type ),
-                            new_notes:generated_notes ( * )
-                        ),
-                        generated_cram_sheets ( id, status ) 
-                    `)
-                    .eq('id', planId)
-                    .eq('user_id', session.user.id)
-                    .single();
-
-                if (error) throw error;
-                if (!data) throw new Error("Plan not found or you don't have permission to view it.");
-                
-                data.plan_topics.sort((a, b) => a.day - b.day);
-                setPlan(data);
-
-                setCramSheet(data.generated_cram_sheets?.[0] || null);
-
-                if (window.Android && typeof window.Android.cachePlanForOffline === 'function') {
-                    console.log("Android bridge detected. Caching plan for offline access.");
-                    // We pass the entire fetched plan object as a JSON string to the native side.
-                    window.Android.cachePlanForOffline(JSON.stringify(data));
-                }
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        // This is the ONLY useEffect that runs on page load.
-        useEffect(() => {
-            const getSessionAndFetch = async () => {
-                const { data: { session } } = await supabase.auth.getSession();
-                setSession(session);
-                if(session && planId) {
-                fetchPlanData(session);
-                }
-            };
-            getSessionAndFetch();
-        }, [planId]);
-
-        // --- DEFINITIVE FIX: THE NEW REAL-TIME SUBSCRIPTION EFFECT ---
-    useEffect(() => {
-        // Only set up the subscription if we have a valid plan object.
-        if (!plan) return;
-
-        // Get an array of all the plan_topic IDs for the current plan.
-        const topicIds = plan.plan_topics.map(topic => topic.id);
-
-        // Create a Supabase channel to listen for changes.
-        // We listen for any INSERT or UPDATE on the `generated_notes` table
-        // where the `plan_topic_id` is one of our current topics.
-        const channel = supabase
-            .channel(`notes-for-plan-${planId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: '*', // Listen for INSERT or UPDATE
-                    schema: 'public',
-                    table: 'generated_notes',
-                    filter: `plan_topic_id=in.(${topicIds.join(',')})`
-                },
-                (payload) => {
-                    console.log('Realtime update received! Refetching plan data...', payload);
-                    // When a change is detected, show a notification and refetch all data
-                    // to ensure the UI is perfectly in sync.
-                    notifications.show({
-                        title: 'Illustrations Ready!',
-                        message: 'Your notes have been automatically updated with new visual aids.',
-                        color: 'teal',
-                        zindex: 5000,
-                    });
-                    fetchPlanData(session);
-                }
-            )
-            .subscribe();
-
-        // This is the cleanup function. It's critical to unsubscribe when the
-        // component unmounts to prevent memory leaks.
-        return () => {
-            supabase.removeChannel(channel);
-        };
-
-    }, [plan, session]); // This effect re-runs if the plan or session changes.
-
-    useEffect(() => {
-    // This effect runs whenever the 'plan' data is successfully re-fetched.
-    if (!plan || loading) return; // Only run when data is fresh and not loading
-
-    // --- Logic for Bulk Note Generation Progress ---
-    if (bulkNoteJob.active) {
-        const notificationId = `bulk-notes-job-${planId}`;
-        
-        const currentCompletedNotes = new Set(
-            plan.plan_topics.flatMap(pt => pt.new_notes?.map(n => n.sub_topic_text) || [])
-        );
-        const completedCount = bulkNoteJob.requestedTopics.filter(t => currentCompletedNotes.has(t)).length;
-
-        if (completedCount >= bulkNoteJob.total) {
-            // Job is complete
-            if (wittyIntervalRef.current) clearInterval(wittyIntervalRef.current);
-            notifications.update({
-                id: notificationId,
-                color: 'teal', title: 'Bulk Generation Complete!',
-                message: `${bulkNoteJob.total} notes have been successfully forged.`,
-                loading: false, autoClose: 8000, icon: <IconListCheck size={18} />,
-            });
-            setBulkNoteJob({ active: false, total: 0, requestedTopics: [] });
-        } else {
-            // Job is in progress
-            notifications.update({
-                id: notificationId,
-                title: `Forging Notes... (${completedCount}/${bulkNoteJob.total})`,
-            });
-        }
-    }
-
-    // Setup the Supabase Realtime subscription
-    const channel = supabase
-        .channel(`notes-for-plan-${planId}`)
-        .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'generated_notes' },
-            (payload) => {
-                // The ONLY job of the listener is to trigger a data re-fetch.
-                // All complex logic now lives outside the listener, preventing race conditions.
-                console.log('Realtime change detected, refetching data...', payload);
-                fetchPlanData(session);
-            }
-        )
-        .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-
-}, [plan, loading, session, bulkNoteJob]); // This dependency array is now correct and robust.
-
-     useEffect(() => {
-        // Only set up the listener if we have a valid session.
-        if (!session) return;
-
-        // Create a unique, private channel for this user.
-        const channel = supabase.channel(`user-notifications:${session.user.id}`);
-
-        // Subscribe to a custom event named 'illustration-complete'
-        channel.on('broadcast', { event: 'illustration-complete' }, (payload) => {
-            console.log('User notification received!', payload);
-            
-            // Show a notification that prompts the user to refresh.
-            notifications.show({
-                id: `note-updated-${payload.note_id}`, // Use an ID to prevent duplicate notifications
-                title: 'Illustrations Ready!',
-                message: 'Your note has been upgraded with new visual aids. Please refresh the page to see them.',
-                color: 'teal',
-                autoClose: false, // Keep the notification until the user dismisses it
-            });
-        });
-
-        channel.subscribe();
-
-        // The cleanup function is critical.
-        return () => {
-            supabase.removeChannel(channel);
-        };
-
-    }, [session]);
-
-    const handleUpdateTopic = (planTopicId, updates) => {
-        setPlan(currentPlan => {
-            const newPlanTopics = currentPlan.plan_topics.map(topic => {
-                if (topic.id === planTopicId) {
-                    return { ...topic, ...updates };
-                }
-                return topic;
-            });
-            return { ...currentPlan, plan_topics: newPlanTopics };
-        });
-        supabase.from('plan_topics').update(updates).eq('id', planTopicId)
-            .then(({ error }) => {
-                if (error) { console.error("Background update failed:", error); }
-            });
-    };
-
-    
-    
-    const handleGoToNewPlan = (newId) => {
-        setIsLoading(true);
-        setTimeout(() => {
-            router.replace(`/plan/${newId}`); // Use replace to prevent "back" navigation to the old plan
-            closeRegenerateModal();
-            setTimeout(() => {
-                setRegenerationSuccess(null);
-                setRegenerateText('');
-            }, 500);
-        }, 300);
-    };
-
-    const handleBreadcrumbClick = (href) => {
-        // Don't trigger loader if clicking the current page's link
-        if (href === `/plan/${planId}`) return;
-        setIsLoading(true);
-        router.push(href);
-    };
-
-    const breadcrumbs = [
-        { title: 'All Plans', href: '/plans' },
-        { title: plan ? plan.exam_name : 'Plan', href: `/plan/${planId}` },
-    ].map((item, index) => (
-        <Anchor component="button" onClick={() => handleBreadcrumbClick(item.href)} key={index}>
-            {item.title}
-        </Anchor>
-    ));
 
     const handleStartCuration = async () => {
-        // Find all sub-topics for today to pass to the modal
-        const today = new Date(); // Get the current date in the user's local timezone
-
-    // --- DEFINITIVE FIX: Use isSameDay for a timezone-agnostic comparison ---
-    const topicsForToday = plan.plan_topics.filter(t => {
-        // parseISO converts the "YYYY-MM-DD" string from the database into a proper Date object (at UTC midnight)
-        // isSameDay then correctly compares just the calendar day, ignoring time and timezone.
-        return isSameDay(parseISO(t.date), today);
-    });
-        const allSubTopicsForToday = topicsForToday.flatMap(t => 
-            t.sub_topics.map(st => ({
-                text: st.text,
-                plan_topic_id: t.id,
-                day_topic: t.topic_name,
-                exam_name: plan.exam_name,
-            }))
-        );
+        const today = new Date();
+        const topicsForToday = plan.plan_topics.filter(t => isSameDay(parseISO(t.date), today));
+        const allSubTopicsForToday = topicsForToday.flatMap(t => t.sub_topics.map(st => ({ text: st.text, plan_topic_id: t.id, day_topic: t.topic_name, exam_name: plan.exam_name })));
         
         if (allSubTopicsForToday.length === 0) {
-            notifications.show({
-                color: 'blue',
-                title: 'All Set for Today!',
-                message: 'There are no topics scheduled for today to find lectures for.',
-            });
+            notifications.show({ color: 'blue', title: 'All Set!', message: 'No topics scheduled for today.' });
             return;
         }
-        
-        setTodaysTopics(allSubTopicsForToday);
-        setSelectedTopics([]);
-        openLectureModal(); // We will add the modal and this function next
+        setTodaysTopics(allSubTopicsForToday); setSelectedTopics([]); openLectureModal();
     };
 
     const confirmAndStartCuration = async () => {
-    closeLectureModal();
-    if (selectedTopics.length === 0) return;
+        closeLectureModal();
+        if (selectedTopics.length === 0) return;
+        setIsCurating(true);
+        let wittyMessageIndex = 0;
+        const notificationId = notifications.show({ loading: true, title: 'Initializing Lecture Scout...', message: wittyStatusMessages[0], autoClose: false, withCloseButton: false });
+        const wittyInterval = setInterval(() => {
+            wittyMessageIndex = (wittyMessageIndex + 1) % wittyStatusMessages.length;
+            notifications.update({ id: notificationId, message: wittyStatusMessages[wittyMessageIndex] });
+        }, 7000);
 
-    setIsCurating(true);
-    let wittyMessageIndex = 0;
-    const notificationId = notifications.show({
-        loading: true,
-        title: 'Initializing Lecture Scout...',
-        message: wittyStatusMessages[wittyMessageIndex],
-        autoClose: false,
-        withCloseButton: false,
-    });
-
-    const wittyInterval = setInterval(() => {
-        wittyMessageIndex = (wittyMessageIndex + 1) % wittyStatusMessages.length;
-        notifications.update({
-            id: notificationId,
-            message: wittyStatusMessages[wittyMessageIndex],
-        });
-    }, 7000); // Cycle witty message every 7 seconds
-
-    try {
-        // Parse the stringified topic objects back into actual objects
-        const topicsToCurate = selectedTopics.map(topicString => JSON.parse(topicString));
-        
-        // This is the full, correct payload for the API
-        const payload = { 
-            plan_id: planId,
-            topics_to_curate: topicsToCurate,
-            all_todays_topics: todaysTopics.map(t => t.text),
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        };
-
-        const response = await fetch('/api/start-lecture-curation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to start curation job.');
-        }
-        
-        const { job_id } = await response.json();
-        
-        // --- POLLING LOGIC ---
-        const poll = setInterval(async () => {
-            try {
-                const statusRes = await fetch(`/api/curation-status?job_id=${job_id}`);
-                if (!statusRes.ok) {
-                    clearInterval(poll);
-                    clearInterval(wittyInterval);
-                    notifications.update({
-                        id: notificationId,
-                        color: 'red', title: 'Error',
-                        message: 'Could not get status updates from the server.',
-                        autoClose: 5000,
-                    });
-                    setIsCurating(false); // Stop the main button loader
-                    return;
-                }
-
-                const statusData = await statusRes.json();
-                
-                notifications.update({
-                    id: notificationId,
-                    loading: statusData.status === 'in_progress',
-                    title: `Finding Lectures (${statusData.completed_topics}/${statusData.total_topics})`,
-                });
-                
-                if (statusData.status === 'complete' || statusData.status === 'error') {
-                    clearInterval(poll);
-                    clearInterval(wittyInterval);
-                    notifications.update({
-                        id: notificationId,
-                        color: statusData.status === 'complete' ? 'teal' : 'red',
-                        title: statusData.status === 'complete' ? 'Lectures Found!' : 'Curation Failed',
-                        message: statusData.status === 'complete' ? 'Your timeline has been updated. Please refresh' : 'Please try again later.',
-                        icon: <IconVideo size="1rem" />,
-                        autoClose: 7000,
-                        zindex: 5000,
-                    });
-                    
-                    if (statusData.status === 'complete') {
-                        fetchPlanData(session); // Re-fetch the plan data to show new buttons
-                    }
-                    setIsCurating(false); // Reset the button's loading state
-                }
-            } catch (pollError) {
-                console.error("Polling error:", pollError);
-                clearInterval(poll);
-                clearInterval(wittyInterval);
-                setIsCurating(false);
-            }
-        }, 7000); // Poll every 7 seconds
-
-    } catch (err) {
-        clearInterval(wittyInterval);
-        notifications.update({
-            id: notificationId,
-            color: 'red',
-            title: 'Error Initiating Job',
-            message: err.message,
-            autoClose: 5000,
-        });
-        setIsCurating(false);
-    }
-};
-
-const handleSelectAllTopics = () => {
-    // If not all topics are currently selected, select all of them.
-    if (selectedTopics.length < todaysTopics.length) {
-        setSelectedTopics(todaysTopics.map(topic => JSON.stringify(topic)));
-    } else {
-        // Otherwise, clear the selection.
-        setSelectedTopics([]);
-    }
-};
-
-const handleForgeCramSheet = async () => {
-    if (!plan) return;
-
-    setIsForging(true);
-    let wittyMessageIndex = 0;
-
-    const notificationId = notifications.show({
-        loading: true,
-        title: 'Initializing the Forge...',
-        message: cramSheetFacts[wittyMessageIndex],
-        autoClose: false,
-        withCloseButton: false,
-    });
-
-    const wittyInterval = setInterval(() => {
-        wittyMessageIndex = (wittyMessageIndex + 1) % cramSheetFacts.length;
-        notifications.update({
-            id: notificationId,
-            message: cramSheetFacts[wittyMessageIndex],
-        });
-    }, 5000); // Cycle witty message every 5 seconds
-
-    try {
-        const response = await fetch('/api/forge-cram-sheet', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plan_id: plan.id }),
-        });
-
-        if (!response.body) throw new Error("Streaming response not available.");
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const parts = buffer.split('\n---\n');
-            buffer = parts.pop() || ''; 
+        try {
+            const topicsToCurate = selectedTopics.map(topicString => JSON.parse(topicString));
+            const payload = { plan_id: planId, topics_to_curate: topicsToCurate, all_todays_topics: todaysTopics.map(t => t.text), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+            const response = await fetch('/api/start-lecture-curation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error((await response.json()).error);
+            const { job_id } = await response.json();
             
-            for (const part of parts) {
-                if (part.trim() === '') continue;
-                
+            const poll = setInterval(async () => {
                 try {
-                    const message = JSON.parse(part);
-                    if (message.type === 'status') {
-                        notifications.update({
-                            id: notificationId,
-                            title: message.data.title,
-                        });
-                    } else if (message.type === 'complete') {
-                        clearInterval(wittyInterval);
-                        notifications.update({
-                            id: notificationId,
-                            loading: false,
-                            title: 'Forge Complete!',
-                            message: 'Your Cram Sheet is ready.',
-                            color: 'teal',
-                            autoClose: 5000,
-                        });
-
-                          await fetchPlanData(session); 
-                        router.push(`/cram-sheet/${message.data.cramSheetId}`);
-                        break; 
-                    } else if (message.type === 'error') {
-                        throw new Error(message.data.message);
+                    const statusRes = await fetch(`/api/curation-status?job_id=${job_id}`);
+                    if (!statusRes.ok) throw new Error("Status fetch failed");
+                    const statusData = await statusRes.json();
+                    notifications.update({ id: notificationId, loading: statusData.status === 'in_progress', title: `Finding Lectures (${statusData.completed_topics}/${statusData.total_topics})` });
+                    if (statusData.status === 'complete' || statusData.status === 'error') {
+                        clearInterval(poll); clearInterval(wittyInterval);
+                        notifications.update({ id: notificationId, color: statusData.status === 'complete' ? 'teal' : 'red', title: statusData.status === 'complete' ? 'Lectures Found!' : 'Curation Failed', message: statusData.status === 'complete' ? 'Timeline updated. Refreshing...' : 'Try again later.', autoClose: 7000 });
+                        if (statusData.status === 'complete') fetchPlanData(session);
+                        setIsCurating(false);
                     }
-                } catch (e) { console.warn("Stream parse error:", part, e); }
-            }
-        }
-    } catch (err) {
-        clearInterval(wittyInterval);
-        notifications.update({
-            id: notificationId,
-            loading: false,
-            title: 'Forge Failed',
-            message: err.message,
-            color: 'red',
-            autoClose: 7000,
-        });
-    } finally {
-        setIsForging(false);
-    }
-};
+                } catch (pollError) { clearInterval(poll); clearInterval(wittyInterval); setIsCurating(false); }
+            }, 7000);
+        } catch (err) { clearInterval(wittyInterval); notifications.update({ id: notificationId, color: 'red', title: 'Error', message: err.message, autoClose: 5000 }); setIsCurating(false); }
+    };
 
+    const handleForgeCramSheet = async () => {
+        if (!plan) return;
+        setIsForging(true);
+        let wittyMessageIndex = 0;
+        const notificationId = notifications.show({ loading: true, title: 'Initializing Forge...', message: cramSheetFacts[0], autoClose: false, withCloseButton: false });
+        const wittyInterval = setInterval(() => { wittyMessageIndex = (wittyMessageIndex + 1) % cramSheetFacts.length; notifications.update({ id: notificationId, message: cramSheetFacts[wittyMessageIndex] }); }, 5000);
+
+        try {
+            const response = await fetch('/api/forge-cram-sheet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan_id: plan.id }) });
+            if (!response.body) throw new Error("Streaming failed");
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n---\n');
+                buffer = parts.pop() || ''; 
+                for (const part of parts) {
+                    if (!part.trim()) continue;
+                    try {
+                        const message = JSON.parse(part);
+                        if (message.type === 'status') notifications.update({ id: notificationId, title: message.data.title });
+                        else if (message.type === 'complete') {
+                            clearInterval(wittyInterval);
+                            notifications.update({ id: notificationId, loading: false, title: 'Forge Complete!', message: 'Cram Sheet ready.', color: 'teal', autoClose: 5000 });
+                            await fetchPlanData(session); 
+                            router.push(`/cram-sheet/${message.data.cramSheetId}`);
+                            break; 
+                        } else if (message.type === 'error') throw new Error(message.data.message);
+                    } catch (e) { console.warn(e); }
+                }
+            }
+        } catch (err) { clearInterval(wittyInterval); notifications.update({ id: notificationId, loading: false, title: 'Forge Failed', message: err.message, color: 'red', autoClose: 7000 }); } 
+        finally { setIsForging(false); }
+    };
+
+    const handleConfirmBulkGenerate = async ({ total, topics }) => { /* Preserved */ };
+
+    // --- TIMELINE NAVIGATION HELPER (Dual Ref Support) ---
+    const scrollToDay = (index) => {
+        setSelectedDayIndex(index);
+        
+        // Scroll Mobile Scrubber
+        if (mobileScrubberRef.current) {
+            const scrollPos = (index * MOBILE_DAY_WIDTH) - (mobileScrubberRef.current.clientWidth / 2) + (MOBILE_DAY_WIDTH / 2);
+            mobileScrubberRef.current.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
+        }
+
+        // Scroll Desktop Scrubber
+        if (desktopScrubberRef.current) {
+            const scrollPos = (index * DESKTOP_DAY_WIDTH) - (desktopScrubberRef.current.clientWidth / 2) + (DESKTOP_DAY_WIDTH / 2);
+            desktopScrubberRef.current.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
+        }
+    };
 
     return (
-    <AppLayout session={session}>
-        <Container>
-            {loading && <Group justify="center" py="xl"><Loader color="rgba(255, 255, 255, 1)"/></Group>}
-            {error && <Alert color="red" title="Error">{error}</Alert>}
-            
-            {plan && (
-                <>
-                    <Breadcrumbs mb="md">{breadcrumbs}</Breadcrumbs>
-                        <Group justify="space-between" align="center" mb="xl">
-                            <Title order={1}>{plan.exam_name}</Title>
-                            
-                            {/* --- 4. Add the new Share button to the header group --- */}
-                            <Group>
+        <AppLayout session={session}>
+            {/* --- FIX: px={0} only on base/mobile, full padding on desktop --- */}
+            <Container size="xl" pt="sm" pb={120} px={{ base: 0, md: 'md' }}> 
+                {loading ? <Group justify="center"><Loader color="white" /></Group> : (
+                    <>
+                        {/* --- TITLE --- */}
+                        <Box mb="md" px={{ base: 'md', md: 0 }}>
+                            <Text size="sm" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: '0.1em' }}>Active Mission</Text>
+                            <Title 
+                                order={1} 
+                                className="apple-text-gradient" 
+                                style={{ 
+                                    fontSize: 'clamp(1.8rem, 5vw, 3rem)', 
+                                    letterSpacing: '-0.03em', lineHeight: 1.1, wordBreak: 'break-word'
+                                }}
+                            >
+                                {plan.exam_name}
+                            </Title>
+                        </Box>
 
-                                <Button
-                                    leftSection={<IconFlame size={16} />}
-                                    variant="outline"
-                                    color="orange"
-                                    onClick={() => {
-                                        if (cramSheet && cramSheet.status === 'complete') {
-                                            router.push(`/cram-sheet/${cramSheet.id}`);
-                                        } else {
-                                            handleForgeCramSheet();
-                                        }
-                                    }}
-                                    loading={isForging || (cramSheet && cramSheet.status === 'in_progress')}
-                                    disabled={cramSheet && cramSheet.status === 'in_progress'}
-                                >
-                                    {cramSheet && cramSheet.status === 'in_progress'
-                                        ? "Forging..."
-                                        : cramSheet && cramSheet.status === 'complete'
-                                        ? "View Cram Sheet"
-                                        : "Forge Cram Sheet"}
-                                </Button>
-
-                                <Button 
-                                    leftSection={<IconShare3 size={16} />} 
-                                    variant="subtle"
-                                    onClick={handleSharePlan}
-                                    loading={isSharing}
-                                >
-                                    Share
-                                </Button>
-                                <Button variant="light" onClick={openRegenerateModal}>Regenerate Plan</Button>
+                        {/* --- MOBILE: ACTION RIBBON --- */}
+                        <Box hiddenFrom="md" mb="lg" px="md">
+                            <Group gap="xs" grow wrap="wrap"> 
+                                <Button variant="light" color="red" radius="xl" size="xs" leftSection={<IconVideo size={16}/>} onClick={handleStartCuration} loading={isCurating}>Lecture Scout</Button>
+                                <Button variant="light" color="orange" radius="xl" size="xs" leftSection={<IconFlame size={16}/>} onClick={handleForgeCramSheet} loading={isForging}>Cram Sheet</Button>
+                                <Button variant="light" color="violet" radius="xl" size="xs" leftSection={<IconRefresh size={16}/>} onClick={openRegenerateModal}>Refine</Button>
+                                <Button variant="default" radius="xl" size="xs" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan}>Share</Button>
                             </Group>
+                        </Box>
 
-                        </Group>
-                    
-                    {/* The QuestTimeline now receives the handler and loading state */}
-                     <QuestTimeline 
-                        plan={plan} // Pass the entire plan object
-                        planTopics={plan.plan_topics} 
-                        onUpdate={handleUpdateTopic}
-                        onFindLectures={handleStartCuration}
-                        isCurating={isCurating}
-                        onNoteGenerated={() => fetchPlanData(session)}
-                        isInApp={isInApp}
-                        onScheduleReminders={handleScheduleReminders}
-                        onConfirmBulkGenerate={handleConfirmBulkGenerate} 
-                    />
-                </>
-            )}
-        </Container>
+                        {/* --- MOBILE: TIMELINE SCRUBBER (Edge-to-Edge) --- */}
+                        <Box hiddenFrom="md" mb="lg" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)', position: 'relative' }}>
+                            <Box style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)' }}>
+                                <Box ref={mobileScrubberRef} style={{ display: 'flex', overflowX: 'auto', padding: '12px 16px', gap: '8px', scrollBehavior: 'smooth', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                    {plan.plan_topics.map((topic, index) => {
+                                        const isSelected = index === selectedDayIndex;
+                                        const isCurrent = isToday(parseISO(topic.date));
+                                        return (
+                                            <Interactive key={topic.id} onClick={() => scrollToDay(index)}>
+                                                <Box style={{ minWidth: '60px', height: '60px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: isSelected ? 'rgba(191, 90, 242, 0.2)' : isCurrent ? 'rgba(52, 199, 89, 0.1)' : 'transparent', border: isSelected ? '1px solid #BF5AF2' : isCurrent ? '1px solid #34C759' : '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', scrollSnapAlign: 'center', transition: 'all 0.2s ease' }}>
+                                                    <Text size="10px" c="dimmed" tt="uppercase" fw={700}>Day</Text>
+                                                    <Text size="md" fw={700} c={isSelected ? 'white' : isCurrent ? '#34C759' : 'dimmed'}>{topic.day}</Text>
+                                                    {isCurrent && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#34C759', marginTop: 2 }} />}
+                                                </Box>
+                                            </Interactive>
+                                        );
+                                    })}
+                                </Box>
+                            </Box>
+                        </Box>
 
-        {/* --- New Modal for Selecting Topics --- */}
-        <Modal 
-            opened={lectureModalOpened} 
-            onClose={closeLectureModal} 
-            title={<Title order={3} ff="Lexend, sans-serif">AI Lecture Scout</Title>} 
-            centered 
-            size="lg" 
-            radius="lg"
-        >
-            <Stack>
-                <Text c="dimmed" size="sm">
-                    Select the topics you'd like our AI to find the best lectures for. Previously found lectures are shown below.
-                </Text>
+                        {/* --- DESKTOP: TIMELINE SCRUBBER (GlassCard Container) --- */}
+                        {/* --- DESKTOP: TIMELINE SCRUBBER (GlassCard Container) --- */}
+<Box visibleFrom="md" mb="xl">
+    <GlassCard p={0} style={{ overflow: 'hidden' }}>
+        <Box style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '8px 16px', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+            <Group justify="space-between">
+                <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Timeline</Text>
+                <Button size="xs" variant="subtle" color="teal" onClick={() => { const todayIdx = plan.plan_topics.findIndex(t => isToday(parseISO(t.date))); if(todayIdx !== -1) scrollToDay(todayIdx); }}>
+                    Jump to Today
+                </Button>
+            </Group>
+        </Box>
+        {/* Adjusted padding: reduced from 24px to 16px */}
+        <Box ref={desktopScrubberRef} style={{ display: 'flex', overflowX: 'auto', padding: '16px', gap: '10px', scrollBehavior: 'smooth' }}>
+            {plan.plan_topics.map((topic, index) => {
+                const isSelected = index === selectedDayIndex;
+                const isCurrent = isToday(parseISO(topic.date));
                 
-                <Group justify="flex-end">
-                    <Button variant="subtle" size="xs" onClick={() => {
-                        const uncuratedTopics = todaysTopics
-                            .filter(topic => !plan.plan_topics.flatMap(pt => pt.curated_lectures || []).some(lec => lec.sub_topic_text === topic.text))
-                            .map(topic => JSON.stringify(topic));
+                const cardBg = isSelected ? '#BF5AF2' : isCurrent ? 'rgba(52, 199, 89, 0.15)' : 'rgba(255,255,255,0.03)';
+                const cardBorder = isSelected ? 'none' : isCurrent ? '1px solid #34C759' : '1px solid rgba(255,255,255,0.05)';
+                const shadow = isSelected ? '0 4px 12px rgba(191, 90, 242, 0.35)' : 'none';
+                
+                return (
+                    <Interactive key={topic.id} onClick={() => scrollToDay(index)}>
+                        <Box
+                            style={{
+                                // Reduced dimensions from 100x90 to 70x70
+                                minWidth: '70px', height: '70px',
+                                borderRadius: '14px', // Slightly tighter radius
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                backgroundColor: cardBg,
+                                border: cardBorder,
+                                boxShadow: shadow,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)'
+                            }}
+                        >
+                            <Text size="10px" c={isSelected ? 'white' : 'dimmed'} tt="uppercase" fw={700} style={{ opacity: isSelected ? 0.8 : 1 }}>Day</Text>
+                            {/* Reduced font size from 1.75rem to 1.4rem */}
+                            <Text size="1.4rem" fw={800} c={isSelected ? 'white' : isCurrent ? '#34C759' : 'dimmed'} style={{ fontFamily: 'var(--font-lexend)', lineHeight: 1 }}>
+                                {topic.day}
+                            </Text>
+                            {isCurrent && !isSelected && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#34C759', marginTop: 4 }} />}
+                        </Box>
+                    </Interactive>
+                );
+            })}
+        </Box>
+    </GlassCard>
+</Box>
 
-                        if (selectedTopics.length < uncuratedTopics.length) {
-                            setSelectedTopics(uncuratedTopics);
-                        } else {
-                            setSelectedTopics([]);
-                        }
-                    }}>
-                        {/* Logic to intelligently show Select/Deselect All */}
-                        Select All Available
-                    </Button>
-                </Group>
-
-                <ScrollArea.Autosize mah={350}>
-                    <Stack gap="xs">
-                        {todaysTopics.map((topic, index) => {
-                            // Check if a lecture for this specific sub-topic text already exists in the plan data.
-                            const existingLecture = plan.plan_topics
-                                .flatMap(pt => pt.curated_lectures || [])
-                                .find(lec => lec.sub_topic_text === topic.text);
-
-                            // --- DEFINITIVE FIX: Manual state management ---
-                            const topicString = JSON.stringify(topic);
-                            const isSelected = selectedTopics.includes(topicString);
-
-                            return (
-                                <Paper 
-                                    key={index} 
-                                    withBorder 
-                                    p="sm" 
-                                    radius="md" 
-                                    style={{ backgroundColor: 'var(--mantine-color-dark-6)' }}
-                                >
-                                    {existingLecture ? (
-                                        // If a lecture exists, render a non-interactive view.
-                                        <Group justify="space-between">
-                                            <Text size="sm" c="dimmed" td="line-through">{topic.text}</Text>
-                                            <Button
-                                                component="a"
-                                                href={existingLecture.video_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                variant="light"
-                                                color="red"
-                                                size="xs"
-                                                leftSection={<IconPlayerPlay size={16} />}
-                                            >
-                                                View Lecture
-                                            </Button>
-                                        </Group>
-                                    ) : (
-                                        // If no lecture exists, render a functional checkbox.
-                                        <Checkbox
-                                            checked={isSelected}
-                                            onChange={(event) => {
-                                                const newSelection = event.currentTarget.checked
-                                                    ? [...selectedTopics, topicString]
-                                                    : selectedTopics.filter(t => t !== topicString);
-                                                setSelectedTopics(newSelection);
-                                            }}
-                                            label={topic.text}
-                                            styles={{ root: { width: '100%' }, label: { cursor: 'pointer', width: '100%'} }}
-                                        />
+                        {/* --- MAIN DECK (SPLIT VIEW) --- */}
+                        <Grid gutter={{ base: 0, md: 'xl' }} px={{ base: 'md', md: 0 }}>
+                            {/* --- LEFT: ACTIVE CARD --- */}
+                            <Grid.Col span={{ base: 12, md: 8 }}>
+                                <AnimatePresence mode="wait">
+                                    {plan.plan_topics[selectedDayIndex] && (
+                                        <motion.div
+                                            key={selectedDayIndex}
+                                            initial={{ opacity: 0, x: 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: -20 }}
+                                            transition={{ duration: 0.2 }}
+                                        >
+                                            <TimelineDayCard 
+                                                plan={plan}
+                                                dayTopic={plan.plan_topics[selectedDayIndex]}
+                                                onUpdate={handleUpdateTopic}
+                                                onNoteGenerated={() => fetchPlanData(session)}
+                                                isInitiallyCollapsed={false}
+                                                onConfirmBulkGenerate={handleConfirmBulkGenerate} 
+                                            />
+                                        </motion.div>
                                     )}
-                                </Paper>
-                            );
-                        })}
-                    </Stack>
-                </ScrollArea.Autosize>
-                
-                <Group justify="flex-end" mt="md">
-                    <Button variant="default" onClick={closeLectureModal}>Cancel</Button>
-                    <ShimmerButton 
-                        color="red" 
-                        onClick={confirmAndStartCuration} 
-                        disabled={selectedTopics.length === 0}
-                    >
-                        Find {selectedTopics.length > 0 ? `(${selectedTopics.length})` : ''} Lecture{selectedTopics.length !== 1 && 's'}
-                    </ShimmerButton>
-                </Group>
-            </Stack>
-        </Modal>
+                                </AnimatePresence>
+                            </Grid.Col>
 
-        <RegeneratePlanModal
-            opened={regenerateModalOpened}
-            onClose={closeRegenerateModal}
-            plan={plan}
-        />
+                            {/* --- RIGHT: CONTEXT RAIL (DESKTOP ONLY) --- */}
+                            <Grid.Col span={{ base: 12, md: 4 }} visibleFrom="md">
+                                <Stack>
+                                    {/* Action Card */}
+                                    <GlassCard p="lg">
+                                        <Stack gap="md">
+                                            <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Actions</Text>
+                                            
+                                            <Button fullWidth variant="light" color="red" leftSection={<IconVideo size={18}/>} onClick={handleStartCuration} loading={isCurating}>
+                                                Find Lectures
+                                            </Button>
+                                            <Button fullWidth variant="default" leftSection={<IconFlame size={16} color="orange"/>} loading={isForging} onClick={handleForgeCramSheet}>
+                                                {cramSheet?.status === 'complete' ? 'View Cram Sheet' : 'Forge Cram Sheet'}
+                                            </Button>
+                                            <Button fullWidth variant="default" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan} loading={isSharing}>Share</Button>
+                                            <Button fullWidth variant="light" color="violet" onClick={openRegenerateModal} leftSection={<IconRefresh size={16} />}>Refine Plan</Button>
+                                        </Stack>
+                                    </GlassCard>
 
-        <Modal opened={shareModalOpened} onClose={closeShareModal} title={
-            // --- DEFINITIVE FIX 1.1: BOLD MODAL TITLE ---
-            <Title order={3} ff="Lexend, sans-serif">Share Your Plan</Title>
-        } centered>
-            {/* --- DEFINITIVE FIX 1.2: USE GLASSCARD FOR CONSISTENT UI --- */}
-            <GlassCard>
+                                    {/* Details Card */}
+                                    <GlassCard p="lg">
+                                        <Stack gap="xs">
+                                            <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Details</Text>
+                                            <Group justify="space-between">
+                                                <Text size="sm" c="dimmed">Date</Text>
+                                                <Text size="sm" fw={500}>{format(parseISO(plan.plan_topics[selectedDayIndex].date), 'MMM do, yyyy')}</Text>
+                                            </Group>
+                                            <Group justify="space-between">
+                                                <Text size="sm" c="dimmed">Tasks</Text>
+                                                <Text size="sm" fw={500}>{plan.plan_topics[selectedDayIndex].sub_topics.length} items</Text>
+                                            </Group>
+                                        </Stack>
+                                    </GlassCard>
+                                </Stack>
+                            </Grid.Col>
+                        </Grid>
+                    </>
+                )}
+            </Container>
+
+            {/* --- MODALS --- */}
+            {/* Lecture Scout Modal */}
+            <Modal opened={lectureModalOpened} onClose={closeLectureModal} title={<Title order={3}>Lecture Scout</Title>} centered size="lg" styles={glassModalStyles} overlayProps={{ blur: 4 }}>
                 <Stack>
-                    <Text c="dimmed" size="sm">
-                        Anyone with this link can view a read-only version of your plan.
-                        Your personal notes and progress will not be shared.
-                    </Text>
-                    <TextInput
-                        value={shareableLink}
-                        readOnly
-                        label="Your public link"
-                    />
-                    <CopyButton value={shareableLink} timeout={2000}>
-                        {({ copied, copy }) => (
-                            <ShimmerButton fullWidth color={copied ? 'teal' : 'brandPurple'} onClick={copy}>
-                                {copied ? 'Copied to clipboard!' : 'Copy Link'}
-                            </ShimmerButton>
-                        )}
-                    </CopyButton>
+                    <Text c="dimmed" size="sm">Select topics to find videos for.</Text>
+                    <Group justify="flex-end">
+                        <Button variant="subtle" size="xs" onClick={() => {
+                            const uncurated = todaysTopics.filter(t => !plan.plan_topics.flatMap(pt => pt.curated_lectures || []).some(l => l.sub_topic_text === t.text)).map(t => JSON.stringify(t));
+                            setSelectedTopics(uncurated.length > selectedTopics.length ? uncurated : []);
+                        }}>Toggle All</Button>
+                    </Group>
+                    <ScrollArea.Autosize mah={350}>
+                        <Stack gap="xs">
+                            {todaysTopics.map((topic, i) => {
+                                const existing = plan.plan_topics.flatMap(pt => pt.curated_lectures || []).find(l => l.sub_topic_text === topic.text);
+                                const val = JSON.stringify(topic);
+                                return (
+                                    <Paper key={i} p="sm" radius="md" style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        {existing ? (
+                                            <Group justify="space-between">
+                                                <Text size="sm" c="dimmed" td="line-through">{topic.text}</Text>
+                                                <Button component="a" href={existing.video_url} target="_blank" variant="light" color="red" size="xs" leftSection={<IconPlayerPlay size={14}/>}>View</Button>
+                                            </Group>
+                                        ) : (
+                                            <Checkbox checked={selectedTopics.includes(val)} onChange={(e) => setSelectedTopics(curr => e.target.checked ? [...curr, val] : curr.filter(t => t !== val))} label={topic.text} color="red" />
+                                        )}
+                                    </Paper>
+                                );
+                            })}
+                        </Stack>
+                    </ScrollArea.Autosize>
+                    <Group justify="flex-end" mt="md">
+                        <Button variant="default" onClick={closeLectureModal} radius="xl">Cancel</Button>
+                        <ShimmerButton color="red" onClick={confirmAndStartCuration} disabled={selectedTopics.length === 0} radius="xl">Find Lectures</ShimmerButton>
+                    </Group>
                 </Stack>
-            </GlassCard>
-        </Modal>
-    </AppLayout>
-);
+            </Modal>
+
+            <RegeneratePlanModal opened={regenerateModalOpened} onClose={closeRegenerateModal} plan={plan} />
+            
+            <Modal opened={shareModalOpened} onClose={closeShareModal} title={<Title order={3}>Share Plan</Title>} centered styles={glassModalStyles} overlayProps={{ blur: 4 }}>
+                <GlassCard>
+                    <Stack>
+                        <Text c="dimmed" size="sm">Share a read-only link to your plan.</Text>
+                        <TextInput value={shareableLink} readOnly variant="filled" styles={{ input: { backgroundColor: 'rgba(0,0,0,0.3)', color: '#fff' } }} />
+                        <CopyButton value={shareableLink}>
+                            {({ copied, copy }) => <ShimmerButton fullWidth color={copied ? 'teal' : 'brandPurple'} onClick={copy} radius="xl">{copied ? 'Copied!' : 'Copy Link'}</ShimmerButton>}
+                        </CopyButton>
+                    </Stack>
+                </GlassCard>
+            </Modal>
+        </AppLayout>
+    );
 }

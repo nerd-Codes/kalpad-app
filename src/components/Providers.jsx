@@ -6,6 +6,7 @@ import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
 import '@mantine/core/styles.css'; // Ensure base styles are always included
 import { OnboardingProvider } from '@/context/OnboardingContext';
+import { GuestProvider } from '@/context/GuestContext'; // --- NEW IMPORT ---
 
 import { BackgroundBlobs } from "@/components/BackgroundBlobs";
 import { PageLoader } from "@/components/PageLoader";
@@ -68,23 +69,26 @@ export function Providers({ children, variant = 'app', colorScheme = 'dark' }) {
   return (
     <LoadingProvider>
       <MantineProvider theme={theme} defaultColorScheme={colorScheme}>
-        <OnboardingProvider>
-        <PostHogProvider>
-          <style>{`
-            @media (max-width: 768px) {
-              .mantine-Notifications-root {
-                top: var(--mantine-spacing-md) !important;
-                right: var(--mantine-spacing-md) !important;
-                bottom: auto !important; left: auto !important;
-                width: calc(100% - var(--mantine-spacing-md) * 2);
-              }
-            }
-          `}</style>
-          <Notifications zIndex={2000} />
-          <BackgroundBlobs />
-          <AppContent>{children}</AppContent>
-        </PostHogProvider>
-        </OnboardingProvider>
+        {/* --- WRAP APP WITH GUEST PROVIDER --- */}
+        <GuestProvider> 
+            <OnboardingProvider>
+                <PostHogProvider>
+                <style>{`
+                    @media (max-width: 768px) {
+                    .mantine-Notifications-root {
+                        top: var(--mantine-spacing-md) !important;
+                        right: var(--mantine-spacing-md) !important;
+                        bottom: auto !important; left: auto !important;
+                        width: calc(100% - var(--mantine-spacing-md) * 2);
+                    }
+                    }
+                `}</style>
+                <Notifications zIndex={2000} />
+                <BackgroundBlobs />
+                <AppContent>{children}</AppContent>
+                </PostHogProvider>
+            </OnboardingProvider>
+        </GuestProvider>
       </MantineProvider>
     </LoadingProvider>
   );

@@ -1,17 +1,22 @@
 // src/app/sign-up/page.js
 "use client";
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import supabase from '@/lib/supabaseClient';
 import Link from 'next/link';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 
 // Mantine & UI Imports
-import { Container, Title, Text, TextInput, PasswordInput, Button, Group, Divider, Alert, Anchor, Popover, Progress, Box } from '@mantine/core';
-import { IconMail, IconLock, IconUser, IconBrandGoogle, IconCheck, IconX } from '@tabler/icons-react';
+import { Container, Title, Text, TextInput, PasswordInput, Button, Group, Divider, Alert, Anchor, Popover, Progress, Box, Stack } from '@mantine/core';
+import { IconMail, IconLock, IconUser, IconBrandGoogle, IconArrowLeft, IconCheck, IconX } from '@tabler/icons-react';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { GlassCard } from '@/components/GlassCard';
+import { Interactive } from '@/components/Interactive';
 import { PasswordRequirement } from '@/components/auth/PasswordRequirement';
+import { useGuest } from '@/context/GuestContext'; // Integration for Guest Mode
 
+// --- PASSWORD LOGIC ---
 const requirements = [
   { re: /[0-9]/, label: 'Includes number' },
   { re: /[a-z]/, label: 'Includes lowercase letter' },
@@ -27,107 +32,278 @@ function getStrength(password) {
   return Math.max(100 - (100 / (requirements.length + 1)) * multiplier, 0);
 }
 
+// --- SUB-COMPONENT: BACKGROUND (Shared aesthetic) ---
+function AuthBackground() {
+    return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', backgroundColor: '#050505' }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 100%, #1a1025 0%, #000000 70%)' }} />
+            <motion.div
+                animate={{ opacity: [0.3, 0.5, 0.3], scale: [1, 1.2, 1] }}
+                transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+                style={{
+                    position: 'absolute', bottom: '-20%', right: '-10%',
+                    width: '60vw', height: '60vw', borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(52, 211, 153, 0.15), transparent 70%)', // Subtle Green hint for "New"
+                    filter: 'blur(80px)'
+                }}
+            />
+            <div style={{ 
+                position: 'absolute', inset: 0, opacity: 0.3,
+                backgroundImage: 'radial-gradient(white 1px, transparent 1px)',
+                backgroundSize: '40px 40px',
+                maskImage: 'linear-gradient(to top, black, transparent)'
+            }} />
+        </div>
+    );
+}
+
 export default function SignUpPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [popoverOpened, setPopoverOpened] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const { guestArtifact, clearGuestArtifact } = useGuest(); // Guest Context
 
-  const checks = requirements.map((requirement, index) => (
-    <PasswordRequirement key={index} label={requirement.label} meets={requirement.re.test(password)} />
-  ));
-  const strength = getStrength(password);
-  const color = strength === 100 ? 'teal' : strength > 50 ? 'yellow' : 'red';
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [popoverOpened, setPopoverOpened] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [isAndroidApp, setIsAndroidApp] = useState(false);
 
-  const handleEmailSignUp = async (e) => {
-    e.preventDefault();
-    if (strength !== 100) {
-        setError("Password does not meet all requirements.");
-        return;
+    // --- 3D TILT PHYSICS ---
+    const x = useMotionValue(200);
+    const y = useMotionValue(200);
+    const rotateX = useTransform(y, [0, 600], [5, -5]); // Slightly reduced intensity for taller card
+    const rotateY = useTransform(x, [0, 400], [-5, 5]);
+
+    function handleMouse(event) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        x.set(event.clientX - rect.left);
+        y.set(event.clientY - rect.top);
     }
-    setLoading(true);
-    setError('');
-    setSuccess('');
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-            emailRedirectTo: `${window.location.origin}/sign-in`,
+
+    // --- INITIALIZATION ---
+    useEffect(() => {
+        if (typeof window !== 'undefined' && navigator.userAgent.includes('KalPad-Android-App')) {
+            setIsAndroidApp(true);
         }
-      });
-      if (error) throw error;
-      setSuccess("Success! Please check your email to verify your account.");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    }, []);
+
+    // --- GUEST SYNC LOGIC ---
+    useEffect(() => {
+        const syncGuestData = async () => {
+            const hasIntent = searchParams.get('intent') === 'guest_sync';
+            if (hasIntent && guestArtifact) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    setLoading(true);
+                    try {
+                        const res = await fetch('/api/sync-guest-data', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(guestArtifact)
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            clearGuestArtifact();
+                            router.push(`/plan/${data.planId}`);
+                        } else {
+                            throw new Error("Sync failed");
+                        }
+                    } catch (e) {
+                        console.error("Sync error:", e);
+                        router.push('/dashboard');
+                    } finally {
+                        setLoading(false);
+                    }
+                }
+            }
+        };
+        syncGuestData();
+    }, [searchParams, guestArtifact]);
+
+    // --- HANDLERS ---
+    const checks = requirements.map((requirement, index) => (
+        <PasswordRequirement key={index} label={requirement.label} meets={requirement.re.test(password)} />
+    ));
+    const strength = getStrength(password);
+    const color = strength === 100 ? 'teal' : strength > 50 ? 'yellow' : 'red';
+
+    const handleEmailSignUp = async (e) => {
+        e.preventDefault();
+        if (strength !== 100) {
+            setError("Password does not meet all requirements.");
+            return;
+        }
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const { error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: { emailRedirectTo: `${window.location.origin}/sign-in` }
+            });
+            if (error) throw error;
+            setSuccess("Success! Please check your email to verify your account.");
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
   
-  // --- THIS IS THE FIX: The missing Google Sign-In handler ---
-  const handleGoogleSignIn = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-      },
-    });
-  };
+    const handleGoogleSignIn = async () => {
+        await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: `${window.location.origin}/dashboard` },
+        });
+    };
 
-  return (
-    <Container size="xs" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100vh' }}>
-        <Title ta="center">Create an Account</Title>
-        <Text c="dimmed" ta="center" mt="xs" mb={30}>
-            Already have an account?{' '}
-            <Anchor component={Link} href="/sign-in">Sign in</Anchor>
-        </Text>
+    // --- STYLES ---
+    const inputStyles = {
+        input: { 
+            backgroundColor: 'rgba(0, 0, 0, 0.3)', 
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            color: 'white',
+            borderRadius: '12px',
+            padding: '24px 16px 24px 50px', // Corrected padding for icons
+            transition: 'all 0.2s ease',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
+            '&:focus': {
+                borderColor: '#BF5AF2',
+                boxShadow: '0 0 0 1px #BF5AF2, inset 0 2px 4px rgba(0,0,0,0.5)'
+            }
+        },
+        label: { color: 'rgba(255,255,255,0.6)', marginBottom: '8px', fontSize: '0.9rem' }
+    };
 
-        <GlassCard>
-            {error && <Alert color="red" title="Sign Up Failed" mb="md" withCloseButton onClose={() => setError('')}>{error}</Alert>}
-            {success && <Alert color="green" title="Success!" mb="md">{success}</Alert>}
+    return (
+        <Box 
+            style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+            onMouseMove={handleMouse}
+        >
+            <AuthBackground />
 
-            {!success && (
-              <form onSubmit={handleEmailSignUp}>
-                  <TextInput leftSection={<IconUser size={16} />} label="Full Name (Optional)" placeholder="Your name" />
-                  <TextInput leftSection={<IconMail size={16} />} mt="md" label="Email" placeholder="you@kalpad.ai" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                  
-                  <Popover opened={popoverOpened} position="bottom" width="target" transitionProps={{ transition: 'pop' }}>
-                      <Popover.Target>
-                          <div onFocusCapture={() => setPopoverOpened(true)} onBlurCapture={() => setPopoverOpened(false)}>
-                              <PasswordInput
-                                  leftSection={<IconLock size={16} />}
-                                  mt="md"
-                                  label="Password"
-                                  placeholder="Your password"
-                                  value={password}
-                                  onChange={(event) => setPassword(event.currentTarget.value)}
-                                  required
-                              />
-                          </div>
-                      </Popover.Target>
-                      <Popover.Dropdown>
-                          <Progress color={color} value={strength} size={5} mb="sm" />
-                          <PasswordRequirement label="Has at least 8 characters" meets={password.length > 7} />
-                          {checks}
-                      </Popover.Dropdown>
-                  </Popover>
+            <div style={{ position: 'absolute', top: 40, left: 40, zIndex: 20 }}>
+                <Interactive>
+                    <Link href="/" style={{ textDecoration: 'none', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <IconArrowLeft size={20} /> <Text size="sm">Back to Base</Text>
+                    </Link>
+                </Interactive>
+            </div>
 
-                  <ShimmerButton type="submit" fullWidth mt="xl" size="md" color="brandPurple" loading={loading}>
-                      Create Account
-                  </ShimmerButton>
-              </form>
-            )}
+            <Container size="xs" style={{ width: '100%', maxWidth: '440px', position: 'relative', zIndex: 10, perspective: 1000 }}>
+                <motion.div
+                    style={{ rotateX, rotateY }}
+                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                >
+                    <GlassCard 
+                        p={40}
+                        style={{
+                            backdropFilter: 'blur(40px) saturate(150%)',
+                            backgroundColor: 'rgba(20, 20, 25, 0.65)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.7)'
+                        }}
+                    >
+                        <Stack gap="xl">
+                            {/* Header */}
+                            <div className="text-center">
+                                <Title order={2} className="apple-text-gradient" style={{ fontSize: '2rem', letterSpacing: '-0.03em' }}>
+                                    Initialize Identity
+                                </Title>
+                                <Text c="dimmed" size="sm" mt={4}>
+                                    Create your secure profile.
+                                </Text>
+                            </div>
 
-            <Divider label="Or" labelPosition="center" my="lg" />
+                            {error && <Alert color="red" variant="light" title="Registration Failed" withCloseButton onClose={() => setError('')} icon={<IconX/>}>{error}</Alert>}
+                            {success && <Alert color="green" variant="light" title="Verify Email" icon={<IconCheck/>}>{success}</Alert>}
 
-            <Button fullWidth variant="default" leftSection={<IconBrandGoogle size={18} />} onClick={handleGoogleSignIn}>
-                Sign up with Google
-            </Button>
-        </GlassCard>
-    </Container>
-  );
+                            {!success && (
+                                <form onSubmit={handleEmailSignUp}>
+                                    <Stack gap="md">
+                                        <TextInput 
+                                            label="Full Name (Optional)" 
+                                            placeholder="Your name" 
+                                            leftSection={<IconUser size={18} color="gray" />}
+                                            styles={inputStyles}
+                                        />
+                                        <TextInput 
+                                            label="Email Credentials" 
+                                            placeholder="you@kalpad.ai" 
+                                            leftSection={<IconMail size={18} color="gray" />}
+                                            value={email} onChange={(e) => setEmail(e.target.value)} 
+                                            required 
+                                            styles={inputStyles}
+                                        />
+                                        
+                                        <Popover opened={popoverOpened} position="bottom" width="target" transitionProps={{ transition: 'pop' }}>
+                                            <Popover.Target>
+                                                <div onFocusCapture={() => setPopoverOpened(true)} onBlurCapture={() => setPopoverOpened(false)}>
+                                                    <PasswordInput
+                                                        label="Passcode"
+                                                        placeholder="Create password"
+                                                        leftSection={<IconLock size={18} color="gray" />}
+                                                        value={password}
+                                                        onChange={(event) => setPassword(event.currentTarget.value)}
+                                                        required
+                                                        styles={inputStyles}
+                                                    />
+                                                </div>
+                                            </Popover.Target>
+                                            <Popover.Dropdown style={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E' }}>
+                                                <Progress color={color} value={strength} size={6} mb="sm" radius="xl" />
+                                                <PasswordRequirement label="At least 8 chars" meets={password.length > 7} />
+                                                {checks}
+                                            </Popover.Dropdown>
+                                        </Popover>
+
+                                        <Interactive>
+                                            <ShimmerButton type="submit" fullWidth size="lg" radius="xl" loading={loading} style={{ marginTop: 8 }}>
+                                                Create Account
+                                            </ShimmerButton>
+                                        </Interactive>
+                                    </Stack>
+                                </form>
+                            )}
+
+                            {!isAndroidApp && !success && (
+                                <>
+                                    <Divider label="OR" labelPosition="center" color="rgba(255,255,255,0.1)" />
+                                    <Interactive>
+                                        <Button 
+                                            fullWidth 
+                                            variant="default" 
+                                            size="lg" 
+                                            radius="xl"
+                                            leftSection={<IconBrandGoogle size={20} />} 
+                                            onClick={handleGoogleSignIn}
+                                            style={{
+                                                backgroundColor: 'rgba(255,255,255,0.05)',
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                color: 'white'
+                                            }}
+                                        >
+                                            Sign up with Google
+                                        </Button>
+                                    </Interactive>
+                                </>
+                            )}
+
+                            <Text c="dimmed" size="xs" ta="center">
+                                Already have an identity? {' '}
+                                <Anchor component={Link} href="/sign-in" c="brandPurple" fw={600}>
+                                    Access Terminal
+                                </Anchor>
+                            </Text>
+                        </Stack>
+                    </GlassCard>
+                </motion.div>
+            </Container>
+        </Box>
+    );
 }

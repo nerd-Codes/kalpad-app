@@ -15,27 +15,22 @@ export function PageLoader({ isLoading }) {
 
   useEffect(() => {
     if (isLoading) {
-      // 1. Immediately reset state and set the initial fact for the cycle
       setShowFact(false);
       setFactIndex(Math.floor(Math.random() * wittyFacts.length));
       
-      // 2. Schedule the witty fact to appear after 5 seconds
       timeoutRef.current = setTimeout(() => {
         setShowFact(true);
-      }, 5000);
+      }, 3000); // Faster initial feedback (3s instead of 5s)
 
-      // 3. Start the interval to cycle through subsequent facts
       intervalRef.current = setInterval(() => {
         setFactIndex(prevIndex => (prevIndex + 1) % wittyFacts.length);
       }, 5000);
 
     } else {
-      // If the loader is hidden early, clear all timers to prevent state updates
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
 
-    // Main cleanup function for when the component unmounts
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -49,33 +44,62 @@ export function PageLoader({ isLoading }) {
       {isLoading && (
         <motion.div
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1, transition: { duration: 0.3, ease: "easeInOut" } }}
-          exit={{ opacity: 0, transition: { duration: 0.3, ease: "easeInOut" } }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4, ease: "easeInOut" }}
           className={classes.loaderOverlay}
         >
-          <div className={classes.content}>
-            {/* The floating logo animation appears immediately via CSS */}
-            <div className={classes.logo}>
+            {/* 1. THE BREATHING ORB (Ambient Glow) */}
+            <motion.div
+                style={{
+                    position: 'absolute',
+                    width: '300px',
+                    height: '300px',
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(191, 90, 242, 0.4) 0%, rgba(94, 92, 230, 0.1) 60%, transparent 80%)',
+                    filter: 'blur(60px)',
+                    zIndex: 1,
+                }}
+                animate={{ 
+                    scale: [1, 1.2, 1],
+                    opacity: [0.5, 0.8, 0.5],
+                }}
+                transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                }}
+            />
+
+            {/* 2. THE SHIMMERING LOGO */}
+            <div className={classes.shimmerText}>
               KalPad
             </div>
             
-            {/* This container ensures the layout is stable and reserves space */}
-            <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+            {/* 3. THE FACT PILL (Conditional) */}
+            <div style={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, width: '100%' }}>
               <AnimatePresence mode="wait">
-                {/* The witty fact is conditionally rendered after 5 seconds */}
                 {showFact && (
                   <motion.div
                     key={fact}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } }}
-                    exit={{ opacity: 0, y: -10, transition: { duration: 0.4, ease: 'easeIn' } }}
+                    className={classes.glassPill}
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
                   >
-                    <Text c="dimmed" ta="center">{fact}</Text>
+                    <Text 
+                        c="dimmed" 
+                        size="sm" 
+                        fw={500} 
+                        style={{ fontFamily: 'var(--font-inter)', color: 'rgba(255,255,255,0.8)' }}
+                    >
+                        {fact}
+                    </Text>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
-          </div>
         </motion.div>
       )}
     </AnimatePresence>

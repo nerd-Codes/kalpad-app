@@ -1,65 +1,158 @@
-// src/components/landing/personality/Devlog.jsx
 "use client";
 
-import { Container, Title, Text, Stack, Divider } from '@mantine/core';
-import ReactMarkdown from 'react-markdown';
+import { Container, Title, Text, Stack, Box, Badge, Group } from '@mantine/core';
+import { motion } from 'framer-motion';
+import { IconGitCommit, IconCpu, IconDeviceMobile, IconBroadcast } from '@tabler/icons-react';
+import { GlassCard } from '../../GlassCard'; 
 
-// The markdown component remains the same
-const markdownComponents = {
-    strong: ({ children }) => <Text component="span" fw={700} c="white">{children}</Text>,
-};
+// --- DATA: THE EVOLUTION ---
+const LOGS = [
+    {
+        id: 'v1',
+        version: 'v1.0 :: GENESIS',
+        title: 'The Strategist',
+        description: 'First constitutional AI deployed. Capable of ruthless syllabus triage and ROI calculation.',
+        align: 'left',
+        icon: IconCpu,
+        color: '#34d399', // Green
+        status: 'DEPLOYED'
+    },
+    {
+        id: 'v2',
+        version: 'v2.0 :: HIVE MIND',
+        title: 'The Mentor Engine',
+        description: 'Multi-modal RAG integrated. The system now "sees" your diagrams and "reads" your chaotic handwriting.',
+        align: 'right',
+        icon: IconGitCommit,
+        color: '#bf5af2', // Purple
+        status: 'DEPLOYED'
+    },
+    {
+        id: 'v3',
+        version: 'v3.0 :: NEURAL LINK',
+        title: 'Native Android Interface',
+        description: 'Forging a dedicated mobile uplink. Offline caching, haptic study timers, and persistent "Focus Mode".',
+        align: 'left',
+        icon: IconDeviceMobile,
+        color: '#f59e0b', // Orange
+        status: 'COMPILING...' // Active dev state
+    }
+];
+
+// --- SUB-COMPONENT: TIMELINE NODE ---
+function LogNode({ log, index }) {
+    const isLeft = log.align === 'left';
+    return (
+        <div className={`flex flex-col md:flex-row items-center justify-between w-full mb-16 ${isLeft ? 'md:flex-row-reverse' : ''}`}>
+            
+            {/* 1. Spacer for opposite side */}
+            <div className="hidden md:block w-5/12" />
+
+            {/* 2. The Center Node (Mobile: Hidden or simplified) */}
+            <div className="absolute left-4 md:left-1/2 transform md:-translate-x-1/2 flex flex-col items-center z-10">
+                <motion.div
+                    initial={{ scale: 0 }}
+                    whileInView={{ scale: 1 }}
+                    transition={{ delay: 0.2 }}
+                    style={{
+                        width: '16px', height: '16px', borderRadius: '50%',
+                        backgroundColor: '#000', border: `2px solid ${log.color}`,
+                        boxShadow: `0 0 15px ${log.color}`
+                    }}
+                />
+            </div>
+
+            {/* 3. The Content Card */}
+            <motion.div
+                initial={{ opacity: 0, x: isLeft ? -50 : 50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6 }}
+                viewport={{ margin: "-100px" }}
+                className="w-full pl-12 md:pl-0 md:w-5/12"
+            >
+                <GlassCard 
+                    p="lg"
+                    style={{
+                        backgroundColor: 'rgba(20, 20, 25, 0.6)',
+                        border: `1px solid ${log.color}20`,
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Status Strip */}
+                    <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', backgroundColor: log.color }} />
+                    
+                    <Stack gap="xs">
+                        <Group justify="space-between">
+                            <Text size="xs" ff="monospace" c={log.color} style={{ letterSpacing: '0.1em' }}>
+                                [{log.version}]
+                            </Text>
+                            {log.status === 'COMPILING...' && (
+                                <Badge variant="filled" color="orange" size="xs" radius="sm" className="animate-pulse">
+                                    BUILDING
+                                </Badge>
+                            )}
+                        </Group>
+                        <Group gap="sm">
+                            <log.icon size={20} color="white" />
+                            <Title order={4} ff="Lexend" c="white" size="h4">{log.title}</Title>
+                        </Group>
+                        <Text size="sm" c="dimmed" lh={1.5}>
+                            {log.description}
+                        </Text>
+                    </Stack>
+                </GlassCard>
+            </motion.div>
+        </div>
+    );
+}
 
 export function Devlog() {
-    // --- MODIFICATION: The new story of the "Mentor Engine" ---
-    const latestUpdateText = "Our AI mentor just evolved. It's not one-size-fits-all anymore; it's a squad of specialists. Choose your weapon: the **'Balanced' Strategist** for a ruthless, high-ROI plan, or the **'Hardcore' Drill Sergeant** for a relentless 100% coverage march. And we gave the entire crew a new secret weapon: the **AI Doubt Solver.** Highlight any sentence in your notes, and our new Groq-powered tutor will give you a brutally honest explanation in a fraction of a second. The genius just got faster.";
-    // --- MODIFICATION: Setting the stage for the Notes V2 overhaul ---
-    const upNextText = "The engine is built. Now, we're putting it in your pocket. The native **Android App** is being forged in the fires of Mount Doom, designed from the ground up to be the Mission Control for your entire academic life. And to make sure you're battle-ready from day one, we're designing a new **'First Mission' onboarding experience.** No boring tooltips. Just a fast, interactive tutorial that helps you launch your first plan and unleash the full power of your new AI co-founder.";
     return (
-        <div style={{
-            position: 'relative',
-            background: 'radial-gradient(ellipse at 50% 50%, rgba(25, 20, 40, 1) 0%, rgba(10, 10, 20, 1) 100%)',
-        }}>
-            <Container size="md" py={{ base: 80, md: 120 }}>
-                <Stack align="center" ta="center">
-                    <Title order={2} ff="Lexend, sans-serif" fz={{ base: '2rem', sm: '2.5rem' }}>
-                        A feature so new, it still has that "new bug" smell.
+        <Box py={{ base: 100, md: 160 }} style={{ position: 'relative', zIndex: 10 }}>
+            <Container size="lg">
+                
+                {/* --- HEADER --- */}
+                <Stack align="center" ta="center" gap="md" mb={100}>
+                    <Group gap="xs" style={{ opacity: 0.7 }}>
+                        <IconBroadcast size={18} className="text-purple-400" />
+                        <Text size="xs" ff="monospace" c="dimmed" tt="uppercase" style={{ letterSpacing: '0.2em' }}>
+                            LIVE TRANSMISSION
+                        </Text>
+                    </Group>
+                    <Title 
+                        order={2} 
+                        className="apple-text-gradient"
+                        style={{ 
+                            fontFamily: 'var(--font-lexend)', 
+                            fontSize: 'clamp(2.5rem, 5vw, 4rem)', 
+                            letterSpacing: '-0.03em',
+                            lineHeight: 1.1
+                        }}
+                    >
+                        Built in Public.<br/>Forged in Chaos.
                     </Title>
-                    
-                    <Stack mt={60} gap={50} w="100%">
-                        {/* --- LATEST UPDATE SECTION --- */}
-                        <Stack align="center" ta="center">
-                            <Text fz={60}>🧠</Text>
-                            {/* --- MODIFICATION: New headline for the update --- */}
-                            <Title order={3} ff="Lexend, sans-serif">Now Live: The Mentor Engine Upgrade</Title>
-                            <Text c="dimmed" size="lg" lh={1.7}>
-                                <ReactMarkdown components={markdownComponents}>
-                                    {latestUpdateText}
-                                </ReactMarkdown>
-                            </Text>
-                        </Stack>
-
-                        <Divider
-                            my="xl"
-                            variant="dashed"
-                            labelPosition="center"
-                            label={
-                                <Text fz={40}>👇</Text>
-                            }
-                        />
-
-                        {/* --- UP NEXT SECTION --- */}
-                        <Stack align="center" ta="center">
-                            <Text fz={60}>🛠️</Text>
-                            <Title order={3} ff="Lexend, sans-serif">Being Forged in the Fires of Mount Doom</Title>
-                             <Text c="dimmed" size="lg" lh={1.7}>
-                                <ReactMarkdown components={markdownComponents}>
-                                    {upNextText}
-                                </ReactMarkdown>
-                            </Text>
-                        </Stack>
-                    </Stack>
                 </Stack>
+
+                {/* --- THE TIMELINE --- */}
+                <Box style={{ position: 'relative' }}>
+                    {/* The Center Line */}
+                    <div 
+                        className="absolute left-4 md:left-1/2 transform md:-translate-x-1/2 h-full w-px"
+                        style={{ 
+                            background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.2) 80%, transparent)',
+                            zIndex: 0
+                        }} 
+                    />
+                    
+                    <Stack gap={0}>
+                        {LOGS.map((log, i) => (
+                            <LogNode key={log.id} log={log} index={i} />
+                        ))}
+                    </Stack>
+                </Box>
+
             </Container>
-        </div>
+        </Box>
     );
 }

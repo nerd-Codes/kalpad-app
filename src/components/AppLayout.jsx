@@ -1,67 +1,32 @@
 // src/components/AppLayout.jsx
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { AppShell, Burger, Group, NavLink, Text, Menu, Avatar, rem, UnstyledButton, ActionIcon, Stack, Title, Paper, SimpleGrid, Box } from '@mantine/core';
-import { useDisclosure, useMediaQuery } from '@mantine/hooks';
+import { useState, useEffect } from 'react';
+import { Title, Text, Avatar, Group, Stack, Box, Menu, SimpleGrid, UnstyledButton } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLoading } from '@/context/LoadingContext';
 import supabase from '@/lib/supabaseClient';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { OnboardingTour } from './OnboardingTour';
-import { AnimatePresence, motion } from 'framer-motion'; // <-- DEFINITIVE ADDITION #1: Import animation tools
+import { AnimatePresence, motion } from 'framer-motion';
 import { 
     IconLayoutDashboard, 
     IconFileText, 
     IconPlus, 
     IconUser, 
     IconLogout,
-    IconChevronRight,
-    IconChevronLeft,
-    IconSettings,
     IconChartBar,
+    IconSettings,
 } from '@tabler/icons-react';
-
 import onboardingSteps from '@/lib/onboardingSteps';
 
-// --- SUB-COMPONENT: UserButton (Unchanged) ---
-function UserButton({ user, desktopOpened, onSignOut }) {
-    // ... (This component's code is unchanged)
-    const userInitials = user?.email?.substring(0, 2).toUpperCase() || 'KP';
-    return (
-        <Menu shadow="md" width={220} position="top-end" withArrow>
-            <Menu.Target>
-                <UnstyledButton
-                    style={(theme) => ({
-                        display: 'block', width: '100%', padding: theme.spacing.md,
-                        color: theme.colors.dark[0], borderRadius: theme.radius.md,
-                        '&:hover': { backgroundColor: theme.colors.dark[5] },
-                    })}
-                >
-                    <Group>
-                        <Avatar color="brandPurple" radius="xl">{userInitials}</Avatar>
-                        {desktopOpened && (
-                            <div style={{ flex: 1 }}>
-                                <Text size="sm" fw={500}>{user?.email?.split('@')[0]}</Text>
-                                <Text c="dimmed" size="xs">Student</Text>
-                            </div>
-                        )}
-                    </Group>
-                </UnstyledButton>
-            </Menu.Target>
-            <Menu.Dropdown>
-                <Menu.Item leftSection={<IconUser style={{ width: rem(14), height: rem(14) }} />} disabled>Profile</Menu.Item>
-                <Menu.Item leftSection={<IconSettings style={{ width: rem(14), height: rem(14) }} />} disabled>Settings</Menu.Item>
-                <Menu.Divider />
-                <Menu.Item color="red" leftSection={<IconLogout style={{ width: rem(14), height: rem(14) }} />} onClick={onSignOut}>Sign Out</Menu.Item>
-            </Menu.Dropdown>
-        </Menu>
-    );
-}
+// --- IMPORTS ---
+import { GlassCard } from '@/components/GlassCard';
+import { Interactive } from '@/components/Interactive';
 
-// --- SUB-COMPONENT: MainNavbar for Sidebar (Unchanged) ---
-function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
-    // ... (This component's code is unchanged)
+// --- 1. THE FLOATING SIDEBAR (DESKTOP) ---
+function FloatingSidebar({ user, onNavigate, onSignOut }) {
     const pathname = usePathname();
     const navLinks = [
         { icon: IconLayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -69,147 +34,187 @@ function MainNavbar({ desktopOpened, toggleDesktop, onNavigate }) {
         { icon: IconPlus, label: 'New Plan', href: '/new-plan', id: 'new-plan-button' },
         { icon: IconChartBar, label: 'Analytics', href: '#', disabled: true },
     ];
+
     return (
-        <Stack justify="space-between" h="100%">
-            <Stack>
-                <Group justify={desktopOpened ? 'space-between' : 'center'}>
-                    {desktopOpened && <Text size="xs" fw={700} c="dimmed">NAVIGATION</Text>}
-                    <ActionIcon onClick={toggleDesktop} variant="default" size="lg" visibleFrom="sm">
-                        {desktopOpened ? <IconChevronLeft size={18} /> : <IconChevronRight size={18} />}
-                    </ActionIcon>
-                </Group>
-                {navLinks.map((link) => (
-                    <NavLink
-                        id={link.id}
-                        key={link.label + (desktopOpened ? '-full' : '-mini')}
-                        label={desktopOpened ? link.label : null}
-                        leftSection={<link.icon size="1.25rem" stroke={1.5} />}
-                        onClick={() => {
-                            // Dispatch the event before navigating
+        <GlassCard 
+            className="fixed left-4 top-4 bottom-4 w-64 flex flex-col z-50 hidden md:flex"
+            style={{ 
+                position: 'fixed', left: '16px', top: '16px', bottom: '16px', width: '260px',
+                display: 'flex', flexDirection: 'column', padding: '24px', zIndex: 50 
+            }}
+            animate={false} // Static container
+        >
+            {/* Logo Area - TEXT ONLY as requested */}
+            <Box mb={40} px={8} pt={8}>
+                <Title order={2} className="apple-text-gradient" style={{ letterSpacing: '-0.03em', fontSize: '1.75rem' }}>
+                    KalPad
+                </Title>
+                <Text size="xs" c="dimmed" fw={500} style={{ letterSpacing: '0.1em' }} tt="uppercase">
+                    
+                </Text>
+            </Box>
+
+            {/* Navigation Links */}
+            <Stack gap="xs" style={{ flex: 1 }}>
+                <Text size="xs" fw={600} c="dimmed" px={12} mb={4} tt="uppercase" style={{ letterSpacing: '0.05em' }}>Menu</Text>
+                {navLinks.map((link) => {
+                    const isActive = pathname === link.href;
+                    return (
+                        <Interactive key={link.label} onClick={() => {
+                            if (link.disabled) return;
                             window.dispatchEvent(new CustomEvent('kalpad-onboarding-advance'));
                             onNavigate(link.href);
-                        }}
-                        active={pathname === link.href}
-                        disabled={link.disabled}
-                        variant="filled"
-                        styles={(theme) => ({
-                            root: { borderRadius: theme.radius.md, padding: rem(12), justifyContent: desktopOpened ? 'flex-start' : 'center',
-                                '&[dataActive]': {
-                                   backgroundColor: theme.colors.brandPurple[6],
-                                   color: 'white',
-                                   '&:hover': { backgroundColor: theme.colors.brandPurple[6] }
-                                },
-                             },
-                            label: { fontSize: theme.fontSizes.md, fontWeight: 500, fontFamily: 'var(--font-lexend)' },
-                        })}
-                    />
-                ))}
+                        }}>
+                            <Box
+                                id={link.id}
+                                py={10} px={12}
+                                style={{
+                                    borderRadius: '12px',
+                                    backgroundColor: isActive ? 'rgba(191, 90, 242, 0.15)' : 'transparent', // Purple tint
+                                    color: isActive ? '#BF5AF2' : 'var(--apple-text-secondary)',
+                                    display: 'flex', alignItems: 'center', gap: '12px',
+                                    transition: 'color 0.2s ease',
+                                    opacity: link.disabled ? 0.5 : 1,
+                                    cursor: link.disabled ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                <link.icon size={20} stroke={isActive ? 2 : 1.5} />
+                                <Text size="sm" fw={isActive ? 600 : 500}>{link.label}</Text>
+                            </Box>
+                        </Interactive>
+                    );
+                })}
             </Stack>
-        </Stack>
+
+            {/* User Profile (Bottom) */}
+            <Menu shadow="md" width={220} position="top-start" withArrow>
+                <Menu.Target>
+                    <Box pt={16} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                        <Interactive>
+                            <Group style={{ cursor: 'pointer', padding: '8px', borderRadius: '12px' }}>
+                                <Avatar color="violet" radius="xl" size="md">{user?.email?.substring(0, 2).toUpperCase()}</Avatar>
+                                <div style={{ flex: 1 }}>
+                                    <Text size="sm" fw={600} c="var(--apple-text-primary)" truncate>{user?.email?.split('@')[0]}</Text>
+                                    <Text size="xs" c="dimmed">Student</Text>
+                                </div>
+                                <IconSettings size={16} color="var(--apple-text-secondary)" />
+                            </Group>
+                        </Interactive>
+                    </Box>
+                </Menu.Target>
+                <Menu.Dropdown style={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E' }}>
+                    <Menu.Item leftSection={<IconUser size={14} />} disabled>Profile</Menu.Item>
+                    <Menu.Divider color="#2C2C2E" />
+                    <Menu.Item color="red" leftSection={<IconLogout size={14} />} onClick={onSignOut}>Sign Out</Menu.Item>
+                </Menu.Dropdown>
+            </Menu>
+        </GlassCard>
     );
 }
 
-// --- DEFINITIVE ADDITION: THE RE-ARCHITECTED BOTTOM NAVIGATION BAR ---
-function BottomNavbar({ user, onNavigate, onSignOut }) {
+// --- 2. THE FLUID BOTTOM SHEET (MOBILE) ---
+// Reverted to fixed bottom, full width, but upgraded materials
+function MobileNavbar({ user, onNavigate, onSignOut }) {
     const pathname = usePathname();
-    const userInitials = user?.email?.substring(0, 2).toUpperCase() || 'KP';
-    
     const navLinks = [
-        { icon: IconLayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-        { icon: IconPlus, label: 'New Plan', href: '/new-plan', id: 'new-plan-button' },
-        { icon: IconFileText, label: 'All Plans', href: '/plans' },
+        { icon: IconLayoutDashboard, label: 'Home', href: '/dashboard' },
+        { icon: IconPlus, label: 'Create', href: '/new-plan', id: 'new-plan-button' },
+        { icon: IconFileText, label: 'Plans', href: '/plans' },
     ];
 
     return (
-        <Paper 
-            p="xs" shadow="xl" radius={0}
-            style={{ position: 'fixed', bottom: 0, left: 0, right: 0,
-                backgroundColor: 'rgba(37, 38, 43, 0.8)', backdropFilter: 'blur(10px)',
-                borderTop: '1px solid var(--mantine-color-dark-5)', zIndex: 1000,
+        <Box
+            style={{ 
+                position: 'fixed', bottom: 0, left: 0, right: 0,
+                backgroundColor: 'rgba(28, 28, 30, 0.85)', // Deep, substantial dark glass
+                backdropFilter: 'blur(24px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                paddingTop: '12px',
+                paddingBottom: 'max(12px, env(safe-area-inset-bottom))', // Respect iOS Home Indicator
+                paddingLeft: '16px', paddingRight: '16px',
+                zIndex: 1000
             }}
-            hiddenFrom="sm"
         >
             <SimpleGrid cols={4} spacing={0}>
                 {navLinks.map((link) => {
                     const isActive = pathname === link.href;
                     return (
-                        <UnstyledButton id={link.id} key={link.label} onClick={() => onNavigate(link.href)}>
-                            {/* --- DEFINITIVE FIX #1: The "Purple Pill" --- */}
-                            <Box 
-                                style={{
-                                    borderRadius: 'var(--mantine-radius-md)',
-                                    padding: 'var(--mantine-spacing-xs)',
-                                    backgroundColor: isActive ? 'var(--mantine-color-brandPurple-6)' : 'transparent',
-                                    transition: 'background-color 0.2s ease',
-                                }}
-                            >
-                                <Stack align="center" gap={2}>
+                        <Interactive key={link.label} onClick={() => onNavigate(link.href)}>
+                            <Stack align="center" gap={4} id={link.id} style={{ padding: '8px' }}>
+                                {/* The Fluid Active Indicator (Purple Glow) */}
+                                <Box
+                                    style={{
+                                        position: 'relative',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        padding: '6px 20px',
+                                        borderRadius: '20px', // Soft Pill shape
+                                        backgroundColor: isActive ? 'rgba(191, 90, 242, 0.2)' : 'transparent',
+                                        transition: 'background-color 0.3s ease'
+                                    }}
+                                >
                                     <link.icon 
-                                        size="1.5rem" 
-                                        stroke={1.5} 
-                                        color={isActive ? 'white' : 'var(--mantine-color-gray-5)'}
+                                        size={22} 
+                                        stroke={isActive ? 2 : 1.5} 
+                                        color={isActive ? '#BF5AF2' : 'var(--apple-text-secondary)'} 
                                     />
-                                    <Text 
-                                        size="xs" 
-                                        c={isActive ? 'white' : 'gray.5'}
-                                    >
-                                        {link.label}
-                                    </Text>
-                                </Stack>
-                            </Box>
-                        </UnstyledButton>
+                                </Box>
+                                <Text size="10px" fw={600} c={isActive ? 'white' : 'dimmed'}>
+                                    {link.label}
+                                </Text>
+                            </Stack>
+                        </Interactive>
                     );
                 })}
-                {/* Profile Menu Button (Unchanged) */}
-                <Menu shadow="md" width={220} position="top-end" withArrow>
+
+                {/* Mobile Profile Menu */}
+                {/* Mobile Profile Menu */}
+                <Menu shadow="xl" width={200} position="top-end" withArrow offset={10}>
                     <Menu.Target>
-                        <UnstyledButton>
-                            <Box style={{ borderRadius: 'var(--mantine-radius-md)', padding: 'var(--mantine-spacing-xs)' }}>
-                                <Stack align="center" gap={2}>
-                                    <Avatar color="brandPurple" radius="xl" size="sm">{userInitials}</Avatar>
-                                    <Text size="xs" c="gray.5">Profile</Text>
-                                </Stack>
-                            </Box>
+                        {/* FIX: Replaced <Interactive> with <UnstyledButton> to pass the ref correctly for positioning */}
+                        <UnstyledButton style={{ cursor: 'pointer' }}>
+                            <Stack align="center" gap={4} style={{ padding: '8px' }}>
+                                <Box style={{ padding: '6px 20px' }}>
+                                    <Avatar 
+                                        color="violet" 
+                                        radius="xl" 
+                                        size={22} 
+                                        style={{ border: '1.5px solid rgba(255,255,255,0.2)' }}
+                                    >
+                                        {user?.email?.substring(0, 2).toUpperCase()}
+                                    </Avatar>
+                                </Box>
+                                <Text size="10px" fw={600} c="dimmed">Profile</Text>
+                            </Stack>
                         </UnstyledButton>
                     </Menu.Target>
-                    <Menu.Dropdown>
-                        <Menu.Item leftSection={<IconUser style={{ width: rem(14), height: rem(14) }} />} disabled>Profile</Menu.Item>
-                        <Menu.Divider />
-                        <Menu.Item color="red" leftSection={<IconLogout style={{ width: rem(14), height: rem(14) }} />} onClick={onSignOut}>Sign Out</Menu.Item>
+                    <Menu.Dropdown style={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E', marginBottom: '10px' }}>
+                        <Menu.Item leftSection={<IconUser size={14} />} disabled>Profile</Menu.Item>
+                        <Menu.Divider color="#2C2C2E" />
+                        <Menu.Item color="red" leftSection={<IconLogout size={14} />} onClick={onSignOut}>Sign Out</Menu.Item>
                     </Menu.Dropdown>
                 </Menu>
             </SimpleGrid>
-        </Paper>
+        </Box>
     );
 }
 
-// --- MAIN LAYOUT COMPONENT (RE-ARCHITECTED FOR ANIMATIONS) ---
-export default function AppLayout({ children, session }) {
-    const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
+// --- 3. MAIN LAYOUT ---
+export default function AppLayout({ children, session, isGuest }) {
     const router = useRouter();
     const { setIsLoading } = useLoading();
     const pathname = usePathname();
-
     const { profile, isLoading: isProfileLoading, startTour } = useOnboarding();
     const isDesktop = useMediaQuery('(min-width: 768px)'); 
 
-// REPLACE the useEffect in AppLayout.jsx with this
-useEffect(() => {
-    const firstStep = onboardingSteps[0];
-    // --- DEFINITIVE FIX: Add a check for the current pathname ---
-    if (
-        !isProfileLoading && 
-        profile && 
-        !profile.has_completed_onboarding &&
-        pathname === firstStep.route &&// Only start the tour if we are on the correct starting page
-        isDesktop 
-    ) {
-        const timer = setTimeout(() => {
-            startTour();
-        }, 1000);
-        return () => clearTimeout(timer);
-    }
-}, [isProfileLoading, profile, startTour, pathname, isDesktop]); // Add pathname to dependency array
+    // Tour Logic (Unchanged)
+    useEffect(() => {
+        const firstStep = onboardingSteps[0];
+        if (!isProfileLoading && profile && !profile.has_completed_onboarding && pathname === firstStep.route && isDesktop) {
+            const timer = setTimeout(() => { startTour(); }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [isProfileLoading, profile, startTour, pathname, isDesktop]);
 
     const handleNavigation = (path) => {
         if (pathname === path || path === '#') return;
@@ -221,67 +226,52 @@ useEffect(() => {
         supabase.auth.signOut().then(() => handleNavigation('/'));
     };
 
-    const headerGlass = { backgroundColor: 'rgba(23, 24, 28, 0.6)', backdropFilter: 'blur(16px)', border: 'none' };
-    const navbarGlass = { backgroundColor: 'rgba(37, 38, 43, 0.5)', backdropFilter: 'blur(16px)', borderRight: '1px solid var(--mantine-color-dark-5)', transition: 'width 200ms ease-in-out' };
+    // Guest Mode: Simple Wrapper
+    if (isGuest) {
+        return (
+            <Box style={{ minHeight: '100vh', padding: '24px' }}>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>{children}</motion.div>
+            </Box>
+        );
+    }
 
-    if (!session) {
-      // Non-logged-in layout is unchanged
-      return (
-          <AppShell header={{ height: 70 }} padding="md">
-              <AppShell.Header style={headerGlass}>
-                  <Group h="100%" px="lg"><Title order={2} ff="Lexend, sans-serif">KalPad</Title></Group>
-              </AppShell.Header>
-              <AppShell.Main>{children}</AppShell.Main>
-          </AppShell>
-      );
-  }
+    if (!session) return <Box p="md">{children}</Box>;
 
-  return (
-    <AppShell
-      header={{ height: 70 }}
-      navbar={{ width: desktopOpened ? 280 : 80, breakpoint: 'sm', collapsed: { mobile: true, desktop: false } }}
-      padding="md"
-      style={{ paddingBottom: '80px' }}
-    >
-      <AppShell.Header style={headerGlass}>
-        <Group h="100%" px="lg"><Title order={2} ff="Lexend, sans-serif">KalPad</Title></Group>
-      </AppShell.Header>
+    return (
+        <div style={{ minHeight: '100vh', display: 'flex' }}>
+            {/* Desktop Sidebar (Floating) */}
+            {isDesktop && (
+                 <FloatingSidebar user={session.user} onNavigate={handleNavigation} onSignOut={handleSignOut} />
+            )}
 
-      <AppShell.Navbar p="md" style={navbarGlass} visibleFrom="sm">
-          <MainNavbar 
-              desktopOpened={desktopOpened}
-              toggleDesktop={toggleDesktop}
-              onNavigate={handleNavigation}
-          />
-          <UserButton 
-              user={session?.user} 
-              desktopOpened={desktopOpened}
-              onSignOut={handleSignOut}
-          />
-      </AppShell.Navbar>
+            <OnboardingTour />
 
-      <OnboardingTour /> 
+            {/* Main Content Area */}
+            <main style={{ 
+                flex: 1, 
+                marginLeft: isDesktop ? '300px' : '0', // Offset for sidebar
+                padding: isDesktop ? '32px' : '16px',
+                paddingBottom: isDesktop ? '32px' : '120px', // Extra padding for mobile navbar
+                maxWidth: '1600px', 
+                marginRight: 'auto'
+            }}>
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={pathname}
+                        initial={{ opacity: 0, y: 10, scale: 0.99 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.99 }}
+                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} // Apple-style easing
+                    >
+                        {children}
+                    </motion.div>
+                </AnimatePresence>
+            </main>
 
-      <AppShell.Main>
-          {/* --- DEFINITIVE FIX #2: PAGE TRANSITION ANIMATIONS --- */}
-          <AnimatePresence mode="wait">
-              <motion.div
-                  key={pathname} // This key is critical for AnimatePresence to detect page changes
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3, ease: 'easeInOut' }}
-              >
-                  {children}
-              </motion.div>
-          </AnimatePresence>
-      </AppShell.Main>
-
-      <BottomNavbar 
-          user={session?.user}
-          onNavigate={handleNavigation}
-          onSignOut={handleSignOut}
-      />
-    </AppShell>
-  );
+            {/* Mobile Navbar (Fixed Bottom) */}
+            {!isDesktop && (
+                <MobileNavbar user={session.user} onNavigate={handleNavigation} onSignOut={handleSignOut} />
+            )}
+        </div>
+    );
 }

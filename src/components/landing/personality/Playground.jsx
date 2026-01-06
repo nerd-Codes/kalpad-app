@@ -1,143 +1,232 @@
-// src/components/landing/personality/Playground.jsx
 "use client";
 
-import { useState } from 'react';
-import { Container, Title, Text, Stack, Grid, Group, ActionIcon, Box } from '@mantine/core';
-import { motion, AnimatePresence, useDragControls, LayoutGroup } from 'framer-motion';
-import { IconArrowLeft, IconArrowRight } from '@tabler/icons-react';
-import { GlassCard } from '../../GlassCard'; // Import GlassCard
+import { useState, useEffect } from 'react';
+import { Container, Title, Text, Stack, Grid, Box, Badge, Group } from '@mantine/core';
+import { motion, AnimatePresence } from 'framer-motion';
+import { IconTerminal2, IconChevronRight, IconCheck, IconCpu } from '@tabler/icons-react';
+import { GlassCard } from '../../GlassCard'; 
 
-// Data for the cards
-const useCases = [
+// --- SCENARIO DATA ---
+const SCENARIOS = [
     {
-        value: 'interview',
-        emoji: '💼',
-        label: 'Interview Crackdown',
-        description: 'Drop in the job description and your resume. KalPad will build you a 14-day hyper-focused prep plan, from system design fundamentals to the exact behavioral questions you’ll be asked.'
+        id: 'upsc',
+        color: '#fb923c', // Orange (High Stakes)
+        label: 'MODE: CIVIL SERVICES',
+        input: 'UPSC Prelims 2025. Weak in History & Economics.',
+        logs: [
+            { text: 'Analyzing syllabus density: GS Paper I & CSAT...', delay: 500 },
+            { text: 'Triaging subjects: Prioritizing Modern History & Macroeconomics.', delay: 1400 },
+            { text: 'Integrating Current Affairs: Last 18 months buffer...', delay: 2200 },
+            { text: '>> GENERATED: "The 6-Month IAS Combat Strategy"', delay: 3000, highlight: true }
+        ]
     },
     {
-        value: 'hackathon',
-        emoji: '🏆',
-        label: 'Hackathon Heist',
-        description: "Got a weekend and a dream? Feed KalPad the hackathon theme and the tech stack you want to use. It will generate a high-level architectural plan and a learning roadmap so you can build, not just google."
+        id: 'skill-dev',
+        color: '#818cf8', // Indigo (Tech)
+        label: 'MODE: SKILL BUILDER',
+        input: 'Learn Python for Data Science by building a stock predictor.',
+        logs: [
+            { text: 'Deconstructing goal: Pandas, NumPy, Scikit-Learn...', delay: 500 },
+            { text: 'Discarding theory: Focusing on project-based milestones.', delay: 1200 },
+            { text: 'Curating resources: Documentation > 3-hour videos...', delay: 2000 },
+            { text: '>> GENERATED: "Zero to Hero: Project Roadmap"', delay: 2800, highlight: true }
+        ]
     },
     {
-        value: 'upsc',
-        emoji: '🇮🇳',
-        label: 'UPSC/CAT Gauntlet',
-        description: "These aren't just exams; they're life-defining quests. KalPad's long-term planning engine can take a multi-year syllabus and build a cohesive, month-by-month architectural plan."
+        id: 'interview',
+        color: '#f472b6', // Pink (Career)
+        label: 'MODE: INTERVIEW PREP',
+        input: 'Google L4 Frontend Interview next week. Need system design prep.',
+        logs: [
+            { text: 'Scanning role requirements...', delay: 500 },
+            { text: 'Prioritizing: Scalability patterns & LeetCode Hards.', delay: 1200 },
+            { text: 'Scheduling mock interviews: Daily at 8 PM...', delay: 2000 },
+            { text: '>> GENERATED: "7-Day FAANG Crunch Plan"', delay: 2800, highlight: true }
+        ]
     },
     {
-        value: 'freelance',
-        emoji: '💸',
-        label: 'Freelance God-Mode',
-        description: "Your client just dropped a 100-page project brief on you. Upload it to KalPad, and it will generate a project timeline, identify key deliverables, and create a learning plan for any new tech you need to master."
+        id: 'thesis',
+        color: '#34d399', // Emerald (Academic)
+        label: 'MODE: THESIS DEFENSE',
+        input: 'Write a 50-page thesis on Quantum Computing by May 1st.',
+        logs: [
+            { text: 'Calculating velocity: 500 words/day required.', delay: 500 },
+            { text: 'Structuring architecture: Lit Review -> Methodology -> Results.', delay: 1400 },
+            { text: 'Allocating buffer for citations & formatting...', delay: 2200 },
+            { text: '>> GENERATED: "Dissertation Delivery Timeline"', delay: 3000, highlight: true }
+        ]
+    },
+    {
+        id: 'hackathon',
+        color: '#22d3ee', // Cyan (Speed)
+        label: 'MODE: HACKATHON',
+        input: 'Build a Fintech MVP in 48 hours with Next.js.',
+        logs: [
+            { text: 'Analyzing constraints: 48h hard limit...', delay: 500 },
+            { text: 'Identifying critical path: Auth -> Database -> Stripe.', delay: 1200 },
+            { text: 'Eliminating low-priority features (UI Polish)...', delay: 2000 },
+            { text: '>> GENERATED: "The 48-Hour Sprint Roadmap"', delay: 2800, highlight: true }
+        ]
     }
 ];
 
+// --- SUB-COMPONENT: TERMINAL LINE ---
+function TerminalLine({ text, color, highlight }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="font-mono text-sm md:text-base"
+            style={{ 
+                color: highlight ? color : 'rgba(255,255,255,0.6)', 
+                fontWeight: highlight ? 700 : 400,
+                marginTop: highlight ? '2px' : '4px',
+                display: 'flex',
+                alignItems: 'center'
+            }}
+        >
+            {highlight && <IconCheck size={14} />}
+            {text}
+        </motion.div>
+    );
+}
+
 export function Playground() {
-    const [activeIndex, setActiveIndex] = useState(0);
-    const dragControls = useDragControls();
+    const [index, setIndex] = useState(0);
+    const activeScenario = SCENARIOS[index];
 
-    const handleNext = () => {
-        setActiveIndex((prev) => (prev + 1) % useCases.length);
-    };
-
-    const handlePrev = () => {
-        setActiveIndex((prev) => (prev - 1 + useCases.length) % useCases.length);
-    };
+    // Cycle through scenarios
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setIndex((prev) => (prev + 1) % SCENARIOS.length);
+        }, 5000); // 5 seconds per scenario
+        return () => clearInterval(timer);
+    }, []);
 
     return (
-        <Container size="lg" py={80}>
-            <Stack align="center" ta="center" gap="xs" mb={50}>
-                 <Title order={2} ff="Lexend, sans-serif" fz={{ base: '2rem', sm: '2.5rem' }}>
-                    Exams are the tutorial. This is the real game.
-                </Title>
-            </Stack>
+        <Box py={{ base: 80, md: 120 }} style={{ position: 'relative', zIndex: 10 }}>
+            <Container size="lg">
+                <Grid gutter={60} align="center">
+                    
+                    {/* --- LEFT: NARRATIVE --- */}
+                    <Grid.Col span={{ base: 12, md: 6 }}>
+                        <Stack gap="xl">
+                            <Box>
+                                <Badge 
+                                    variant="outline" color="gray" size="lg" mb="md"
+                                    styles={{ root: { borderColor: 'rgba(255,255,255,0.2)', color: 'white', fontFamily: 'var(--font-lexend)' } }}
+                                >
+                                    REAL WORLD PROTOCOLS
+                                </Badge>
+                                <Title 
+                                    order={2} 
+                                    className="apple-text-gradient"
+                                    style={{ 
+                                        fontFamily: 'var(--font-lexend)', 
+                                        fontSize: 'clamp(2.5rem, 4vw, 3.5rem)', 
+                                        lineHeight: 1.1,
+                                        letterSpacing: '-0.02em'
+                                    }}
+                                >
+                                    Exams are the trailer. <br/>
+                                    <span style={{ color: 'white' }}>This is the real game.</span>
+                                </Title>
+                            </Box>
+                            
+                            <Text size="xl" c="dimmed" lh={1.6}>
+                                KalPad doesn't just help you pass. It helps you build. 
+                                Whether it's a 48-hour hackathon, a high-stakes interview, or a freelance deadline, 
+                                our planning engine adapts to the chaos of the real world.
+                            </Text>
+                        </Stack>
+                    </Grid.Col>
 
-            <Grid gutter={{ base: 40, lg: 80 }}>
-                {/* Left Column: Text Descriptions */}
-                <Grid.Col span={{ base: 12, md: 6 }}>
-                    <Stack justify="center" h="100%" gap="xl">
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={activeIndex}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.3 }}
-                            >
-                                <Title order={3} ff="Lexend, sans-serif">{useCases[activeIndex].label}</Title>
-                                <Text size="lg" c="dimmed" mt="md">{useCases[activeIndex].description}</Text>
-                            </motion.div>
-                        </AnimatePresence>
-                        <Group mt="lg">
-                            <ActionIcon variant="default" size="xl" radius="xl" onClick={handlePrev}><IconArrowLeft /></ActionIcon>
-                            <ActionIcon variant="default" size="xl" radius="xl" onClick={handleNext}><IconArrowRight /></ActionIcon>
-                        </Group>
-                    </Stack>
-                </Grid.Col>
-
-                {/* Right Column: High-Fidelity Stacked Card Carousel */}
-                <Grid.Col span={{ base: 12, md: 6 }}>
-                    {/* LayoutGroup is the key to the smooth re-stacking animation */}
-                    <LayoutGroup>
-                        <Box 
+                    {/* --- RIGHT: THE TERMINAL --- */}
+                    <Grid.Col span={{ base: 12, md: 6 }}>
+                        <GlassCard 
+                            p={0}
                             style={{ 
-                                position: 'relative', 
-                                height: '400px', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center' 
+                                height: '400px',
+                                backgroundColor: '#0d0d0f', // Near black terminal bg
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                boxShadow: '0 30px 60px -10px rgba(0,0,0,0.5)',
+                                overflow: 'hidden',
+                                display: 'flex', flexDirection: 'column'
                             }}
                         >
-                            {/* AnimatePresence is no longer needed here, simplifying the logic */}
-                            {useCases.map((card, index) => {
-                                const position = index - activeIndex;
-                                // Render only the top 3 cards for performance and visual clarity
-                                if (Math.abs(position) >= 3) return null; 
-                                
-                                return (
+                            {/* Window Header */}
+                            <Box p="md" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                                <Group justify="space-between">
+                                    <Group gap={6}>
+                                        <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                                        <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                                        <div className="w-3 h-3 rounded-full bg-green-500/80" />
+                                    </Group>
+                                    <Group gap={6} style={{ opacity: 0.5 }}>
+                                        <IconTerminal2 size={14} />
+                                        <Text size="xs" ff="monospace">kalpad_engine_v2.0</Text>
+                                    </Group>
+                                </Group>
+                            </Box>
+
+                            {/* Terminal Body */}
+                            <Box p="xl" style={{ flex: 2, fontFamily: 'monospace' }} minheight="50rem" overflow="hidden">
+                                <AnimatePresence mode="wait">
                                     <motion.div
-                                        key={card.value}
-                                        layout // This is now the ONLY prop driving the animation
-                                        initial={false}
-                                        animate={{
-                                            y: position * 15,
-                                            scale: 1 - Math.abs(position) * 0.05,
-                                            zIndex: useCases.length - Math.abs(position),
-                                            opacity: position === 0 ? 1 : 0.7,
-                                            rotate: position * 3, // Adds a subtle tilt to the stack
-                                        }}
-
-                                        // A simple spring transition feels more tactile
-                                        transition={{ type: 'spring', stiffness: 400, damping: 40 }}
-
-                                        // Drag logic is unchanged but will feel better with the new animation
-                                        drag="x"
-                                        dragConstraints={{ left: 0, right: 0 }}
-                                        onDragEnd={(event, info) => {
-                                            if (info.offset.x > 100) handlePrev();
-                                            if (info.offset.x < -100) handleNext();
-                                        }}
-                                        style={{
-                                            position: 'absolute',
-                                            width: '80%',
-                                            height: '90%',
-                                        }}
+                                        key={activeScenario.id}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
                                     >
-                                        <GlassCard p="xl" h="100%" style={{ cursor: 'grab' }}>
-                                            <Stack align="center" justify="center" h="100%">
-                                                <Text fz={100}>{card.emoji}</Text>
-                                            </Stack>
-                                        </GlassCard>
+                                        <Group gap="xs" mb="lg">
+                                            <Badge 
+                                                variant="dot" 
+                                                color={activeScenario.color} 
+                                                size="sm" 
+                                                style={{ backgroundColor: 'transparent', color: activeScenario.color }}
+                                            >
+                                                {activeScenario.label}
+                                            </Badge>
+                                        </Group>
+
+                                        {/* User Input Line */}
+                                        <Group gap="xs" mb="md" align="flex-start">
+                                            <IconChevronRight size={18} color={activeScenario.color} style={{ marginTop: 2 }} />
+                                            <Text c="white" size="sm" style={{ fontFamily: 'monospace' }}>
+                                                {activeScenario.input}
+                                                <motion.span 
+                                                    animate={{ opacity: [0, 1, 0] }} 
+                                                    transition={{ duration: 0.8, repeat: Infinity }}
+                                                    style={{ display: 'inline-block', width: '10px', height: '1.2em', backgroundColor: activeScenario.color, marginLeft: '8px', verticalAlign: 'text-bottom' }}
+                                                />
+                                            </Text>
+                                        </Group>
+
+                                        {/* System Logs */}
+                                        <Stack gap="xs">
+                                            {activeScenario.logs.map((log, i) => (
+                                                <motion.div
+                                                    key={i}
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: log.delay / 1000 }} // Convert ms to s
+                                                >
+                                                    <TerminalLine 
+                                                        text={log.text} 
+                                                        highlight={log.highlight} 
+                                                        color={activeScenario.color} 
+                                                    />
+                                                </motion.div>
+                                            ))}
+                                        </Stack>
                                     </motion.div>
-                                );
-                            })}
-                        </Box>
-                    </LayoutGroup>
-                </Grid.Col>
-            </Grid>
-        </Container>
+                                </AnimatePresence>
+                            </Box>
+                        </GlassCard>
+                    </Grid.Col>
+                </Grid>
+            </Container>
+        </Box>
     );
 }

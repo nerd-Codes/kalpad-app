@@ -4,87 +4,56 @@
 import { useState, useEffect } from 'react';
 import supabase from '@/lib/supabaseClient';
 import AppLayout from '@/components/AppLayout';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLoading } from '@/context/LoadingContext';
-
-// Mantine component imports
-import { Container, Title, Text, SimpleGrid, Grid, GridCol, Group, Badge, Button, Paper, Alert, Loader, Stack } from '@mantine/core';
+import { Container, Title, Text, Group, Loader, Stack, Box, Grid } from '@mantine/core'; // Added Grid
 import { format, isToday } from 'date-fns';
-import { ContinueStudyingCard } from '@/components/ContinueStudyingCard';
 
-// Custom component imports
-import { StatCard } from '@/components/StatCard';
-import { GlassCard } from '@/components/GlassCard';
-import { Heatmap } from '@/components/Heatmap';
-import { DatePicker } from '@/components/DatePicker';
+// --- NEW BENTO COMPONENTS ---
+import { HeroTile } from '@/components/HeroTile';
+import { MetricsDeck } from '@/components/MetricsDeck';
+import { CalendarStrip } from '@/components/CalendarStrip';
 import { TimelineDayCard } from '@/components/TimelineDayCard';
-import { IconCheck, IconFileText, IconCalendarEvent, IconBulb, IconFlame } from '@tabler/icons-react';
+import { GlassCard } from '@/components/GlassCard';
 
-// Import our list of tips
 import { studyTips } from '@/lib/studyTips';
 
 export default function DashboardPage() {
-
-    const router = useRouter(); // Initialize the router
-    const { setIsLoading } = useLoading(); // This should already exist
+    const router = useRouter();
+    const { setIsLoading } = useLoading();
+    
+    // ... [STATE & EFFECT LOGIC PRESERVED 1:1 - COPY FROM PREVIOUS BLOCK] ...
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
     const [plans, setPlans] = useState([]);
-    const [stats, setStats] = useState({ 
-        plansCreated: 0, 
-        nextExamDate: 'N/A',
-        weeklyCompleted: 0,
-        currentStreak: 0,
-        completions: {}
-    });
+    const [stats, setStats] = useState({ plansCreated: 0, weeklyCompleted: 0, currentStreak: 0, completions: {} });
     const [error, setError] = useState('');
     const [tipOfTheDay, setTipOfTheDay] = useState('');
-
-    // State for the timeline section
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [dailyTasks, setDailyTasks] = useState([]);
     const [timelineLoading, setTimelineLoading] = useState(false);
 
-    const handleContinuePlanClick = (planId) => {
-        setIsLoading(true); // Trigger the blurry page loader
-        router.push(`/plan/${planId}`);
-    };
-
     useEffect(() => {
-        // Pick a random tip on the initial load
         setTipOfTheDay(studyTips[Math.floor(Math.random() * studyTips.length)]);
-
         const fetchData = async () => {
             setLoading(true);
             const { data: { session } } = await supabase.auth.getSession();
             setSession(session);
-            if (!session) {
-                setLoading(false);
-                return;
-            }
-
+            if (!session) { setLoading(false); return; }
             try {
                 const { data, error } = await supabase
                     .from('study_plans')
                     .select(`id, exam_name, exam_date, plan_topics ( date, sub_topics )`)
                     .eq('is_active', true)
                     .order('created_at', { ascending: false });
-
                 if (error) throw error;
-                
                 setPlans(data || []);
                 calculateAllStats(data || []);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
+            } catch (err) { setError(err.message); } finally { setLoading(false); }
         };
         fetchData();
     }, []);
 
-    // This effect runs whenever the `selectedDate` or `session` changes to fetch timeline data
     useEffect(() => {
         const fetchTimelineData = async () => {
             if (!session) return;
@@ -93,243 +62,129 @@ export default function DashboardPage() {
             try {
                 const response = await fetch(`/api/timeline?date=${dateString}`);
                 if (!response.ok) throw new Error((await response.json()).error);
-                
-                // --- DEFINITIVE MODIFICATION: PARSE THE NEW RESPONSE STRUCTURE ---
                 const responseData = await response.json();
-                
-                // Set the state for the UI with the plan data
                 setDailyTasks(responseData.plans || []);
-
-                // --- DEFINITIVE MODIFICATION: THE "SMART CLIENT" LOGIC ---
-                // Check if the backend sent a native command.
                 const trigger = responseData.triggerNativeAction;
-
-                // If a trigger exists AND we are in the native app, execute the command.
-                if (trigger && window.Android && typeof window.Android.setReminder === 'function') {
-                    if (trigger.type === 'SET_REMINDER') {
-                        console.log("Native trigger received from API. Executing:", trigger);
-                        // Pass the details object to the native setReminder function.
-                        window.Android.setReminder(JSON.stringify(trigger.details));
-                    }
+                if (trigger && window.Android && typeof window.Android.setReminder === 'function' && trigger.type === 'SET_REMINDER') {
+                    window.Android.setReminder(JSON.stringify(trigger.details));
                 }
-                
-            } catch (err) {
-                console.error("Timeline fetch error:", err.message);
-            } finally {
-                setTimelineLoading(false);
-            }
+            } catch (err) { console.error(err); } finally { setTimelineLoading(false); }
         };
         fetchTimelineData();
-    }, [selectedDate, session]); // This dependency array is correct.
+    }, [selectedDate, session]);
 
     const calculateAllStats = (allPlans) => {
-        if (!allPlans || allPlans.length === 0) {
-            setStats({ plansCreated: 0, nextExamDate: 'N/A', completions: {}, weeklyCompleted: 0, currentStreak: 0 });
-            return;
-        }
-        
-        const upcomingExams = allPlans.filter(p => new Date(p.exam_date) >= new Date());
+        if (!allPlans || allPlans.length === 0) return;
         const completionsByDay = {};
         let weeklyCompletedCount = 0;
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
+        const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
         allPlans.forEach(plan => {
-            if (plan.plan_topics) {
-                plan.plan_topics.forEach(day => {
-                    if (day.date && day.sub_topics) {
-                        const dayDate = new Date(day.date);
-                        const completedInDay = day.sub_topics.filter(sub => sub.completed).length;
-                        if (completedInDay > 0) {
-                            const dateString = format(dayDate, 'yyyy-MM-dd');
-                            completionsByDay[dateString] = (completionsByDay[dateString] || 0) + completedInDay;
-                            if (dayDate >= oneWeekAgo) { weeklyCompletedCount += completedInDay; }
-                        }
+            plan.plan_topics?.forEach(day => {
+                if (day.date && day.sub_topics) {
+                    const completed = day.sub_topics.filter(sub => sub.completed).length;
+                    if (completed > 0) {
+                        const dStr = format(new Date(day.date), 'yyyy-MM-dd');
+                        completionsByDay[dStr] = (completionsByDay[dStr] || 0) + completed;
+                        if (new Date(day.date) >= oneWeekAgo) weeklyCompletedCount += completed;
                     }
-                });
-            }
+                }
+            });
         });
-
         let currentStreak = 0;
-        let today = new Date();
-        today.setHours(0,0,0,0);
-        if (completionsByDay[format(today, 'yyyy-MM-dd')]) {
+        let d = new Date(); d.setHours(0,0,0,0);
+        if (completionsByDay[format(d, 'yyyy-MM-dd')]) {
             currentStreak = 1;
-            let yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            while (completionsByDay[format(yesterday, 'yyyy-MM-dd')]) {
-                currentStreak++;
-                yesterday.setDate(yesterday.getDate() - 1);
-            }
+            let y = new Date(d); y.setDate(y.getDate() - 1);
+            while (completionsByDay[format(y, 'yyyy-MM-dd')]) { currentStreak++; y.setDate(y.getDate() - 1); }
         }
-
-        setStats({
-            plansCreated: allPlans.length,
-            nextExamDate: upcomingExams.length > 0 ? upcomingExams[0].exam_date : 'All exams passed!',
-            completions: completionsByDay,
-            weeklyCompleted: weeklyCompletedCount,
-            currentStreak: currentStreak,
-        });
+        setStats({ plansCreated: allPlans.length, completions: completionsByDay, weeklyCompleted: weeklyCompletedCount, currentStreak });
     };
-    
+
     const handleUpdateTaskGroup = (planTopicId, updates) => {
-        // Optimistically update the local state for a snappy UX
-        setDailyTasks(currentTasks => 
-            currentTasks.map(planWithTopic => {
-                // Check if the topic to update is within this plan object
-                if (planWithTopic.plan_topics[0]?.id === planTopicId) {
-                    // Create a new, updated topic object
-                    const updatedTopic = { ...planWithTopic.plan_topics[0], ...updates };
-                    // Return a new plan object with the updated topic inside
-                    return { ...planWithTopic, plan_topics: [updatedTopic] };
-                }
-                return planWithTopic;
-            })
-        );
-        
-        // Send the update to the database in the background
-        supabase.from('plan_topics').update(updates).eq('id', planTopicId)
-            .then(({ error }) => { 
-                if (error) {
-                    console.error("Background update failed:", error);
-                    // Optionally, add a notification to the user that the save failed
-                }
-            });
+        setDailyTasks(current => current.map(p => p.plan_topics[0]?.id === planTopicId ? { ...p, plan_topics: [{ ...p.plan_topics[0], ...updates }] } : p));
+        supabase.from('plan_topics').update(updates).eq('id', planTopicId).then();
     };
 
-            const calculateProgress = (plan) => {
-            if (!plan || !plan.plan_topics) return 0;
+    const calculateProgress = (plan) => {
+        if (!plan?.plan_topics) return 0;
+        let total = 0, done = 0;
+        plan.plan_topics.forEach(d => { total += d.sub_topics?.length || 0; done += d.sub_topics?.filter(s => s.completed).length || 0; });
+        return total === 0 ? 0 : Math.round((done / total) * 100);
+    };
 
-            let totalSubTopics = 0;
-            let completedSubTopics = 0;
-            
-            plan.plan_topics.forEach(day => {
-                if (day.sub_topics && Array.isArray(day.sub_topics)) {
-                    totalSubTopics += day.sub_topics.length;
-                    completedSubTopics += day.sub_topics.filter(sub => sub.completed).length;
-                }
-            });
+    const mostRecentPlan = plans[0];
+    const todaysTopic = mostRecentPlan?.plan_topics.find(t => isToday(new Date(t.date)));
+    const examDates = plans.map(p => p.exam_date);
 
-            if (totalSubTopics === 0) return 0;
-            return Math.round((completedSubTopics / totalSubTopics) * 100);
-        };
+    return (
+        <AppLayout session={session}>
+            <Container size="xl" pt="sm">
+                <Box mb={32}>
+                    <Text size="sm" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: '0.1em' }}>
+                        {format(new Date(), 'EEEE, MMMM do')}
+                    </Text>
+                    <Title order={1} className="apple-text-gradient" style={{ fontSize: '3rem', letterSpacing: '-0.03em' }}>
+                        Command Center
+                    </Title>
+                </Box>
 
-    const examDates = plans.map(plan => plan.exam_date);
+                {loading ? <Group justify="center"><Loader color="white"/></Group> : (
+                    <Grid gutter="xl">
+                        {/* --- LEFT COLUMN (FOCUS & METRICS) - Spans 8 cols --- */}
+                        <Grid.Col span={{ base: 12, lg: 8 }}>
+                            <Stack gap="lg">
+                                <HeroTile 
+                                    plan={mostRecentPlan} 
+                                    progress={mostRecentPlan ? calculateProgress(mostRecentPlan) : 0} 
+                                    todaysTopic={todaysTopic} 
+                                    onJumpBackIn={(id) => { setIsLoading(true); router.push(`/plan/${id}`); }} 
+                                />
+                                <MetricsDeck stats={stats} />
+                            </Stack>
+                        </Grid.Col>
 
-    const mostRecentPlan = plans.length > 0 ? plans[0] : null;
-    const mostRecentPlanProgress = mostRecentPlan ? calculateProgress(mostRecentPlan) : 0;
+                        {/* --- RIGHT COLUMN (TIMELINE) - Spans 4 cols --- */}
+                        <Grid.Col span={{ base: 12, lg: 4 }}>
+                            <Stack gap="lg">
+                                <GlassCard p="lg">
+                                    <CalendarStrip 
+                                        selectedDate={selectedDate} 
+                                        setSelectedDate={setSelectedDate} 
+                                        examDates={examDates} 
+                                    />
+                                </GlassCard>
 
-    // Find the specific topic scheduled for today within the most recent plan
-    const todaysTopicForRecentPlan = mostRecentPlan?.plan_topics.find(topic => 
-        isToday(new Date(topic.date))
-    );
-
-    // Calculate days left specifically for this plan for context
-    const daysLeftForRecentPlan = mostRecentPlan ? Math.max(0, Math.ceil((new Date(mostRecentPlan.exam_date) - new Date()) / (1000 * 60 * 60 * 24))) : 0;
-
-    // ADD THIS ENTIRE FUNCTION inside the DashboardPage component
-
-const handleResetOnboarding = async () => {
-    // A guard clause to ensure we have a session before proceeding.
-    if (!session) {
-        alert("Session not found. Cannot reset onboarding.");
-        return;
-    }
-    
-    // Provide a confirmation dialog to prevent accidental resets.
-    const isConfirmed = window.confirm(
-        "DEV ONLY: Are you sure you want to reset your onboarding status? You will need to hard refresh after this."
-    );
-
-    if (isConfirmed) {
-        try {
-            // We use supabase.functions.invoke, which automatically handles authentication
-            // by passing the user's JWT from the client's session.
-            const { error } = await supabase.functions.invoke('reset-onboarding');
-
-            if (error) throw error;
-
-            alert('Onboarding status has been reset successfully. Please hard refresh the page (Ctrl+Shift+R or Cmd+Shift+R) to start the tour.');
-            
-            // Force a full page reload to re-initialize all contexts from scratch.
-            window.location.reload();
-        } catch (error) {
-            console.error("Failed to reset onboarding:", error);
-            alert(`Failed to reset onboarding: ${error.message}`);
-        }
-    }
-};
-
-   return (
-    <AppLayout session={session}>
-        <Container size="xl">
-            <Title order={1} ff="Lexend, sans-serif">Dashboard</Title>
-            <Text c="dimmed" mb="xl">Welcome back! Here's your mission control for academic success.</Text>
-            
-            {loading && <Group justify="center" py="xl"><Loader color="rgba(255, 255, 255, 1)"/></Group>}
-            {error && <Alert color="red" title="Error" mb="xl" withCloseButton onClose={() => setError('')}>{error}</Alert>}
-
-            {!loading && (
-                <Stack gap={50}>
-                    {/* --- ACT I: IMMEDIATE FOCUS --- */}
-                    <ContinueStudyingCard 
-                        plan={mostRecentPlan} 
-                        progress={mostRecentPlanProgress} 
-                        todaysTopic={todaysTopicForRecentPlan}
-                        onJumpBackIn={handleContinuePlanClick} // Pass the handler as a prop
-                    />
-
-                    {/* --- ACT II: TODAY'S MISSION (Now full-width) --- */}
-                    <Stack gap="lg">
-                        <Title order={2} ff="Lexend, sans-serif">Today's Mission</Title>
-                        <GlassCard>
-                            <DatePicker selectedDate={selectedDate} setSelectedDate={setSelectedDate} examDates={examDates} />
-                            {timelineLoading && <Group justify="center" py="xl"><Loader color="rgba(255, 255, 255, 1)"/></Group>}
-                            {!timelineLoading && dailyTasks.length === 0 && (
-                                <Text ta="center" c="dimmed" py="md">Nothing scheduled for this day. Enjoy your break!</Text>
-                            )}
-                            {!timelineLoading && dailyTasks.length > 0 && (
                                 <Stack gap="md">
+                                    <Group justify="space-between" px="xs">
+                                        <Text size="sm" fw={600} c="dimmed" tt="uppercase">Agenda</Text>
+                                        <Text size="xs" c="dimmed">{dailyTasks.length} Sessions</Text>
+                                    </Group>
+
+                                    {timelineLoading && <Loader size="sm" mx="auto" />}
+                                    
+                                    {!timelineLoading && dailyTasks.length === 0 && (
+                                        <GlassCard p="xl" style={{ borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.1)' }}>
+                                            <Text ta="center" c="dimmed" size="sm">No missions scheduled.</Text>
+                                        </GlassCard>
+                                    )}
+
                                     {dailyTasks.map(planWithTopic => (
                                         <TimelineDayCard 
                                             key={planWithTopic.plan_topics[0].id}
-                                            viewMode="dashboard" // Tell the card to render in dashboard mode
+                                            viewMode="dashboard"
                                             plan={planWithTopic}
                                             dayTopic={planWithTopic.plan_topics[0]}
                                             onUpdate={handleUpdateTaskGroup}
-                                            onNoteGenerated={() => fetchTimelineData()}
+                                            onNoteGenerated={() => {}}
+                                            isInitiallyCollapsed={false}
                                         />
                                     ))}
                                 </Stack>
-                            )}
-                        </GlassCard>
-                    </Stack>
-                    
-                    {/* --- ACT III: STATS & INSIGHTS (Now includes Heatmap) --- */}
-                    <Stack gap="lg">
-    <Title order={2} ff="Lexend, sans-serif">Stats & Insights</Title>
-
-    {/* A single SimpleGrid to arrange all 5 cards linearly */}
-    <SimpleGrid cols={{ base: 1, sm: 2, md: 3, xl: 5 }} spacing="xl">
-        
-        {/* Card 1: The Heatmap, styled to match the StatCards */}
-        <GlassCard style={{ position: 'relative', overflow: 'hidden' }}>
-                <Heatmap data={stats.completions} />
-        </GlassCard>
-        
-        {/* Cards 2-5: The StatCards */}
-        <StatCard title="Current Study Streak" value={`${stats.currentStreak} Days`} emoji="🔥" color="var(--mantine-color-orange-5)" />
-        <StatCard title="Topics This Week" value={stats.weeklyCompleted} emoji="✅" color="var(--mantine-color-brandGreen-4)" />
-        <StatCard title="Active Plans" value={stats.plansCreated} emoji="📚" color="var(--mantine-color-blue-4)" />
-        <StatCard title="Next Exam" value={mostRecentPlan ? format(new Date(mostRecentPlan.exam_date), 'MMM d') : 'N/A'} emoji="🗓️" color="var(--mantine-color-brandPurple-4)" />
-
-    </SimpleGrid>
-</Stack>
-
-
-                </Stack>
-            )}
-        </Container>
-    </AppLayout>
-);
+                            </Stack>
+                        </Grid.Col>
+                    </Grid>
+                )}
+            </Container>
+        </AppLayout>
+    );
 }

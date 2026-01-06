@@ -1,89 +1,141 @@
-// src/components/landing/personality/Community.jsx
 "use client";
 
-import { Container, Title, Text, Stack, Button, Group, Grid, Box } from '@mantine/core';
-import { IconBrandDiscord, IconBrandWhatsapp } from '@tabler/icons-react';
-// --- MODIFICATION: IMPORT THE NEW CSS MODULE ---
-import classes from './Community.module.scss';
+import { Container, Title, Text, Stack, Button, Group, Box, Badge, Avatar, AvatarGroup } from '@mantine/core';
+import { IconBrandDiscord, IconBrandWhatsapp, IconUsers, IconActivity } from '@tabler/icons-react';
+import { GlassCard } from '../../GlassCard'; 
+import { Interactive } from '@/components/Interactive';
 
 export function Community() {
     return (
-        // --- MODIFICATION: ADD `position: 'relative'` TO THE WRAPPER ---
-        <Box
+        <Box 
             id="community-section" 
-             style={{
-                background: 'radial-gradient(ellipse at 50% 50%, rgba(25, 20, 40, 1) 0%, rgba(10, 10, 20, 1) 100%)',
-                position: 'relative',
-                overflow: 'hidden', // Hides stars that go outside the container
-             }}
+            py={{ base: 100, md: 160 }} 
+            style={{ position: 'relative', zIndex: 10 }}
         >
-            {/* --- MODIFICATION: ADD THE STARFIELD ELEMENT --- */}
-            <div className={classes.starfield}>
-                <div className={classes.stars}></div>
-                <div className={classes.stars2}></div>
-                <div className={classes.stars3}></div>
-            </div>
-            
-            {/* --- MODIFICATION: ADD `position: 'relative', zIndex: 1` TO THE CONTAINER --- */}
-            <Container size="lg" py={{ base: 120, md: 200 }} style={{ position: 'relative', zIndex: 1 }}>
-                <Grid gutter={{ base: 60, md: 100 }} align="center">
-                    {/* The rest of your Grid content remains completely unchanged */}
-                    <Grid.Col span={{ base: 12, md: 6 }}>
-                        <Title
-                            order={1}
-                            ff="Lexend, sans-serif"
-                            lh={1.1}
-                            style={{ whiteSpace: 'pre-line' }}
-                        >
-                            <Text component="span" fz={{ base: '2rem', sm: '3rem' }} fw={500} c="dimmed">
-                                {"Become a\n"}
+            <Container size="md">
+                <GlassCard 
+                    p={{ base: 'xl', md: 80 }}
+                    style={{
+                        backgroundColor: 'rgba(15, 15, 20, 0.6)',
+                        backdropFilter: 'blur(30px) saturate(150%)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        boxShadow: '0 0 100px -20px rgba(124, 58, 237, 0.2)', // Purple glow
+                        textAlign: 'center'
+                    }}
+                >
+                    <Stack align="center" gap="xl">
+                        
+                        {/* 1. Header: Social Proof */}
+                        <Group gap="xs" style={{ opacity: 0.8 }}>
+                            <AvatarGroup spacing="sm">
+                                <Avatar color="cyan" radius="xl">AJ</Avatar>
+                                <Avatar color="blue" radius="xl">SK</Avatar>
+                                <Avatar color="grape" radius="xl">RK</Avatar>
+                            </AvatarGroup>
+                            <Text size="sm" c="dimmed" fw={500} ml="xs">
+                                +100Students currently deploying strategies
                             </Text>
-                            <Text component="span" fz={{ base: '4rem', sm: '6rem' }} fw={800} c="white">
-                                {"Co-Founder."}
-                            </Text>
-                            <Text component="span" fz={{ base: '2rem', sm: '3rem' }} fw={500} c="dimmed">
-                                {"\n(Sort of)."}
-                            </Text>
-                        </Title>
-                    </Grid.Col>
+                        </Group>
 
-                    <Grid.Col span={{ base: 12, md: 6 }}>
-                         <Stack gap="xl">
-                             <Text size="xl" c="dimmed" lh={1.7}>
-                                Let's be brutally honest: this is <Text component="span" fw={700} c="white">ground zero</Text>. Things will break. But your <Text component="span" fw={700} c="white">feedback is the fuel</Text> that will forge this app into a weapon. The <Text component="span" fw={700} c="white">first 100 brave souls</Text> to join our community aren't just users—you're the founding members. Our legends. And legends get the keys to the kingdom (a.k.a. <Text component="span" fw={700} c="white">lifetime Pro access</Text>), forever. On the house.
-                            </Text>
-                            
-                            <Group mt="md">
+                        {/* 2. The Headline */}
+                        <Box>
+                            <Badge 
+                                variant="outline" color="gray" size="lg" mb="md"
+                                styles={{ root: { borderColor: 'rgba(255,255,255,0.2)', color: 'white', fontFamily: 'var(--font-lexend)' } }}
+                            >
+                                THE INNER CIRCLE
+                            </Badge>
+                            <Title 
+                                order={2} 
+                                style={{ 
+                                    fontFamily: 'var(--font-lexend)', 
+                                    fontSize: 'clamp(2.5rem, 6vw, 4.5rem)', 
+                                    lineHeight: 1,
+                                    letterSpacing: '-0.04em',
+                                    color: 'white'
+                                }}
+                            >
+                                Don't just use the tool. <br/>
+                                <span className="apple-text-gradient">Build the weapon.</span>
+                            </Title>
+                        </Box>
+
+                        {/* 3. The Narrative */}
+                        <Text size="xl" c="dimmed" lh={1.6} maw={700}>
+                            KalPad is built in public. The roadmap isn't decided in a boardroom; it's decided in our Discord. 
+                            Join the "War Room" to report bugs, request features, and roast our code.
+                        </Text>
+
+                        {/* 4. The Portals (Buttons) */}
+                        <Group mt="lg" gap="lg">
+                            <Interactive>
                                 <Button
                                     component="a"
                                     href="https://discord.gg/KmTCWwsD5u"
                                     target="_blank"
-                                    rel="noopener noreferrer"
-                                    variant="light"
-                                    color="grape"
-                                    size="lg"
+                                    size="xl"
                                     radius="xl"
-                                    leftSection={<IconBrandDiscord size={20} />}
+                                    leftSection={<IconBrandDiscord size={24} />}
+                                    style={{
+                                        backgroundColor: '#5865F2',
+                                        color: 'white',
+                                        boxShadow: '0 10px 30px rgba(88, 101, 242, 0.4)',
+                                        border: 'none',
+                                        fontSize: '1.1rem'
+                                    }}
                                 >
-                                    Join the War Room
+                                    Join Discord
                                 </Button>
+                            </Interactive>
+                            <Interactive>
                                 <Button
                                     component="a"
                                     href="https://chat.whatsapp.com/EMN3fzJCBWNFwDT25qWxq2?mode=ac_t"
                                     target="_blank"
-                                    rel="noopener noreferrer"
-                                    variant="light"
-                                    color="teal"
-                                    size="lg"
+                                    size="xl"
                                     radius="xl"
-                                    leftSection={<IconBrandWhatsapp size={20} />}
+                                    variant="default"
+                                    leftSection={<IconBrandWhatsapp size={24} color="#25D366" />}
+                                    style={{
+                                        backgroundColor: 'rgba(255,255,255,0.05)',
+                                        color: 'white',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        fontSize: '1.1rem'
+                                    }}
                                 >
-                                    Get Inner Circle Access
+                                    WhatsApp
                                 </Button>
+                            </Interactive>
+                        </Group>
+
+                        {/* 5. System Status Footer */}
+                        <Box 
+                            mt="xl" 
+                            pt="lg" 
+                            style={{ 
+                                width: '100%', 
+                                borderTop: '1px solid rgba(255,255,255,0.05)',
+                                display: 'flex', justifyContent: 'center' 
+                            }}
+                        >
+                            <Group gap="xl" c="dimmed" style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                                <Group gap={6}>
+                                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                    <span>SYSTEM: ONLINE</span>
+                                </Group>
+                                <Group gap={6}>
+                                    <IconUsers size={14} />
+                                    <span>MEMBERS: 100+</span>
+                                </Group>
+                                <Group gap={6}>
+                                    <IconActivity size={14} />
+                                    <span>UPTIME: 99.9%</span>
+                                </Group>
                             </Group>
-                         </Stack>
-                    </Grid.Col>
-                </Grid>
+                        </Box>
+
+                    </Stack>
+                </GlassCard>
             </Container>
         </Box>
     );

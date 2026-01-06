@@ -2,57 +2,35 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { Modal, ScrollArea, Group, Title, Text, Textarea, Stack, Badge, Button, ActionIcon, Box, Loader, Tooltip, Alert, Paper, ThemeIcon } from '@mantine/core';
-import { IconCircleCheck, IconMessageQuestion,IconMessageCircle, IconBook, IconBulb, IconSparkles, IconFileExport, IconBolt, IconAward   } from '@tabler/icons-react';
+import { 
+    Modal, ScrollArea, Group, Title, Text, Stack, Badge, Button, 
+    ActionIcon, Box, Loader, Tooltip, Alert, Paper, ThemeIcon, Transition 
+} from '@mantine/core';
+import { 
+    IconCircleCheck, IconMessageQuestion, IconMessageCircle, IconBook, 
+    IconBulb, IconSparkles, IconFileExport, IconBolt, IconAward, IconX 
+} from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { Popover } from '@mantine/core';
 import { useTextSelection } from '../hooks/useTextSelection';
 import { notifications } from '@mantine/notifications';
+import { AnimatePresence, motion } from 'framer-motion';
 
-import { ShimmerButton } from './landing/ShimmerButton';
-
-import Link from 'next/link';
-
+// --- KALPAD OS IMPORTS ---
+import { GlassCard } from '@/components/GlassCard';
+import { Interactive } from '@/components/Interactive';
 import { FollowUpModal } from './FollowUpModal';
 
-// Markdown and LaTeX imports
+// --- MARKDOWN ENGINE ---
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-
 import markdownStyles from '../styles/MarkdownStyles.module.css';
 
-import { PrintableNote } from './PrintableNote';
-
-// import katexCSS from '!!raw-loader!katex/dist/katex.min.css';
-// import markdownCustomCSS from '!!raw-loader!../styles/MarkdownStyles.module.css';
-
-
-// --- HELPER FUNCTIONS FOR DYNAMIC BADGE COLORS ---
-const getDayDifficultyColor = (difficulty) => {
-    switch (difficulty?.toLowerCase()) {
-        case 'easy': return 'green';
-        case 'medium': return 'yellow';
-        case 'hard': return 'orange';
-        case 'intense': return 'red';
-        default: return 'gray';
-    }
-};
-
-const getSubTopicTypeColor = (type) => {
-    switch (type?.toLowerCase()) {
-        case 'concept': return 'blue';
-        case 'problem-solving': return 'grape';
-        case 'derivation': return 'cyan';
-        case 'review': return 'teal';
-        default: return 'gray';
-    }
-};
-
+// --- CONSTANTS ---
 const PDF_CSS = `@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lexend+Deca:wght@900&display=swap');
 body { font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; color: #222; margin: 2rem; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Lexend Deca', sans-serif; font-weight: 600; margin: 1.5rem 0 0.75rem 0; color: #111; }
@@ -73,57 +51,50 @@ th { background: #f0f0f0; }
 .katex { font-family: 'Lexend Deca', 'Inter', serif; font-size: 1em; }
 @page { size: A4; margin: 0.3in; }`;
 
-export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet = false }) {
+// --- MODAL STYLES ---
+const glassPopupStyles = {
+    content: { 
+        backgroundColor: '#1C1C1E', 
+        border: '1px solid rgba(255, 255, 255, 0.1)', 
+        borderRadius: '20px',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+    },
+    header: { backgroundColor: 'transparent' },
+    title: { fontFamily: 'var(--font-lexend)', fontWeight: 600, color: 'white' },
+    close: { color: 'gray', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' } }
+};
 
+export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet = false }) {
     const [renderContent, setRenderContent] = useState(false);
     const { selection, clearSelection } = useTextSelection();
+    
+    // Modals
     const [followUpModalOpened, { open: openFollowUpModal, close: closeFollowUpModal }] = useDisclosure(false);
-    const [customQuestion, setCustomQuestion] = useState('');
+    const [exportModalOpened, { open: openExportModal, close: closeExportModal }] = useDisclosure(false);
 
-    // --- DEFINITIVE FIX: CUSTOM STATE MANAGEMENT (REPLACES `useChat`) ---
+    // Logic State
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [aiResponse, setAiResponse] = useState(null);
-
     const [isExporting, setIsExporting] = useState(false);
 
-    const [exportModalOpened, { open: openExportModal, close: closeExportModal }] = useDisclosure(false);
-
-    // This effect delays the rendering of the heavy markdown content.
+    // --- EFFECTS ---
     useEffect(() => {
         if (noteData) {
-            // When the modal is told to open, wait a short moment for the animation to start.
-            const timer = setTimeout(() => {
-                setRenderContent(true);
-            }, 100); // 100ms is a good starting point
-
+            const timer = setTimeout(() => setRenderContent(true), 100);
             return () => clearTimeout(timer);
         } else {
-            // When the modal closes, immediately hide the content so it's fresh for next time.
             setRenderContent(false);
         }
     }, [noteData]);
 
-    // Defensive check: If no note data, render nothing.
-    if (!noteData) {
-        return null;
-    }
+    if (!noteData) return null;
     
-    // Destructure all the necessary data with fallbacks
-    const { 
-        notes_markdown = "No content available.",
-        sub_topic = {},
-        day_topic = {},
-        exam_name = "Study Plan"
-    } = noteData;
+    const { notes_markdown = "No content available.", sub_topic = {}, day_topic = {}, exam_name = "Study Plan" } = noteData;
     
+    // --- HANDLERS ---
     const handleDoubtRequest = async (action, questionText = '') => {
-        setIsLoading(true);
-        setError(null);
-        setAiResponse(null);
-        clearSelection();
-        closeFollowUpModal();
-
+        setIsLoading(true); setError(null); setAiResponse(null); clearSelection(); closeFollowUpModal();
         const bodyPayload = {
             fullNoteContent: notes_markdown,
             context: { examName: exam_name, dayTopic: day_topic.topic_name, subTopic: sub_topic.text },
@@ -131,361 +102,250 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
             highlightedText: action !== 'custom' ? selection.text : undefined,
             question: action === 'custom' ? questionText : undefined,
         };
-
         try {
-            const response = await fetch('/api/solve-doubt', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(bodyPayload) // No `data` nesting
-            });
-
+            const response = await fetch('/api/solve-doubt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyPayload) });
             const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error || 'The AI tutor failed to respond.');
-            }
-            
+            if (!response.ok) throw new Error(data.error || 'The AI tutor failed to respond.');
             setAiResponse(data.response);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setIsLoading(false);
-            setCustomQuestion('');
-        }
+        } catch (err) { setError(err.message); } finally { setIsLoading(false); }
     };
-
 
     const handleMarkAsComplete = () => {
-        // 1. Find the index of the sub-topic that needs to be updated.
         const subTopicIndex = day_topic.sub_topics?.findIndex(st => st.text === sub_topic.text);
-        
-        // 2. If it's found, create a new `sub_topics` array with the updated completion status.
         if (subTopicIndex !== -1) {
-            const newSubTopics = day_topic.sub_topics.map((st, index) => 
-                index === subTopicIndex ? { ...st, completed: true } : st
-            );
-            
-            // 3. Call the parent `onUpdate` function with the correct signature: (planTopicId, { updates })
+            const newSubTopics = day_topic.sub_topics.map((st, index) => index === subTopicIndex ? { ...st, completed: true } : st);
             onUpdate(day_topic.id, { sub_topics: newSubTopics });
-
-            // 4. Provide clear user feedback.
-            notifications.show({
-                title: 'Task Completed!',
-                message: `"${sub_topic.text}" has been marked as complete.`,
-                color: 'green',
-                icon: <IconCircleCheck size={18} />,
-            });
+            notifications.show({ title: 'Task Completed!', message: `"${sub_topic.text}" has been marked as complete.`, color: 'green', icon: <IconCircleCheck size={18} /> });
         }
-        onClose(); // Close the modal
+        onClose();
     };
 
-     const customRenderers = {
-        img: ({ node, ...props }) => {
-            // --- DEFINITIVE FIX: CONDITIONAL STYLING ---
-            // Check if the image source is an SVG.
-            const isSvg = props.src.endsWith('.svg');
-
-            // Define the base style for all images.
-            const baseStyle = {
-                maxWidth: '100%',
-                maxHeight: '1500px',
-                borderRadius: '8px',
-            };
-
-            // Conditionally add the background and padding only for SVGs.
-            const finalStyle = isSvg 
-                ? { ...baseStyle, background: 'black', padding: '0.5rem' } 
-                : baseStyle;
-
-            return (
-                <span style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}>
-                    <img {...props} style={finalStyle} />
-                </span>
-            );
-        },
-    };
-
-     const handleCloseResponseModal = () => {
-        setAiResponse(null);
-        setError(null);
-    };
-const handleExportToPdf = async () => {
-        if (!noteData) return;
-        setIsExporting(true);
-        try {
-            const response = await fetch('/api/export-note-pdf', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    markdown: notes_markdown,
-                    topicName: day_topic.topic_name,
-                    subTopicName: sub_topic.text,
-                    css: PDF_CSS, // Send the definitive CSS
-                }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to export PDF.');
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const fileName = `${sub_topic.text.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-            notifications.show({ title: 'Export Successful', message: 'Your PDF has started downloading.', color: 'green' });
-        } catch (err) {
-            notifications.show({ title: 'Export Failed', message: err.message, color: 'red' });
-        } finally {
-            setIsExporting(false);
-        }
-    };
-
-const handleAutoPrint = () => {
-    if (!noteData) return;
-    setIsExporting(true);
-
-    const printUrl = isCramSheet 
-    ? `/print-cram-sheet/${noteData.id}` 
-    : `/print/${noteData.id}`;
-
-    const printWindow = window.open(printUrl, '_blank');
-
-    if (!printWindow) {
-        notifications.show({
-            title: 'Popup Blocked',
-            message: 'Please allow popups for this site to export your note.',
-            color: 'yellow',
-        });
-        setIsExporting(false);
-        return;
-    }
-
-    // --- THE DEFINITIVE "LISTENER" LOGIC ---
-    const handleMessage = (event) => {
-        // 1. We only care about messages from the window we just opened.
-        if (event.source !== printWindow) {
-            return;
-        }
-        
-        // 2. We only care about our specific "ready" signal.
-        if (event.data === 'KALPAD_PRINT_READY') {
-            console.log("Print page is ready. Triggering print command.");
-            
-            // 3. Trigger the print command on the popup window.
-            printWindow.print();
-            setIsExporting(false); // Can re-enable the button now
-            
-            // 4. Clean up this listener to prevent memory leaks.
-            window.removeEventListener('message', handleMessage);
-        }
-    };
-
-    const handleAfterPrint = () => {
-        printWindow.close();
-        printWindow.removeEventListener('afterprint', handleAfterPrint);
-        // Ensure the message listener is also cleaned up if the user closes the print dialog
-        window.removeEventListener('message', handleMessage);
-    };
-    
-    // Start listening for messages from the popup window.
-    window.addEventListener('message', handleMessage);
-    // Listen for when the print dialog is closed.
-    printWindow.addEventListener('afterprint', handleAfterPrint, { once: true });
-};
-
-    // Handler 1: API-based export
     const handleAPIBasedExport = async () => {
-        setIsExporting(true);
-        closeExportModal(); // Close the choice modal
+        setIsExporting(true); closeExportModal();
         try {
-            const response = await fetch('/api/export-note-pdf', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    markdown: notes_markdown,
-                    topicName: day_topic.topic_name,
-                    subTopicName: sub_topic.text,
-                    css: PDF_CSS,
-                }),
-            });
-            if (!response.ok) { throw new Error((await response.json()).error || 'Failed to export PDF.'); }
+            const response = await fetch('/api/export-note-pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markdown: notes_markdown, topicName: day_topic.topic_name, subTopicName: sub_topic.text, css: PDF_CSS }) });
+            if (!response.ok) throw new Error((await response.json()).error || 'Failed to export PDF.');
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const fileName = `${sub_topic.text.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-            notifications.show({ title: 'Export Successful', message: 'Your PDF has started downloading.', color: 'green' });
-        } catch (err) {
-            notifications.show({ title: 'Export Failed', message: err.message, color: 'red' });
-        } finally {
-            setIsExporting(false);
-        }
+            const a = document.createElement('a'); a.href = url; a.download = `${sub_topic.text.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+            document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
+            notifications.show({ title: 'Export Successful', message: 'Downloading PDF...', color: 'green' });
+        } catch (err) { notifications.show({ title: 'Export Failed', message: err.message, color: 'red' }); } finally { setIsExporting(false); }
     };
 
-    // Handler 2: The high-quality, client-side auto-print
     const handleClientSidePrint = () => {
-        setIsExporting(true);
-        closeExportModal(); // Close the choice modal
-        const printUrl = isCramSheet 
-            ? `/print-cram-sheet/${noteData.id}` 
-            : `/print/${noteData.id}`;
+        setIsExporting(true); closeExportModal();
+        const printUrl = isCramSheet ? `/print-cram-sheet/${noteData.id}` : `/print/${noteData.id}`;
         const printWindow = window.open(printUrl, '_blank');
-        if (!printWindow) {
-            notifications.show({ title: 'Popup Blocked', message: 'Please allow popups for this site to export your note.', color: 'yellow' });
-            setIsExporting(false);
-            return;
-        }
-        const handleMessage = (event) => {
-            if (event.source === printWindow && event.data === 'KALPAD_PRINT_READY') {
-                printWindow.print();
-                setIsExporting(false);
-                window.removeEventListener('message', handleMessage);
-            }
-        };
-        const handleAfterPrint = () => {
-            printWindow.close();
-            printWindow.removeEventListener('afterprint', handleAfterPrint);
-            window.removeEventListener('message', handleMessage);
-        };
+        if (!printWindow) { notifications.show({ title: 'Popup Blocked', message: 'Please allow popups.', color: 'yellow' }); setIsExporting(false); return; }
+        const handleMessage = (event) => { if (event.source === printWindow && event.data === 'KALPAD_PRINT_READY') { printWindow.print(); setIsExporting(false); window.removeEventListener('message', handleMessage); } };
+        const handleAfterPrint = () => { printWindow.close(); printWindow.removeEventListener('afterprint', handleAfterPrint); window.removeEventListener('message', handleMessage); };
         window.addEventListener('message', handleMessage);
         printWindow.addEventListener('afterprint', handleAfterPrint, { once: true });
     };
 
+    const handleCloseResponseModal = () => {
+        setAiResponse(null);
+        setError(null);
+    };
 
+    const customRenderers = {
+        img: ({ node, ...props }) => {
+            const isSvg = props.src.endsWith('.svg');
+            const finalStyle = isSvg ? { maxWidth: '100%', maxHeight: '1500px', borderRadius: '8px', background: 'black', padding: '0.5rem' } : { maxWidth: '100%', maxHeight: '1500px', borderRadius: '8px' };
+            return <span style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}><img {...props} style={finalStyle} /></span>;
+        },
+    };
 
+    // --- RENDER ---
     return (
         <>
-        <Modal
-            opened={!!noteData}
-            onClose={onClose}
-            fullScreen
-            withCloseButton
-            size="90%" // Uses 90% of the viewport width for a better reading experience
-            title={
-                <Text fw={500}>{exam_name}</Text>
-            }
-            styles={{
-                header: { background: 'var(--mantine-color-dark-8)' },
-                body: { height: 'calc(100% - 60px)', background: 'var(--mantine-color-dark-8)' },
-            }}
-
-            transitionProps={{ duration: 200 }} 
-            zIndex={3000}
-        >
-
-            <Popover opened={selection.text.length > 5} position="top" withArrow shadow="md" zIndex={3002}>
+            {/* 1. THE FULLSCREEN READER MODAL */}
+            <Modal
+                opened={!!noteData}
+                onClose={onClose}
+                fullScreen
+                withCloseButton={false} 
+                padding={0}
+                zIndex={3000}
+                styles={{
+                    root: { '--modal-size': '100vw' },
+                    content: { backgroundColor: 'var(--mantine-color-dark-8)' }, 
+                    body: { height: '100vh', overflow: 'hidden', backgroundColor: '#0A0A0A' }
+                }}
+            >
+                {/* --- CONTEXT LENS (POPOVER) --- */}
+                <Popover opened={selection.text.length > 5} position="top" withArrow shadow="xl" zIndex={3002}>
                     <Popover.Target>
-                        <div style={{ position: 'absolute', top: `${selection.position.y - 45}px`, left: `${selection.position.x}px`, transform: 'translateX(-50%)' }} />
+                        <div style={{ position: 'absolute', top: `${selection.position.y}px`, left: `${selection.position.x}px`, pointerEvents: 'none' }} />
                     </Popover.Target>
-                    <Popover.Dropdown>
+                    <Popover.Dropdown style={{ 
+                        backgroundColor: 'rgba(30, 30, 35, 0.9)', 
+                        backdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        padding: '6px',
+                        borderRadius: '99px'
+                    }}>
                         <Group gap="xs">
-                            <Tooltip label="Explain this simply" zIndex={3003} withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('explain')}><IconBook size={18} /></ActionIcon></Tooltip>
-                            <Tooltip label="Give a real-world analogy" zIndex={3003} withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('analogy')}><IconBulb size={18} /></ActionIcon></Tooltip>
-                            <Tooltip label="Why is this important?" zIndex={3003} withArrow><ActionIcon variant="default" onClick={() => handleDoubtRequest('importance')}><IconMessageCircle size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Explain" withArrow><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('explain')}><IconBook size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Analogy" withArrow><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('analogy')}><IconBulb size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Importance" withArrow><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('importance')}><IconMessageCircle size={18} /></ActionIcon></Tooltip>
                         </Group>
                     </Popover.Dropdown>
                 </Popover>
 
-
-            <ScrollArea h="100%" type="auto">
-                <Stack p="md" className="printable-note-area">
-                    {/* --- THE IMMERSIVE HEADER --- */}
-                    <Stack gap="xs" className="modal-header">
-                        <Title order={2} ff="Lexend, sans-serif">{day_topic.topic_name}</Title>
-                        <Title order={4} fw={500}>{sub_topic.text}</Title>
-                        {!isCramSheet && (
-                        <Group>
-                            <Badge color={getDayDifficultyColor(day_topic.day_difficulty)} variant="light">
-                                Day: {day_topic.day_difficulty}
-                            </Badge>
-                             <Badge color={getDayDifficultyColor(sub_topic.difficulty)} variant="light">
-                                Task: {sub_topic.difficulty}
-                            </Badge>
-                        </Group>
-                        )}
-                    </Stack>
-                    
-                    {/* --- THE ACTION BAR --- */}
-                    <Group justify="flex-end" className="action-bar">
-                        <Button
-                                leftSection={<IconFileExport size={16} />}
-                                variant="default"
-                                onClick={openExportModal} // This now opens the choice modal
-                                loading={isExporting}
-                            >
-                                Export to PDF
-                        </Button>
-                        {/* --- DEFINITIVE ADDITION: THE "ASK A FOLLOW-UP" BUTTON --- */}
-                        <Button
-                            leftSection={<IconMessageQuestion size={16} />}
-                            variant="default"
-                            onClick={openFollowUpModal}
+                {/* --- FLOATING CLOSE BUTTON (Top Right) --- */}
+                <Box style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 50 }}>
+                    <Interactive onClick={onClose}>
+                        <ActionIcon 
+                            size="xl" 
+                            radius="xl" 
+                            variant="filled" 
+                            color="gray" 
+                            style={{ 
+                                backgroundColor: 'rgba(255,255,255,0.1)',
+                                backdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                color: 'white'
+                            }}
                         >
-                            Ask a Follow-up
-                        </Button>
+                            <IconX size={24} />
+                        </ActionIcon>
+                    </Interactive>
+                </Box>
 
-                        {!isCramSheet && (
-                        <ShimmerButton
-                            leftSection={<IconCircleCheck size={16} />}
-                            color="green"
-                            variant="light"
-                            onClick={handleMarkAsComplete}
-                            disabled={sub_topic.completed}
+                {/* --- MAIN SCROLL AREA --- */}
+                <ScrollArea h="100vh" type="auto" offsetScrollbars>
+                    <Box pt={80} pb={150}> 
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.4 }}
+                            style={{ 
+                                width: '100%',
+                                maxWidth: '100%', // EDGE TO EDGE
+                                padding: '0 5%', // Comfortable gutters
+                                margin: '0 auto'
+                            }}
                         >
-                            {sub_topic.completed ? 'Completed' : 'Mark as Complete'}
-                        </ShimmerButton>
-                        )}
-                    </Group>
-                    
-                   <Box className={markdownStyles.markdown}>
-                        {renderContent ? (
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm, remarkMath]}
-                                rehypePlugins={[rehypeRaw, rehypeKatex]}
-                                components={customRenderers}
-                            >
-                                {notes_markdown}
-                            </ReactMarkdown>
-                        ) : (
-                            <Group justify="center" p="xl">
-                                <Loader />
-                            </Group>
-                        )}
+                            {/* --- THE DOCUMENT TITLE BLOCK --- */}
+                            <Box mb="xl" pb="lg" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                <Text size="lg" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }} mb={4}>
+                                    {day_topic.topic_name}
+                                </Text>
+                                <Title 
+                                    order={1} 
+                                    className="apple-text-gradient"
+                                    style={{ 
+                                        fontFamily: 'var(--font-lexend)', 
+                                        fontSize: 'clamp(2.5rem, 5vw, 4rem)',
+                                        fontWeight: 800,
+                                        letterSpacing: '-0.03em',
+                                        lineHeight: 1.1
+                                    }}
+                                >
+                                    {sub_topic.text}
+                                </Title>
+                            </Box>
+
+                            {/* --- CONTENT SURFACE --- */}
+                            {renderContent ? (
+                                <Box className={markdownStyles.markdown} style={{ fontSize: '1.125rem' }}>
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                        rehypePlugins={[rehypeRaw, rehypeKatex]}
+                                        components={customRenderers}
+                                    >
+                                        {notes_markdown}
+                                    </ReactMarkdown>
+                                </Box>
+                            ) : (
+                                <Group justify="center" p="xl"><Loader color="gray" type="dots" /></Group>
+                            )}
+                        </motion.div>
                     </Box>
-                </Stack>
-            </ScrollArea>
+                </ScrollArea>
 
-        </Modal>
+                {/* --- FLOATING COMMAND DOCK (Bottom, Labeled) --- */}
+                <Box 
+                    style={{ 
+                        position: 'fixed', 
+                        bottom: '32px', 
+                        left: '50%', 
+                        transform: 'translateX(-50%)', 
+                        zIndex: 40 
+                    }}
+                >
+                    <GlassCard 
+                        p={8} 
+                        radius="xl"
+                        style={{ 
+                            backgroundColor: 'rgba(30, 30, 35, 0.85)', 
+                            backdropFilter: 'blur(24px) saturate(180%)',
+                            boxShadow: '0 20px 50px -10px rgba(0,0,0,0.6)',
+                            display: 'flex', alignItems: 'center', gap: '8px'
+                        }}
+                    >
+                        <Interactive onClick={openFollowUpModal}>
+                            <Button 
+                                variant="subtle" 
+                                color="gray" 
+                                radius="xl" 
+                                leftSection={<IconMessageQuestion size={20} />}
+                                style={{ color: 'white', fontWeight: 500 }}
+                            >
+                                Ask Tutor
+                            </Button>
+                        </Interactive>
 
-        <Modal
+                        <Interactive onClick={openExportModal}>
+                            <Button 
+                                variant="subtle" 
+                                color="gray" 
+                                radius="xl" 
+                                leftSection={<IconFileExport size={20} />}
+                                loading={isExporting}
+                                style={{ color: 'white', fontWeight: 500 }}
+                            >
+                                Export
+                            </Button>
+                        </Interactive>
+
+                        {!isCramSheet && (
+                            <Interactive onClick={handleMarkAsComplete}>
+                                <Button 
+                                    radius="xl" 
+                                    color={sub_topic.completed ? 'teal' : 'brandPurple'}
+                                    variant="gradient"
+                                    gradient={sub_topic.completed ? { from: 'teal', to: 'green' } : { from: '#BF5AF2', to: '#5E5CE6' }}
+                                    leftSection={<IconCircleCheck size={20} />}
+                                    disabled={sub_topic.completed}
+                                    style={{ boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}
+                                >
+                                    {sub_topic.completed ? 'Done' : 'Complete'}
+                                </Button>
+                            </Interactive>
+                        )}
+                    </GlassCard>
+                </Box>
+
+            </Modal>
+
+            {/* --- ANCILLARY MODALS --- */}
+            <Modal
                 opened={isLoading || !!aiResponse || !!error}
                 onClose={handleCloseResponseModal}
-                title={ <Group> <IconSparkles size={20} /> <Title order={4}>The Professor</Title> </Group> }
+                title={<Group gap="xs"><IconSparkles size={18} color="#A78BFA"/><Text inherit>AI Tutor</Text></Group>}
                 centered size="xl"
                 zIndex={3001}
+                styles={glassPopupStyles}
             >
                 <Stack>
-                    {isLoading && <Group justify="center" p="xl"><Loader /></Group>}
-                    {error && <Alert color="red" title="An error occurred">{error}</Alert>}
+                    {isLoading && <Group justify="center" p="xl"><Loader color="violet" /></Group>}
+                    {error && <Alert color="red" title="Error">{error}</Alert>}
                     {aiResponse && (
                         <Box className={markdownStyles.markdown} mah="60vh" style={{ overflowY: 'auto' }}>
-                             {/* --- DEFINITIVE FIX: ADDED FULL SUITE OF PLUGINS --- */}
-                             <ReactMarkdown
-                                remarkPlugins={[remarkGfm, remarkMath]}
-                                rehypePlugins={[rehypeRaw, rehypeKatex]}
-                                components={customRenderers}
-                            >
+                             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, rehypeKatex]} components={customRenderers}>
                                 {aiResponse}
                             </ReactMarkdown>
                         </Box>
@@ -493,51 +353,24 @@ const handleAutoPrint = () => {
                 </Stack>
             </Modal>
 
-            <FollowUpModal
-                opened={followUpModalOpened}
-                onClose={closeFollowUpModal}
-                isLoading={isLoading}
-                onSubmit={(question) => {
-                    handleDoubtRequest('custom', question);
-                }}
-            />
+            <FollowUpModal opened={followUpModalOpened} onClose={closeFollowUpModal} isLoading={isLoading} onSubmit={(q) => handleDoubtRequest('custom', q)} />
 
-            <Modal
-                opened={exportModalOpened}
-                onClose={closeExportModal}
-                title={<Title order={3} ff="Lexend, sans-serif">Choose Export Quality</Title>}
-                centered
-                zIndex={3010}
-            >
+            <Modal opened={exportModalOpened} onClose={closeExportModal} title="Export Options" centered zIndex={3010} styles={glassPopupStyles}>
                 <Stack>
-                    <Text c="dimmed" size="sm" mb="md">
-                        Select an export method based on your needs.
-                    </Text>
-                    <Paper withBorder p="md" radius="md" style={{ cursor: 'pointer' }} onClick={handleAPIBasedExport}>
+                    <Paper withBorder p="md" radius="md" style={{ cursor: 'pointer', backgroundColor: 'transparent' }} onClick={handleAPIBasedExport}>
                         <Group>
-                            <ThemeIcon color="teal" size="lg" variant="light">
-                                <IconBolt size={20} />
-                            </ThemeIcon>
-                            <Box>
-                                <Text fw={500}>Fast Export</Text>
-                                <Text size="xs" c="dimmed">Quickest method. Good for text, but may have minor styling issues with complex math.</Text>
-                            </Box>
+                            <ThemeIcon color="teal" size="lg" variant="light"><IconBolt size={20}/></ThemeIcon>
+                            <Box><Text fw={500} c="white">Fast Export</Text><Text size="xs" c="dimmed">Quick .pdf generation</Text></Box>
                         </Group>
                     </Paper>
-                    <Paper withBorder p="md" radius="md" style={{ cursor: 'pointer' }} onClick={handleClientSidePrint}>
+                    <Paper withBorder p="md" radius="md" style={{ cursor: 'pointer', backgroundColor: 'transparent' }} onClick={handleClientSidePrint}>
                         <Group>
-                            <ThemeIcon color="brandPurple" size="lg" variant="light">
-                                <IconAward size={20} />
-                            </ThemeIcon>
-                            <Box>
-                                <Text fw={500}>High-Quality Export</Text>
-                                <Text size="xs" c="dimmed">Pixel-perfect rendering. Recommended for final drafts. May be slower to load.</Text>
-                            </Box>
+                            <ThemeIcon color="brandPurple" size="lg" variant="light"><IconAward size={20}/></ThemeIcon>
+                            <Box><Text fw={500} c="white">High-Quality</Text><Text size="xs" c="dimmed">Pixel-perfect print rendering</Text></Box>
                         </Group>
                     </Paper>
                 </Stack>
             </Modal>
         </>
-
     );
 }

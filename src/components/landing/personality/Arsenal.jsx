@@ -1,123 +1,155 @@
-// src/components/landing/personality/Arsenal.jsx
 "use client";
 
-import { useState } from 'react';
-import { Container, Title, Text, SimpleGrid, Paper, Stack } from '@mantine/core';
+import { Container, Title, Text, SimpleGrid, Stack, Box, Group, ThemeIcon, Badge } from '@mantine/core';
 import { motion } from 'framer-motion';
+import { IconBrain, IconFileText, IconRadar2, IconCpu, IconBolt, IconSearch } from '@tabler/icons-react';
 import { GlassCard } from '../../GlassCard'; 
+import { Interactive } from '@/components/Interactive';
 
-const features = [
-    {
-        emoji: '🎯',
-        title: 'The Strategist',
-        description: 'Our AI acts like a ruthless senior who red-pens your syllabus, highlights the gold, and crosses out the garbage. Its "Strategy Report" is brutally honest.',
-        accents: ['🔥', '🗑️']
-    },
-    {
-        emoji: '🤯',
-        title: 'The Professor',
-        description: "This AI can actually make sense of your professor's hieroglyphics. It reads your chaotic notes and generates a single, beautiful document that sounds like it was written by a human who actually slept.",
-        accents: ['✍️', '✨']
-    },
-    {
-        emoji: '🎬',
-        title: 'The Scout',
-        description: 'Our Lecture Scout slays the YouTube algorithm for you. It hunts for high-signal lectures and ignores the ones with 5-minute "LIKE AND SUBSCRIBE PLS" intros.',
-        accents: ['🤫', '⚡']
-    }
-];
-
-// A single, reusable card component with the flip logic built-in
-function FlipCard({ feature }) {
-    const [isFlipped, setIsFlipped] = useState(false);
-
-    const cardStyles = {
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        backfaceVisibility: 'hidden',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        padding: 'var(--mantine-spacing-xl)',
-    };
-
+// --- SUB-COMPONENT: THE SYSTEM CARD ---
+function SystemCard({ icon: Icon, label, title, description, accentColor, delay }) {
     return (
-        <div
-            onMouseEnter={() => setIsFlipped(true)}
-            onMouseLeave={() => setIsFlipped(false)}
-            style={{
-                width: '100%',
-                minHeight: '350px',
-                backgroundColor: 'transparent',
-                perspective: '1000px',
-            }}
-        >
+        <Interactive className="h-full">
             <motion.div
-                style={{
-                    position: 'relative',
-                    width: '100%',
-                    height: '100%',
-                    transformStyle: 'preserve-3d',
-                }}
-                animate={{ rotateY: isFlipped ? 180 : 0 }}
-                transition={{ duration: 0.6 }}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: delay }}
+                viewport={{ once: true }}
+                style={{ height: '100%' }}
             >
-                {/* --- FRONT OF THE CARD --- */}
                 <GlassCard 
+                    p="xl" 
+                    h="100%"
                     style={{ 
-                        ...cardStyles,
-                        // --- FIX #1: Less blur, brighter background ---
-                        backgroundColor: 'rgba(37, 38, 43, 0.6)',
-                        backdropFilter: 'blur(8px)',
+                        backgroundColor: 'rgba(20, 20, 25, 0.6)',
+                        border: `1px solid rgba(255,255,255,0.05)`,
+                        // Dynamic glow on hover handled by Interactive wrapper, 
+                        // but we add a static subtle glow here
+                        boxShadow: `0 0 0 1px ${accentColor}10, inset 0 0 20px ${accentColor}05`,
+                        display: 'flex',
+                        flexDirection: 'column'
                     }}
                 >
-                    <Stack align="center">
-                        <Text fz={80} lh={1}>{feature.emoji}</Text>
-                        <Title order={3} ff="Lexend, sans-serif">{feature.title}</Title>
-                    </Stack>
-                </GlassCard>
+                    {/* Header: Tech Label */}
+                    <Group justify="space-between" mb="xl">
+                        <Badge 
+                            variant="outline" 
+                            color="gray" 
+                            size="sm" 
+                            styles={{ root: { borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-lexend)' } }}
+                        >
+                            {label}
+                        </Badge>
+                        <motion.div 
+                            animate={{ opacity: [0.3, 1, 0.3] }} 
+                            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                        >
+                            <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: accentColor, boxShadow: `0 0 10px ${accentColor}` }} />
+                        </motion.div>
+                    </Group>
 
-                {/* --- BACK OF THE CARD --- */}
-                <GlassCard 
-                    style={{ 
-                        ...cardStyles, 
-                        transform: 'rotateY(180deg)',
-                        // --- FIX #2: More blur, darker background ---
-                        backgroundColor: 'rgba(23, 24, 28, 0.7)',
-                        backdropFilter: 'blur(16px)',
-                    }}
-                >
-                    <motion.span style={{ position: 'absolute', top: 20, left: 20, opacity: 0.5, fontSize: '1.5rem' }}>{feature.accents[0]}</motion.span>
-                    <motion.span style={{ position: 'absolute', bottom: 20, right: 20, opacity: 0.5, fontSize: '1.5rem' }}>{feature.accents[1]}</motion.span>
-                    
-                    <Stack align="center">
-                        <Title order={4} ff="Lexend, sans-serif">{feature.title}</Title>
-                        <Text c="dimmed">{feature.description}</Text>
+                    {/* Icon Core */}
+                    <Box mb="lg">
+                        <ThemeIcon 
+                            size={60} 
+                            radius="md" 
+                            variant="gradient" 
+                            gradient={{ from: `${accentColor}20`, to: `${accentColor}05`, deg: 145 }}
+                            style={{ border: `1px solid ${accentColor}30` }}
+                        >
+                            <Icon size={30} color={accentColor} stroke={1.5} />
+                        </ThemeIcon>
+                    </Box>
+
+                    {/* Content */}
+                    <Stack gap="md" style={{ flex: 1 }}>
+                        <Title order={3} ff="Lexend, sans-serif" size="h3" c="white">
+                            {title}
+                        </Title>
+                        <Text c="dimmed" size="md" lh={1.6}>
+                            {description}
+                        </Text>
                     </Stack>
+
+                    {/* Footer: Tech Specs (Visual Filler) */}
+                    <Group mt="xl" gap="xs" style={{ opacity: 0.3 }}>
+                        <IconCpu size={14} />
+                        <Text size="10px" ff="monospace">v2.5.0</Text>
+                        <Box style={{ width: 1, height: 10, backgroundColor: 'white' }} />
+                        <IconBolt size={14} />
+                        <Text size="10px" ff="monospace">LATENCY: 40ms</Text>
+                    </Group>
                 </GlassCard>
             </motion.div>
-        </div>
+        </Interactive>
     );
 }
 
-
-
 export function Arsenal() {
     return (
-        <Container size="lg" py={80}>
-            <Stack align="center" ta="center" gap="xs" mb={50}>
-                 <Title order={2} ff="Lexend, sans-serif" fz={{ base: '2rem', sm: '2.5rem' }}>
-                    Meet the slightly unhinged AI crew that does your dirty work.
-                </Title>
-            </Stack>
+        <Box py={{ base: 100, md: 160 }} style={{ position: 'relative', zIndex: 10 }}>
+            <Container size="lg">
+                
+                {/* --- SECTION HEADER --- */}
+                <Stack align="center" ta="center" gap="md" mb={80}>
+                    <Badge 
+                        variant="filled" 
+                        color="dark" 
+                        size="lg" 
+                        radius="sm"
+                        style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', letterSpacing: '0.1em' }}
+                    >
+                        SYSTEM ARCHITECTURE
+                    </Badge>
+                    <Title 
+                        order={2} 
+                        className="apple-text-gradient"
+                        style={{ 
+                            fontFamily: 'var(--font-lexend)', 
+                            fontSize: 'clamp(2.5rem, 5vw, 3.5rem)', 
+                            letterSpacing: '-0.03em',
+                            lineHeight: 1.1
+                        }}
+                    >
+                        Three engines. One objective.
+                    </Title>
+                    <Text c="dimmed" size="xl" maw={600}>
+                        We didn't just wrap ChatGPT. We engineered a dedicated workflow for academic dominance.
+                    </Text>
+                </Stack>
 
-            <SimpleGrid cols={{ base: 1, md: 3 }} spacing={40}>
-                {features.map((feature) => (
-                    <FlipCard key={feature.title} feature={feature} />
-                ))}
-            </SimpleGrid>
-        </Container>
+                {/* --- THE GRID --- */}
+                <SimpleGrid cols={{ base: 1, md: 3 }} spacing={30}>
+                    
+                    <SystemCard 
+                        icon={IconBrain}
+                        label="ENGINE 01"
+                        title="The Strategist"
+                        description="Uses Chain-of-Thought reasoning to ruthlessly triage your syllabus. It identifies high-ROI topics and cuts the fluff before you even start studying."
+                        accentColor="#34d399" // Emerald Teal
+                        delay={0}
+                    />
+
+                    <SystemCard 
+                        icon={IconFileText}
+                        label="ENGINE 02"
+                        title="Context-Aware RAG"
+                        description="Upload your chaotic PDFs. Our engine vectorizes them into a semantic knowledge base, generating textbook-quality notes that actually reference your professor's slides."
+                        accentColor="#818cf8" // Indigo
+                        delay={0.2}
+                    />
+
+                    <SystemCard 
+                        icon={IconRadar2} // Or IconSearch
+                        label="ENGINE 03"
+                        title="The Lecture Scout"
+                        description="A multi-agent crawler that navigates the noise of YouTube. It finds, verifies, and curates the single best explanation for every concept in your plan."
+                        accentColor="#f472b6" // Pink
+                        delay={0.4}
+                    />
+
+                </SimpleGrid>
+            </Container>
+        </Box>
     );
 }

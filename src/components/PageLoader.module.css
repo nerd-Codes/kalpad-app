@@ -7,42 +7,69 @@
     width: 100vw;
     height: 100vh;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: rgba(10, 10, 15, 0.5);
-    backdrop-filter: blur(10px);
-    z-index: 9999;
-}
-
-.content {
-    display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.5rem;
-    width: 100%;
-    /* The critical fix for mobile padding is preserved */
-    padding: 0 var(--mantine-spacing-md);
-    box-sizing: border-box;
+    justify-content: center;
+    
+    /* The "Living Glass" Effect */
+    background-color: rgba(0, 0, 0, 0.6); /* Deep dark base */
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    
+    z-index: 9999;
+    overflow: hidden;
 }
 
-.logo {
+/* The "Shimmering" Typography */
+.shimmerText {
     font-family: var(--font-lexend);
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: white;
-    /* The restored float animation */
-    animation: float 3s ease-in-out infinite;
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    
+    /* The Light Beam Gradient */
+    background: linear-gradient(
+        to right, 
+        rgba(255, 255, 255, 0.4) 0%, 
+        #ffffff 50%, 
+        rgba(255, 255, 255, 0.4) 100%
+    );
+    background-size: 200% auto;
+    
+    /* Masking text to background */
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    
+    /* The sweep animation */
+    animation: shine 3s linear infinite;
+    position: relative;
+    z-index: 2;
 }
 
-/* The restored keyframes for the float animation */
-@keyframes float {
-	0% {
-		transform: translateY(0px);
-	}
-	50% {
-		transform: translateY(-8px);
-	}
-	100% {
-		transform: translateY(0px);
-	}
+@keyframes shine {
+    to {
+        background-position: 200% center;
+    }
+}
+
+/* The "Status Pill" Container */
+.glassPill {
+    margin-top: 2rem;
+    padding: 12px 24px;
+    
+    /* High-Fidelity Glass Material */
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 
+        0 4px 20px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    
+    border-radius: 999px; /* Full Pill */
+    max-width: 90%;
+    width: auto;
+    text-align: center;
+    position: relative;
+    z-index: 2;
 }
