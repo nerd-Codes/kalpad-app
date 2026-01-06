@@ -255,7 +255,7 @@ export default function AllPlansPage() {
                 <Group justify="space-between" align="end" mb={40}>
                     <Box>
                         <Title order={1} className="apple-text-gradient" style={{ fontSize: '3rem', letterSpacing: '-0.03em' }}>
-                            Mission Control
+                            All Plans
                         </Title>
                         <Text c="dimmed" size="sm" fw={500} mt={4}>
                             {activePlans.length} Active • {pastPlans.length} Archived

@@ -6,7 +6,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: #1a1b1e; /* A very dark base color */
+  background-color: #1a1b1e; /* Original dark base */
   z-index: -10;
   overflow: hidden;
 }
@@ -14,11 +14,12 @@
 .blob {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.4;
+  opacity: 0.4; /* Desktop Opacity */
   filter: blur(100px);
   will-change: transform;
 }
 
+/* Original Colors & Positions */
 .blob1 {
   width: 400px;
   height: 400px;
@@ -56,4 +57,18 @@
   100% {
     transform: translate(-30px, 40px) scale(0.9);
   }
+}
+
+/* --- MOBILE OPTIMIZATION --- */
+@media (max-width: 768px) {
+  .blob {
+    /* Significantly darker on mobile to prevent washing out white text */
+    opacity: 0.2; 
+    filter: blur(80px);
+  }
+
+  /* Adjust sizes slightly so they don't overwhelm small screens */
+  .blob1 { width: 300px; height: 300px; }
+  .blob2 { width: 350px; height: 350px; }
+  .blob3 { width: 250px; height: 250px; }
 }

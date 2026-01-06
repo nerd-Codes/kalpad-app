@@ -290,7 +290,7 @@ export default function NewPlanPage() {
             <Container size="xl" pt="md" px="md" style={{ overflowX: 'hidden', maxWidth: '100vw' } } className="no-scrollbar">
                 <Box mb="xl">
                     <Title order={1} className="apple-text-gradient" style={{ fontSize: '3rem', letterSpacing: '-0.03em' }}>
-                        Creation Studio
+                        Create New Plan
                     </Title>
                     <Text c="dimmed" size="lg" mt={4}>Architect your path to victory.</Text>
                 </Box>

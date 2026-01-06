@@ -124,7 +124,7 @@ export default function DashboardPage() {
                         {format(new Date(), 'EEEE, MMMM do')}
                     </Text>
                     <Title order={1} className="apple-text-gradient" style={{ fontSize: '3rem', letterSpacing: '-0.03em' }}>
-                        Command Center
+                        Dashboard
                     </Title>
                 </Box>
 
