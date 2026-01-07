@@ -375,7 +375,7 @@ export function Hero() {
                                     <Button
                                         component="a"
                                         href="/android/kalpad.apk" // Points to public/android/kalpad.apk
-                                        download="KalPad_v1.apk"   // The name the user's file will save as
+                                        download="KalPad.apk"   // The name the user's file will save as
                                         size="xl"
                                         radius="xl"
                                         variant="default"
