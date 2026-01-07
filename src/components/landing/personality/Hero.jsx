@@ -373,17 +373,19 @@ export function Hero() {
                                 {/* 2. New Android Download Button */}
                                 <Interactive>
                                     <Button
-                                        component="a"
-                                        href="/android/kalpad.apk" // Points to public/android/kalpad.apk
-                                        download="KalPad.apk"   // The name the user's file will save as
+                                        component="a" // Force it to be a standard anchor tag
+                                        href="/android/kalpad.apk" 
+                                        target="_blank" // Opens in new context to force browser download handler
+                                        rel="noopener noreferrer" // Security best practice
+                                        download // Explicit HTML5 download attribute
                                         size="xl"
                                         radius="xl"
                                         variant="default"
-                                        leftSection={<IconBrandAndroid size={24} color="#3DDC84" />} // Official Android Green
+                                        leftSection={<IconBrandAndroid size={24} color="#3DDC84" />} 
                                         style={{ 
                                             height: '60px',
                                             fontSize: '1.1rem',
-                                            backgroundColor: 'rgba(61, 220, 132, 0.05)', // Subtle green tint
+                                            backgroundColor: 'rgba(61, 220, 132, 0.05)', 
                                             border: '1px solid rgba(61, 220, 132, 0.3)',
                                             color: 'white',
                                             boxShadow: '0 0 20px rgba(61, 220, 132, 0.1)'

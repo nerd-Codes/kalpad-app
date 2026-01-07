@@ -18,6 +18,24 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+
+  async headers() {
+    return [
+      {
+        source: "/android/:path*.apk",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "application/vnd.android.package-archive",
+          },
+          {
+            key: "Content-Disposition",
+            value: "attachment",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default withPWA(nextConfig);
