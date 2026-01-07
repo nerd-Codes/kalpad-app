@@ -167,9 +167,195 @@ export default function NewPlanPage() {
     }, [plan.length, isGenerating]);
 
     // --- HANDLERS ---
-    const sanitizeText = (text) => text; 
-    const handleFileChange = (file) => setStudyMaterialFile(file);
-    const handleProcessFile = async () => { /* ... File processing ... */ }; 
+    const sanitizeText = (text) => {
+        if (!text) return '';
+        let sanitized = text.replace(/\u0000/g, '');
+        sanitized = sanitized.replace(/([^\ud800-\udbff])([\udc00-\udfff])/g, '$1?');
+        sanitized = sanitized.replace(/([\ud800-\udbff])([^\udc00-\udfff])/g, '$1?');
+        return sanitized;
+    };
+
+    const chunkText = (text, chunkSize, chunkOverlap) => {
+        const chunks = [];
+        if (!text) return chunks;
+        let i = 0;
+        while (i < text.length) {
+            chunks.push(text.substring(i, i + chunkSize));
+            i += chunkSize - chunkOverlap;
+        }
+        return chunks;
+    };
+    
+    const resizeImage = (blob, maxWidth = 768) => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(blob);
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const scale = maxWidth / img.width;
+                canvas.width = maxWidth;
+                canvas.height = img.height * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((resizedBlob) => {
+                    if (!resizedBlob) { return reject(new Error('Canvas to Blob conversion failed')); }
+                    resolve(resizedBlob);
+                }, 'image/jpeg', 0.8);
+            };
+            img.onerror = (error) => reject(error);
+        });
+    };
+    const handleFileChange = (file) => {
+            setStudyMaterialFile(file);
+            // This now correctly updates our new state object
+            setProcessingState({
+                step: 'selected', // A new step to indicate a file is ready
+                totalPages: 0,
+                currentPage: 0,
+                message: file ? `${file.name} selected. Ready to process.` : ''
+            });
+        };
+
+   
+
+const handleProcessFile = async () => {
+    if (!studyMaterialFile || !session) return;
+    
+    setIsProcessing(true);
+    setError(''); // Clear any previous errors
+
+    try {
+        setProcessingState({ step: 'checking', currentPage: 0, totalPages: 0, message: `Checking for '${studyMaterialFile.name}'...` });
+        
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+        const fileReaderPromise = new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (err) => reject(err);
+            reader.readAsArrayBuffer(studyMaterialFile);
+        });
+        const buffer = await fileReaderPromise;
+
+        const typedarray = new Uint8Array(buffer);
+        const pdfDoc = await pdfjsLib.getDocument({ data: typedarray }).promise;
+        const pageCount = pdfDoc.numPages;
+
+        // --- Step 1: Pre-flight check ---
+        const checkResponse = await fetch('/api/check-document', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_name: studyMaterialFile.name, page_count: pageCount }),
+        });
+        if (!checkResponse.ok) {
+            const errorData = await checkResponse.json();
+            throw new Error(`Pre-check failed: ${errorData.error || 'Unknown error'}`);
+        }
+        const { status } = await checkResponse.json();
+        
+        // Detailed logging of the check status
+        console.log(`Document check status: ${status}. Pages: ${pageCount}`);
+        if (status === 'exists') {
+            setProcessingState(prev => ({ ...prev, message: `Document '${studyMaterialFile.name}' already exists. Re-indexing text.` }));
+        } else {
+            setProcessingState(prev => ({ ...prev, message: `New document or version. Starting full processing.` }));
+        }
+
+        let textChunks = [];
+        let imageUrls = []; // This will hold public URLs of images for ingestion API
+        let fullText = '';
+        
+        // --- Step 2: Parse text (always done) ---
+        setProcessingState(prev => ({ ...prev, step: 'parsing_text', currentPage: 0, totalPages: pageCount, message: `Parsing text from ${pageCount} pages...` }));
+        for (let i = 1; i <= pageCount; i++) {
+            setProcessingState(prev => ({ ...prev, currentPage: i, message: `Parsing page ${i} of ${pageCount}...` }));
+            await new Promise(res => setTimeout(res, 5)); // Allow UI to update
+            const page = await pdfDoc.getPage(i);
+            const textContent = await page.getTextContent();
+            fullText += textContent.items.map(item => item.str).join(' ') + '\n\n';
+        }
+        textChunks = chunkText(sanitizeText(fullText), 1000, 200);
+        console.log(`Parsed ${textChunks.length} text chunks.`);
+
+        // --- Step 3: Conditionally handle image rendering & uploading ---
+        if (status === 'exists') {
+            // For existing documents, fetch existing image URLs
+            setProcessingState(prev => ({ ...prev, step: 'fetching_urls', message: `Fetching existing image URLs...` }));
+            const { data: existingImages, error: fetchUrlError } = await supabase
+                .from('documents')
+                .select('image_url, page_number')
+                .eq('user_id', session.user.id)
+                .eq('file_name', studyMaterialFile.name)
+                .eq('content_type', 'image_page')
+                .order('page_number');
+            
+            if (fetchUrlError) throw new Error(`Could not fetch existing image URLs: ${fetchUrlError.message}`);
+            imageUrls = existingImages.map(img => img.image_url);
+            setPageImageUrls(imageUrls); // Update frontend state
+            console.log(`Fetched ${imageUrls.length} existing image URLs.`);
+
+        } else { // status === 'new' - full processing needed
+            setProcessingState(prev => ({ ...prev, step: 'parsing_images', currentPage: 0, totalPages: pageCount, message: `Rendering ${pageCount} page images...` }));
+            const pageImagesBlobs = [];
+            for (let i = 1; i <= pageCount; i++) {
+                setProcessingState(prev => ({ ...prev, currentPage: i, message: `Rendering page ${i} of ${pageCount}...` }));
+                await new Promise(res => setTimeout(res, 5));
+                const page = await pdfDoc.getPage(i);
+                const viewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.createElement('canvas');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                const context = canvas.getContext('2d');
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                const highResBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9));
+                const resizedBlob = await resizeImage(highResBlob);
+                pageImagesBlobs.push(resizedBlob);
+            }
+            console.log(`Rendered ${pageImagesBlobs.length} page images.`);
+
+            setProcessingState(prev => ({ ...prev, step: 'uploading_images', message: `Uploading ${pageImagesBlobs.length} images...` }));
+            for (const [index, imageBlob] of pageImagesBlobs.entries()) {
+                const fileName = `page_${index + 1}_${new Date().getTime()}.jpeg`;
+                const filePath = `${session.user.id}/${studyMaterialFile.name}/${fileName}`;
+                const { error: uploadError } = await supabase.storage.from('study-materials').upload(filePath, imageBlob, { contentType: 'image/jpeg' });
+                if (uploadError) throw uploadError;
+                const { data: { publicUrl } } = supabase.storage.from('study-materials').getPublicUrl(filePath);
+                imageUrls.push(publicUrl);
+                setProcessingState(prev => ({ ...prev, message: `Uploading image ${index + 1} of ${pageImagesBlobs.length}...` }));
+                await new Promise(res => setTimeout(res, 5));
+            }
+            setPageImageUrls(imageUrls); // Update state with newly uploaded URLs
+            console.log(`Uploaded ${imageUrls.length} new image URLs.`);
+        }
+
+        // --- Step 4: Call the unified ingestion API ---
+        setProcessingState(prev => ({ ...prev, step: 'indexing', message: `Indexing content in database...` }));
+        const ingestResponse = await fetch('/api/ingest-document', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text_chunks: textChunks,
+                page_image_urls: imageUrls,
+                file_name: studyMaterialFile.name,
+            }),
+        });
+        if (!ingestResponse.ok) {
+            const errorData = await ingestResponse.json();
+            throw new Error(errorData.error || "Failed to index content on the server.");
+        }
+        
+        const result = await ingestResponse.json();
+        setProcessingState({ step: 'done', message: `✅ Success! ${result.message}` });
+
+    } catch (err) {
+        console.error("File processing pipeline error:", err);
+        setProcessingState({ step: 'error', message: `Error: ${err.message}` });
+        setError(`File processing failed: ${err.message}`); // Display error at top level
+    } finally {
+        setIsProcessing(false);
+    }
+};
 
     const handlePlanGeneration = async (e) => {
         e.preventDefault();
@@ -270,10 +456,6 @@ export default function NewPlanPage() {
         } catch (err) { setSaveError(err.message); } finally { setIsSaving(false); }
     };
 
-    // --- RENDER ---
-    // ... inside NewPlanPage component ...
-
-    // --- RENDER ---
     return (
         <AppLayout session={session}>
             {/* 1. Global Style Injection for Hiding Scrollbars */}
