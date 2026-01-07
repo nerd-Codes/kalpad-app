@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Container, Title, Text, Box, Group, Stack } from '@mantine/core';
+import { Container, Title, Text, Box, Group, Stack, Button } from '@mantine/core';
 import { ShimmerButton } from '../ShimmerButton';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconBrandDiscord, IconBrandWhatsapp, IconArrowRight, IconSparkles, IconBolt } from '@tabler/icons-react';
+import { IconBrandDiscord, IconBrandWhatsapp, IconArrowRight, IconSparkles, IconBolt, IconBrandAndroid  } from '@tabler/icons-react';
 import { Interactive } from '@/components/Interactive';
 import { GlassCard } from '@/components/GlassCard';
 
@@ -293,195 +293,124 @@ export function Hero() {
               {/* --- FOREGROUND INTERFACE --- */}
 
             <Container size="md" style={{ position: 'relative', zIndex: 10 }}>
-
                 <motion.div
-
                     initial={{ opacity: 0, scale: 0.95 }}
-
                     animate={{ opacity: 1, scale: 1 }}
-
                     transition={{ duration: 0.8, delay: 0.2 }}
-
                 >
-
                     <GlassCard 
-
                         p={{ base: 'xl'}} 
-
                         style={{ 
-
                             // Thinner, brighter glass for the Stripe feel
-
                             backdropFilter: 'blur(40px)',
-
                             backgroundColor: 'rgba(255, 255, 255, 0.03)',
-
                             border: '1px solid rgba(255,255,255,0.1)',
-
                             boxShadow: '0 40px 100px -20px rgba(0,0,0,0.5)',
-
                             textAlign: 'center'
-
                         }}
-
                     >
-
                         <Stack align="center">
-
                             {/* Status Pill */}
-
                             <motion.div
-
                                 animate={{ 
-
                                     backgroundColor: isPanic ? 'rgba(255, 59, 48, 0.1)' : 'rgba(52, 199, 89, 0.1)',
-
                                     color: isPanic ? '#FF3B30' : '#34C759',
-
                                     borderColor: isPanic ? 'rgba(255, 59, 48, 0.2)' : 'rgba(52, 199, 89, 0.2)'
-
                                 }}
-
                                 style={{
-
                                     padding: '8px 20px',
-
                                     borderRadius: '99px',
-
                                     border: '1px solid',
-
                                     fontSize: '0.7rem',
-
                                     fontWeight: 700,
-
                                     letterSpacing: '0.05em',
-
                                     textTransform: 'uppercase',
-
                                     display: 'inline-flex',
-
                                     alignItems: 'center',
-
                                     gap: '8px'
-
                                 }}
-
                             >
-
                                 <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'currentColor' }} />
-
                                 {isPanic ? "Current State: Panic" : "Target State: Control"}
-
                             </motion.div>
 
-
-
                             <Title 
-
                                 order={2} 
-
                                 style={{ 
-
                                     fontFamily: 'var(--font-lexend)', 
-
                                     fontSize: 'clamp(2rem, 5vw, 3rem)',
-
                                     fontWeight: 800,
-
                                     lineHeight: 1.1,
-
                                     letterSpacing: '-0.03em',
-
                                     color: 'white'
-
                                 }}
-
                             >
-
                                 Stop negotiating with <br/> your syllabus.
-
                             </Title>
 
-
-
                             <Text size="sm" c="dimmed" maw={600} mx="auto" style={{ lineHeight: 1.6 }}>
-
                                 You have 10 days. The syllabus is 500 pages. 
-
                                 <span style={{ color: '#fff', fontWeight: 600 }}> We build the strategy that makes it possible.</span>
-
                             </Text>
 
-
-
-                            <Group>
-
+                            <Group mt="md" gap="md" justify="center">
+                                {/* 1. Existing Web App Button */}
                                 <ShimmerButton
-
                                     size="xl"
-
                                     onClick={() => handleGetStarted()}
-
                                     radius="xl"
-
                                     style={{ 
-
                                         fontSize: '1.1rem', 
-
-                                        padding: '16px 48px',
-
-                                        // Stripe-like vibrant shadow
-
-                                        boxShadow: '0 20px 40px -10px rgba(124, 58, 237, 0.5)',
-
+                                        padding: '0 40px', 
+                                        height: '60px', // Explicit height to match
+                                        boxShadow: '0 0 40px rgba(124, 58, 237, 0.4)',
                                         background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)'
-
                                     }}
-
                                 >
-
                                     Start The Engine <IconArrowRight size={20} style={{ marginLeft: 8 }}/>
-
                                 </ShimmerButton>
 
+                                {/* 2. New Android Download Button */}
+                                <Interactive>
+                                    <Button
+                                        component="a"
+                                        href="/android/kalpad.apk" // Points to public/android/kalpad.apk
+                                        download="KalPad_v1.apk"   // The name the user's file will save as
+                                        size="xl"
+                                        radius="xl"
+                                        variant="default"
+                                        leftSection={<IconBrandAndroid size={24} color="#3DDC84" />} // Official Android Green
+                                        style={{ 
+                                            height: '60px',
+                                            fontSize: '1.1rem',
+                                            backgroundColor: 'rgba(61, 220, 132, 0.05)', // Subtle green tint
+                                            border: '1px solid rgba(61, 220, 132, 0.3)',
+                                            color: 'white',
+                                            boxShadow: '0 0 20px rgba(61, 220, 132, 0.1)'
+                                        }}
+                                    >
+                                        Download App
+                                    </Button>
+                                </Interactive>
                             </Group>
-
-
 
                             <Group gap="xl" mt="sm" style={{ opacity: 0.7 }}>
-
                                 <Interactive>
-
                                     <Group gap={6} style={{ cursor: 'pointer' }}>
-
                                         <IconBrandDiscord size={20} />
-
                                         <Text size="sm" fw={500}>Join the Community</Text>
-
                                     </Group>
-
                                 </Interactive>
-
                                 <Interactive>
-
                                     <Group gap={6} style={{ cursor: 'pointer' }}>
-
                                         <IconBolt size={20} />
-
                                         <Text size="sm" fw={500}>v2.5 Now Live</Text>
-
                                     </Group>
-
                                 </Interactive>
-
                             </Group>
-
                         </Stack>
-
                     </GlassCard>
-
                 </motion.div>
-
             </Container>
         </Box>
     );
