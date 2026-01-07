@@ -374,7 +374,7 @@ export function Hero() {
                                 <Interactive>
                                     <Button
                                         component="a" // Force it to be a standard anchor tag
-                                        href="/android/kalpad.apk" 
+                                        href="https://fwibambhxyjklrcnqdse.supabase.co/storage/v1/object/public/androoid/KalPad.apk" 
                                         target="_blank" // Opens in new context to force browser download handler
                                         rel="noopener noreferrer" // Security best practice
                                         download // Explicit HTML5 download attribute
