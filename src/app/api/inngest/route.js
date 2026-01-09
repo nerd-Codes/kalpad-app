@@ -25,249 +25,332 @@ const supabaseAdmin = createClient(
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// --- The Main Curation Function ---
+// --- HELPER: Set Cover Algorithm (Unchanged logic, adapted data) ---
+function solveSetCover(candidates, requiredTopics) {
+    let finalPlaylist = [];
+    let uncoveredTopics = new Set(requiredTopics);
+    
+    // Deep copy
+    let pool = JSON.parse(JSON.stringify(candidates));
+
+    // Filter out low-quality garbage
+    pool = pool.filter(v => v.relevance_score >= 60 && v.covered_topics.length > 0);
+
+    while (uncoveredTopics.size > 0 && pool.length > 0) {
+        pool.forEach(video => {
+            // Calculate Utility: How many *new* topics does this video solve?
+            video.new_topic_count = video.covered_topics.filter(t => uncoveredTopics.has(t)).length;
+            
+            // Efficiency Score: (Relevance * New Topics) / Duration Penalty?
+            // For now, raw utility * relevance is best.
+            video.efficiency = video.new_topic_count * video.relevance_score;
+        });
+
+        // Sort by Efficiency Descending
+        pool.sort((a, b) => b.efficiency - a.efficiency);
+
+        const bestVideo = pool[0];
+
+        // If even the best video adds 0 value, stop.
+        if (bestVideo.new_topic_count === 0) break;
+
+        finalPlaylist.push(bestVideo);
+        
+        // Mark topics as covered
+        bestVideo.covered_topics.forEach(t => uncoveredTopics.delete(t));
+
+        // Remove from pool
+        pool.shift();
+    }
+    return finalPlaylist;
+}
+
+// --- MAIN PIPELINE ---
+// --- THE MAIN CURATION PIPELINE ---
 const curationPipeline = inngest.createFunction(
-    { id: "lecture-scout-curriculum-assembler-v1", name: "Lecture Scout Curriculum Assembler", concurrency: 2 },
+    { id: "lecture-scout-orchestrator", name: "Lecture Scout Orchestrator", concurrency: 4 },
     { event: "lecture-scout/curation.requested" },
     async ({ event, step }) => {
-        const { job_id, user_id, sub_topics_to_curate, all_todays_topics, user_timezone } = event.data;
-        const scoutUrl = process.env.LECTURE_SCOUT_URL;
-        if (!scoutUrl) throw new Error("LECTURE_SCOUT_URL is not configured.");
+        const { job_id, sub_topics_to_curate, user_timezone } = event.data;
+        const SCOUT_URL = process.env.LECTURE_SCOUT_URL; 
+        if (!SCOUT_URL) throw new Error("LECTURE_SCOUT_URL missing");
 
-        await step.run("update-job-status-to-inprogress", async () => {
+        const rawTopicTexts = sub_topics_to_curate.map(t => t.text);
+        const examName = sub_topics_to_curate[0]?.exam_name || "General Exam";
+
+        await step.run("update-status", async () => {
             await supabaseAdmin.from('curation_jobs').update({ status: 'in_progress' }).eq('id', job_id);
         });
 
-        // --- AGENT 1: Broad Search Query Generation ---
-        const searchQueries = await step.run("agent-1-generate-search-queries", async () => {
-            const model = await getVertexAIModel("gemini-2.5-flash-lite", { responseMimeType: "application/json" });
+        // --- STEP 1: Filter & Cluster (Refined Logic) ---
+        const { clusters, lecture_worthy_topics } = await step.run("filter-and-cluster", async () => {
+            const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
             const prompt = `
-                You are an expert Research Strategist for an AI-powered study platform. Your sole task is to generate a diverse and intelligent set of YouTube search queries to build a pool of high-quality lecture candidates.
-
-                **CONTEXT:**
-                - **Student's Topics for Today:**
-                - ${sub_topics_to_curate.map(t => t.text).join('\n  - ')}
-                - **Overall Daily Theme:** "${all_todays_topics.join(', ')}"
-                - **User's Region (for context):** "${user_timezone}"
-
-                **YOUR DIRECTIVE:**
-                Generate a JSON array of 5 to 7 unique and high-quality search queries. The goal is to cast a wide but intelligent net. Your queries MUST include a mix of the following types:
-                1.  **Broad Theme Queries:** Create 1-2 queries for the "Overall Daily Theme" to find comprehensive, long-form lectures (e.g., "Operating Systems full course lecture", "Introduction to Quantum Mechanics").
-                2.  **Specific Sub-Topic Queries:** For each of the "Student's Topics for Today," create a precise query. Add clarifying keywords like "tutorial," "explained," "derivation," or "example problems."
-                3.  **Regional/Contextual Queries:** Create 1-2 queries that incorporate regional context based on the user's location, if relevant (e.g., "GATE CSE Operating Systems lecture", "CBSE Class 12 Physics tutorial").
-                4.  **Conceptual Queries:** Create 1-2 queries aimed at finding visual or intuitive explanations (e.g., "Heisenberg Uncertainty Principle explained visually").
-
-                **CRITICAL JSON SCHEMA:**
-                Your entire output MUST be a single, valid JSON object with one key: "queries".
-                {
-                "queries": [
-                    "query 1",
-                    "query 2",
-                    "query 3",
-                    "query 4",
-                    "query 5"
-                ]
-                }
-                `;
-            const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
-            const data = JSON.parse(result.response.candidates[0].content.parts[0].text);
-            return data.queries;
-        });
-
-        // --- AGENT 2: Microservice Orchestrator (Search & Fetch Transcripts) ---
-        const transcriptPool = await step.run("agent-2-fetch-video-pool", async () => {
-            let allCandidates = new Map();
-            for (const query of searchQueries) {
-                const response = await fetch(`${scoutUrl}/search`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query }),
-                });
-                if (response.ok) {
-                    const videos = await response.json();
-                    videos.forEach(v => allCandidates.set(v.id, v));
-                }
-            }
-
-            const uniqueVideos = Array.from(allCandidates.values());
-            const transcriptResults = [];
+            You are an Academic Curator.
+            **INPUT TOPICS:** ${JSON.stringify(rawTopicTexts)}
             
-            await Promise.all(uniqueVideos.slice(0, 10).map(async (video) => { // Process up to 10 unique videos
-                try {
-                    const response = await fetch(`${scoutUrl}/getTranscript`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ videoId: video.id }),
-                    });
-                    if (response.ok) {
-                        const { full_transcript } = await response.json();
-                        if (full_transcript) transcriptResults.push({ ...video, full_transcript });
-                    }
-                } catch (e) { console.warn(`Skipping transcript for ${video.id}:`, e.message); }
-            }));
-            return transcriptResults;
+            **TASK 1: FILTER (The "Homework" Gate)**
+            - **KEEP:** Concepts, Theories, Derivations, "How to interpret...", "Demonstration of...", "Mechanism of...".
+            - **DISCARD:** "Solve Q1-10", "Practice Sheet", "Quiz", "Take notes".
+            - *Nuance:* "Practice interpreting spectra" is a SKILL (Keep). "Solve 50 spectra problems" is a DRILL (Discard).
+            
+            **TASK 2: CLUSTER (The "Context" Grouping)**
+            Group the kept topics into Semantic Clusters.
+            - Topics typically taught in the same 1-hour lecture should be clustered.
+            - Distinct instrumentation or disparate physics concepts MUST be separated.
+            
+            **OUTPUT JSON:**
+            {
+                "lecture_worthy_topics": ["List of strings..."],
+                "clusters": [
+                    { "theme": "Cluster Name", "topics": ["Topic A", "Topic B"] }
+                ]
+            }
+            `;
+            const res = await model.generateContent(prompt);
+            return JSON.parse(res.response.candidates[0].content.parts[0].text);
         });
 
-        if (transcriptPool.length === 0) {
-            await step.run("update-job-status-to-error-no-videos", async () => {
-                await supabaseAdmin.from('curation_jobs').update({ status: 'error' }).eq('id', job_id);
+        if (!lecture_worthy_topics || lecture_worthy_topics.length === 0) {
+            await step.run("finalize-empty", async () => {
+                 await supabaseAdmin.from('curation_jobs').update({ status: 'complete' }).eq('id', job_id);
             });
-            return { message: "Failed: No videos with transcripts were found to analyze." };
+            return "No lecture-worthy topics found.";
         }
 
-        // --- AGENT 3: Transcript Indexer AI ---
-        const indexedVideos = await step.run("agent-3-index-transcripts", async () => {
+        // --- STEP 2: Generate Queries Per Cluster (Expanded) ---
+        const searchQueries = await step.run("gen-cluster-queries", async () => {
             const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
-            const userTopics = sub_topics_to_curate.map(t => t.text);
             
-            const indexingPromises = transcriptPool.map(video => {
-                const prompt = `
-                    You are an AI Academic Indexer. Your task is to analyze a video transcript and act as a strict, intelligent filter. You will determine which of a user's specific study topics are covered in the video, how well they are covered, and provide a concise summary of the explanation.
-
-                    **CONTEXT:**
-                    - **User's Full List of Topics for Today:**
-                    ${JSON.stringify(userTopics)}
-                    - **Video Title:** "${video.title}"
-
-                    **SOURCE MATERIAL:**
-                    - **Video Transcript (first 25,000 characters):**
-                    """
-                    ${video.full_transcript.substring(0, 25000)}...
-                    """
-
-                    **YOUR TASK (Execute with precision):**
-                    1.  Read the user's full list of topics.
-                    2.  Read the video transcript and title.
-                    3.  For EACH topic in the user's list, determine if it is substantively discussed in the transcript.
-                    4.  If a topic is discussed, you MUST generate an object for it in the output array. If it is NOT discussed, you MUST NOT include it in the output.
-
-                    **CRITICAL JSON SCHEMA:**
-                    Your entire output MUST be a single, valid JSON object with one key: "topic_analysis". This key must be an array of objects.
-                    For each topic found in the transcript, the object MUST contain:
-                    - **"topic_name":** The exact string of the topic from the user's list.
-                    - **"relevance_score":** An integer from 1 to 100.
-                        - (90-100): A deep, thorough explanation with examples. The core focus of the video.
-                        - (70-89): A solid, clear explanation, but perhaps not the main focus.
-                        - (50-69): The topic is mentioned and explained, but briefly or at a surface level.
-                        - (<50): The topic is only mentioned in passing; do NOT include it in the output.
-                    - **"summary":** A single, concise sentence summarizing the video's explanation of THAT specific topic (e.g., "The video explains the photoelectric effect by detailing Einstein's equation and the concept of light quanta.").
-
-                    **EXAMPLE OUTPUT:**
-                    {
-                    "topic_analysis": [
-                        {
-                        "topic_name": "The Photoelectric Effect",
-                        "relevance_score": 95,
-                        "summary": "The video provides a detailed derivation of Einstein's photoelectric equation and uses an animated experiment to explain the concept of work function."
-                        },
-                        {
-                        "topic_name": "Wave-Particle Duality",
-                        "relevance_score": 75,
-                        "summary": "The transcript discusses wave-particle duality as the foundational context for the photoelectric effect but doesn't cover other experiments like electron diffraction."
-                        }
-                    ]
-                    }
-                    `;
-                return model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
-                    .then(result => {
-                        const analysis = JSON.parse(result.response.candidates[0].content.parts[0].text);
-                        return { id: video.id, title: video.title, channel: video.channel, topic_analysis: analysis.topic_analysis || [] };
-                    })
-                    .catch(e => ({ id: video.id, title: video.title, channel: video.channel, topic_analysis: [] }));
-            });
-            return Promise.all(indexingPromises);
-        });
-
-        // --- AGENT 4: Master Curator AI ---
-        const finalCuration = await step.run("agent-4-master-curator", async () => {
-            const model = await getVertexAIModel("gemini-2.5-flash-lite", { responseMimeType: "application/json" });
-            const userTopics = sub_topics_to_curate.map(t => t.text);
             const prompt = `
-                You are a Master Curator AI, an expert in pedagogy and information design. Your task is to assemble the perfect, most efficient video playlist for a student's study session from a pre-analyzed pool of candidates.
+            Context: Indian Student. Exam: "${examName}". Region: ${user_timezone}.
+            **CLUSTERS:** ${JSON.stringify(clusters)}
 
-                **CONTEXT:**
-                - **Student's Full List of Topics for Today:**
-                ${JSON.stringify(userTopics)}
-
-                - **Available Video Candidates and Their Indexed Topic Coverage:**
-                ${JSON.stringify(indexedVideos.map(v => ({ id: v.id, title: v.title, channel: v.channel, topic_analysis: v.topic_analysis })))}
-
-                **YOUR DIRECTIVE (This is a combinatorial optimization problem):**
-                Select the OPTIMAL and SMALLEST set of videos to achieve the highest quality coverage across all of the student's topics.
-
-                **YOUR UNBREAKABLE RULES OF CURATION:**
-                1.  **Prioritize "Power Videos":** A single video that covers multiple topics with a high score (e.g., >80) is DRAMATICALLY more valuable than multiple separate videos. Your primary goal is to find these long-form, comprehensive lectures.
-                2.  **Maximize Total Score:** The final combination of videos you select should aim to maximize the sum of the 'relevance_score' for all of the user's topics.
-                3.  **Avoid Redundancy:** Do not select two different videos to explain the same topic unless they both have exceptionally high scores (>90) and clearly offer different perspectives (e.g., one is a theoretical lecture, the other is a problem-solving session).
-                4.  **Be Ruthless:** If a topic is only covered with a low score (<60) by all available videos, do not hesitate to omit it. It is better to recommend nothing than to recommend a poor-quality resource.
-
-                **CRITICAL JSON OUTPUT SCHEMA:**
-                Your entire output MUST be a single, valid JSON array. Each object in the array represents a video you have selected. The object MUST contain:
-                - **"id":** The video's unique ID.
-                - **"title":** The video's title.
-                - **"channel":** The video's channel name.
-                - **"relevance_score":** The AVERAGE relevance score for the topics this video covers from the user's list.
-                - **"relevant_topics":** A JSON array of strings, listing the EXACT topic names from the user's list that this video should be watched for.
-
-                **EXAMPLE OUTPUT:**
-                [
-                {
-                    "id": "abc-123",
-                    "title": "Quantum Mechanics Full Chapter Lecture (MIT)",
-                    "channel": "MIT OpenCourseWare",
-                    "relevance_score": 92,
-                    "relevant_topics": [
-                    "The Photoelectric Effect",
-                    "Wave-Particle Duality",
-                    "Heisenberg Uncertainty Principle"
-                    ]
-                },
-                {
-                    "id": "def-456",
-                    "title": "Practice Problems: The Photoelectric Effect",
-                    "channel": "Physics-is-Fun",
-                    "relevance_score": 95,
-                    "relevant_topics": [
-                    "The Photoelectric Effect"
-                    ]
-                }
-                ]
-                `;
-            const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
-            return JSON.parse(result.response.candidates[0].content.parts[0].text);
+            **TASK:** Generate 3 YouTube search queries for EACH cluster.
+            1. **The "One Shot" Query:** Broad coverage (e.g. "UV-Vis Spectroscopy One Shot Hindi").
+            2. **The "Deep Dive" Query:** Focus on the most complex/instrumental topic (e.g. "FTIR Instrumentation Working Hindi").
+            3. **The "English/Hinglish" Query:** Specific keywords for high-quality Indian educators (e.g. "Spectroscopy JEE/NEET Physics Wallah/Unacademy").
+            
+            **OUTPUT JSON:** { "queries": ["query1", "query2", ...] } (Flattened list of all queries)
+            `;
+            
+            const res = await model.generateContent(prompt);
+            return JSON.parse(res.response.candidates[0].content.parts[0].text).queries;
         });
-        
-        // --- AGENT 5: Final Save Loop ---
-        await step.run("agent-5-save-curation", async () => {
-            let topicsCompletedInJob = 0;
-            for (const finalVideo of finalCuration) {
-                if (!finalVideo.relevant_topics) continue;
-                for (const topicName of finalVideo.relevant_topics) {
-                    const subTopicData = sub_topics_to_curate.find(st => st.text === topicName);
-                    if (subTopicData) {
-                        const { error } = await supabaseAdmin.from('curated_lectures').upsert({
-                            plan_topic_id: subTopicData.plan_topic_id,
-                            sub_topic_text: topicName,
-                            video_url: `https://www.youtube.com/watch?v=${finalVideo.id}`,
-                            title: finalVideo.title,
-                            channel_name: finalVideo.channel,
-                            relevance_score: 100, // Score from the curator is the new truth
-                            justification: `Covers topic: ${topicName}`,
+
+        // --- STEP 3: Massive Parallel Search (Container I/O) ---
+        // We fetch candidates from ALL clusters into a single pool
+        const candidates = await step.run("fetch-candidates", async () => {
+            let allVideos = [];
+            // Run queries in parallel
+            await Promise.all(searchQueries.map(async (q) => {
+                try {
+                    const res = await fetch(`${SCOUT_URL}/search`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: q })
+                    });
+                    if (res.ok) {
+                        const vids = await res.json();
+                        allVideos.push(...vids);
+                    }
+                } catch (e) { console.error(`Search error for ${q}`, e); }
+            }));
+            
+            // Dedup by ID
+            const unique = new Map();
+            allVideos.forEach(v => unique.set(v.id, v));
+            // We want a large pool to filter down. Top 30 unique videos across all clusters.
+            return Array.from(unique.values()).slice(0, 30);
+        });
+
+        if (candidates.length === 0) {
+            await step.run("fail-job", async () => {
+                await supabaseAdmin.from('curation_jobs').update({ status: 'error' }).eq('id', job_id);
+            });
+            return "No videos found.";
+        }
+
+        // --- STEP 4: Fetch Metadata & Audit ---
+        // Fetch metadata
+        const videoDetails = await step.run("fetch-metadata", async () => {
+            const results = [];
+            const CHUNK_SIZE = 5;
+            for (let i = 0; i < candidates.length; i += CHUNK_SIZE) {
+                const chunk = candidates.slice(i, i + CHUNK_SIZE);
+                const chunkResults = await Promise.all(chunk.map(async (video) => {
+                    try {
+                        const res = await fetch(`${SCOUT_URL}/getVideoDetails`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ videoId: video.id })
                         });
-                        if (error) console.error(`DB Upsert Error for ${topicName}:`, error.message);
-                        else topicsCompletedInJob++;
+                        return res.ok ? await res.json() : null;
+                    } catch (e) { return null; }
+                }));
+                results.push(...chunkResults.filter(r => r !== null));
+            }
+            return results;
+        });
+
+        // Audit (Vertex AI)
+        const auditedVideos = await step.run("audit-metadata-strict", async () => {
+            const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
+            
+            const auditPromises = videoDetails.map(async (video) => {
+                const prompt = `
+                **ROLE:** Strict Academic Auditor.
+                **TARGET EXAM:** "${examName}"
+                **REQUIRED TOPICS:** ${JSON.stringify(lecture_worthy_topics)}
+                **PREFERRED:** Hinglish/English (Indian Context).
+                
+                **VIDEO METADATA:**
+                Title: "${video.title}"
+                Channel: "${video.channel}"
+                Duration: "${video.duration}"
+                Desc: """${video.description.substring(0, 1000)}..."""
+                Chapters: ${JSON.stringify(video.chapters || [])}
+
+                **LOGIC:**
+                1. **Language:** If "Hindi Medium" (Pure Hindi text) -> Score 0. If "Hinglish" -> Score High.
+                2. **Relevance:** Does it actually teach the Required Topics?
+                3. **Depth:** Is the duration sufficient? (e.g. 5 mins for "Instrumentation" is bad. 30 mins is good).
+
+                **OUTPUT JSON:**
+                { 
+                    "covered_topics": ["Exact Topic String"], 
+                    "relevance_score": (0-100),
+                    "justification": "Why?"
+                }
+                `;
+                
+                try {
+                    const res = await model.generateContent(prompt);
+                    const data = JSON.parse(res.response.candidates[0].content.parts[0].text);
+                    return {
+                        id: video.id,
+                        title: video.title,
+                        channel: video.channel,
+                        thumbnail: video.thumbnail,
+                        covered_topics: data.covered_topics?.filter(t => lecture_worthy_topics.includes(t)) || [],
+                        relevance_score: data.relevance_score || 0,
+                        justification: data.justification
+                    };
+                } catch (e) { return null; }
+            });
+            return (await Promise.all(auditPromises)).filter(v => v !== null);
+        });
+
+        // --- STEP 5: Initial Set Cover Solver ---
+        let finalPlaylist = solveSetCover(auditedVideos, lecture_worthy_topics);
+
+        // --- STEP 6: The "Sniper" Backfill (Gap Analysis) ---
+        const coveredSet = new Set(finalPlaylist.flatMap(v => v.covered_topics));
+        const missingTopics = lecture_worthy_topics.filter(t => !coveredSet.has(t));
+
+        if (missingTopics.length > 0) {
+            const backfillVideos = await step.run("sniper-backfill", async () => {
+                const model = await getVertexAIModel("gemini-2.5-flash", { responseMimeType: "application/json" });
+                const backfillResults = [];
+
+                // Process each missing topic individually
+                for (const missingTopic of missingTopics) {
+                    // 1. Generate ultra-specific query
+                    const queryPrompt = `Generate 1 highly specific YouTube query to find a detailed lecture on: "${missingTopic}" for "${examName}" in Hindi/Hinglish. Output JSON: { "query": "string" }`;
+                    const qRes = await model.generateContent(queryPrompt);
+                    const query = JSON.parse(qRes.response.candidates[0].content.parts[0].text).query;
+
+                    // 2. Fetch 5 candidates
+                    let sniperCandidates = [];
+                    try {
+                        const sRes = await fetch(`${SCOUT_URL}/search`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ query: query })
+                        });
+                        if (sRes.ok) sniperCandidates = await sRes.json();
+                    } catch(e) {}
+                    
+                    if (sniperCandidates.length === 0) continue;
+
+                    // 3. Fetch Metadata & Audit (Mini Loop)
+                    // We just pick the first valid one to save time/tokens
+                    for (const candidate of sniperCandidates.slice(0, 3)) { // Check top 3
+                         try {
+                            const metaRes = await fetch(`${SCOUT_URL}/getVideoDetails`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ videoId: candidate.id })
+                            });
+                            if (!metaRes.ok) continue;
+                            const meta = await metaRes.json();
+                            
+                            // Quick AI Check
+                            const auditPrompt = `
+                            Topic: "${missingTopic}"
+                            Video: "${meta.title}" (${meta.duration})
+                            Desc: "${meta.description.substring(0, 500)}"
+                            Is this a good explanation?
+                            JSON: { "is_good": boolean, "justification": "string" }
+                            `;
+                            const auditRes = await model.generateContent(auditPrompt);
+                            const auditData = JSON.parse(auditRes.response.candidates[0].content.parts[0].text);
+                            
+                            if (auditData.is_good) {
+                                backfillResults.push({
+                                    id: meta.id,
+                                    title: meta.title,
+                                    channel: meta.channel,
+                                    thumbnail: meta.thumbnail,
+                                    covered_topics: [missingTopic], // Explicitly map to the missing topic
+                                    relevance_score: 85, // Sniper hits are usually high relevance
+                                    justification: auditData.justification
+                                });
+                                break; // Found one, move to next missing topic
+                            }
+                         } catch(e) {}
+                    }
+                }
+                return backfillResults;
+            });
+            
+            // Merge backfill into playlist
+            finalPlaylist = [...finalPlaylist, ...backfillVideos];
+        }
+
+        // --- STEP 7: Final Save ---
+        await step.run("save-results", async () => {
+            let savedCount = 0;
+            for (const video of finalPlaylist) {
+                for (const topicText of video.covered_topics) {
+                    const originalTopic = sub_topics_to_curate.find(t => t.text === topicText);
+                    if (originalTopic) {
+                        await supabaseAdmin.from('curated_lectures').upsert({
+                            plan_topic_id: originalTopic.plan_topic_id,
+                            sub_topic_text: topicText,
+                            video_url: `https://www.youtube.com/watch?v=${video.id}`,
+                            title: video.title,
+                            channel_name: video.channel,
+                            relevance_score: video.relevance_score,
+                            justification: video.justification || "AI Curated.",
+                        });
+                        savedCount++;
                     }
                 }
             }
-            // Update progress in a single call at the end
-            await supabaseAdmin.rpc('increment_completed_topics', { job_id_param: job_id, increment_value: topicsCompletedInJob });
+            if (savedCount > 0) {
+                 await supabaseAdmin.rpc('increment_completed_topics', { job_id_param: job_id, increment_value: savedCount });
+            }
         });
 
-        await step.run("update-job-status-to-complete", async () => {
+        await step.run("finalize-job", async () => {
             await supabaseAdmin.from('curation_jobs').update({ status: 'complete' }).eq('id', job_id);
         });
 
-        return { message: `Lecture Scout v3 job ${job_id} completed successfully.` };
+        return { message: "Scout job complete.", videos_found: finalPlaylist.length };
     }
 );
+
 
 // --- AGENT 2: THE SCRIPTER ---
 const scripterAgent = inngest.createFunction(
