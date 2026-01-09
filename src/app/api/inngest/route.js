@@ -25,6 +25,14 @@ const supabaseAdmin = createClient(
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+const getBaseUrl = () => {
+    if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+    return 'http://localhost:3000';
+};
+
+const INTERNAL_SCOUT_URL = `${getBaseUrl()}/api/internal/lecture-scout`;
+
 // --- HELPER: Set Cover Algorithm (Unchanged logic, adapted data) ---
 function solveSetCover(candidates, requiredTopics) {
     let finalPlaylist = [];
@@ -142,26 +150,25 @@ const curationPipeline = inngest.createFunction(
         // We fetch candidates from ALL clusters into a single pool
         const candidates = await step.run("fetch-candidates", async () => {
             let allVideos = [];
-            // Run queries in parallel
-            await Promise.all(searchQueries.map(async (q) => {
+            for (const q of searchQueries) {
                 try {
-                    const res = await fetch(`${SCOUT_URL}/search`, {
+                    // Call our own API route
+                    const res = await fetch(INTERNAL_SCOUT_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ query: q })
+                        body: JSON.stringify({ action: 'search', query: q })
                     });
+                    
                     if (res.ok) {
                         const vids = await res.json();
                         allVideos.push(...vids);
                     }
                 } catch (e) { console.error(`Search error for ${q}`, e); }
-            }));
+            }
             
-            // Dedup by ID
             const unique = new Map();
             allVideos.forEach(v => unique.set(v.id, v));
-            // We want a large pool to filter down. Top 30 unique videos across all clusters.
-            return Array.from(unique.values()).slice(0, 30);
+            return Array.from(unique.values()).slice(0, 15);
         });
 
         if (candidates.length === 0) {
@@ -175,15 +182,16 @@ const curationPipeline = inngest.createFunction(
         // Fetch metadata
         const videoDetails = await step.run("fetch-metadata", async () => {
             const results = [];
-            const CHUNK_SIZE = 5;
+            const CHUNK_SIZE = 5; // Batch size
+            
             for (let i = 0; i < candidates.length; i += CHUNK_SIZE) {
                 const chunk = candidates.slice(i, i + CHUNK_SIZE);
                 const chunkResults = await Promise.all(chunk.map(async (video) => {
                     try {
-                        const res = await fetch(`${SCOUT_URL}/getVideoDetails`, {
+                        const res = await fetch(INTERNAL_SCOUT_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ videoId: video.id })
+                            body: JSON.stringify({ action: 'details', videoId: video.id })
                         });
                         return res.ok ? await res.json() : null;
                     } catch (e) { return null; }
