@@ -84,7 +84,7 @@ export function Footer() {
                         <ColumnHeader title="Product" />
                         <FooterLink href="/#" label="Generate Plan" />
                         <FooterLink href="/#" label="Dashboard" />
-                        <FooterLink href="/#" label="Pricing" />
+                        <FooterLink href="/pricing" label="Pricing" />
                         <FooterLink href="/#" label="Manifesto" />
                     </Stack>
 
