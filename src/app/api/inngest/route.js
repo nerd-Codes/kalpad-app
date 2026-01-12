@@ -31,7 +31,7 @@ const getBaseUrl = () => {
     return 'http://localhost:3000';
 };
 
-const INTERNAL_SCOUT_URL = `${getBaseUrl()}/api/internal/lecture-scout`;
+const INTERNAL_SCOUT_URL = `https://kalpad-app.vercel.app/api/internal/lecture-scout`;
 
 // --- HELPER: Set Cover Algorithm (Unchanged logic, adapted data) ---
 function solveSetCover(candidates, requiredTopics) {
