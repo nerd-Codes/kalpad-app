@@ -270,7 +270,7 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
                 <Box 
                     style={{ 
                         position: 'fixed', 
-                        bottom: '32px', 
+                        bottom: '2.5vh', 
                         left: '50%', 
                         transform: 'translateX(-50%)', 
                         zIndex: 40 

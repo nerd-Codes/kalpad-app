@@ -81,11 +81,10 @@ export function Footer() {
 
                     {/* COL 2: PRODUCT */}
                     <Stack align="flex-start" gap="xs">
-                        <ColumnHeader title="Product" />
-                        <FooterLink href="/#" label="Generate Plan" />
-                        <FooterLink href="/#" label="Dashboard" />
+                        <ColumnHeader title="Know More" />
+                        <FooterLink href="/about" label="About Us" />
+                        <FooterLink href="/guest-plan" label="Guest Mode" />
                         <FooterLink href="/pricing" label="Pricing" />
-                        <FooterLink href="/#" label="Manifesto" />
                     </Stack>
 
                     {/* COL 3: LEGAL & COMPLIANCE (TRANSPARENT) */}
