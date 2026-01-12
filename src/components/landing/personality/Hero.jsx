@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { IconBrandDiscord, IconBrandWhatsapp, IconArrowRight, IconSparkles, IconBolt, IconBrandAndroid  } from '@tabler/icons-react';
 import { Interactive } from '@/components/Interactive';
 import { GlassCard } from '@/components/GlassCard';
+import Link from 'next/link';
 
 // --- SUB-COMPONENT: THE LIVING MESH ---
 
@@ -355,20 +356,49 @@ export function Hero() {
 
                             <Group mt="md" gap="md" justify="center">
                                 {/* 1. Existing Web App Button */}
-                                <ShimmerButton
-                                    size="xl"
-                                    onClick={() => handleGetStarted()}
-                                    radius="xl"
-                                    style={{ 
-                                        fontSize: '1.1rem', 
-                                        padding: '0 40px', 
-                                        height: '60px', // Explicit height to match
-                                        boxShadow: '0 0 40px rgba(124, 58, 237, 0.4)',
-                                        background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)'
-                                    }}
-                                >
-                                    Start The Engine <IconArrowRight size={20} style={{ marginLeft: 8 }}/>
-                                </ShimmerButton>
+                                <Stack gap={10} align="center">
+                                    <Interactive>
+                                        <Button
+                                            component={Link}
+                                            href="/guest-plan"
+                                            size="xl"
+                                            radius="xl"
+                                            style={{ 
+                                                height: '64px',
+                                                padding: '0 48px',
+                                                fontSize: '1.2rem',
+                                                fontWeight: 600,
+                                                letterSpacing: '0.02em',
+                                                color: 'white',
+                                                // The "Deep Neon" Look
+                                                background: 'linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%)',
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                boxShadow: `
+                                                    0 0 0 1px rgba(124, 58, 237, 0.5), /* Inner ring */
+                                                    0 10px 40px -10px rgba(124, 58, 237, 0.6), /* Ambient Glow */
+                                                    inset 0 1px 0 rgba(255,255,255,0.2) /* Top Highlight */
+                                                `
+                                            }}
+                                            rightSection={<IconArrowRight size={22} />}
+                                        >
+                                            Try It Out
+                                        </Button>
+                                    </Interactive>
+                                    
+                                    <Text 
+                                        size="11px" 
+                                        c="dimmed" 
+                                        fw={600} 
+                                        tt="uppercase" 
+                                        style={{ 
+                                            letterSpacing: '0.1em', 
+                                            opacity: 0.6,
+                                            textShadow: '0 0 10px rgba(0,0,0,0.5)' 
+                                        }}
+                                    >
+                                        No sign in required
+                                    </Text>
+                                </Stack>
 
                                 {/* 2. New Android Download Button */}
                                 <Interactive>
