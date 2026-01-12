@@ -20,12 +20,14 @@ import {
 import { 
     IconCalendar, IconBooks, IconPdf, IconTargetArrow, IconX, 
     IconListDetails, IconInfoCircle, IconRotateClockwise, IconBolt, 
-    IconSwords, IconTools, IconBrain, IconCheck, IconFlask 
+    IconSwords, IconTools, IconBrain, IconCheck, IconFlask, IconLock
 } from '@tabler/icons-react';
 
 import { useOnboarding } from '@/context/OnboardingContext';
 import { SavePlanNudge } from '@/components/SavePlanNudge';
 import nudgeClasses from '@/components/SavePlanNudge.module.css'; 
+
+
 
 // --- 0. ROBUST SAMPLE DATA ---
 const SAMPLE_STRATEGY = {
@@ -127,9 +129,48 @@ export default function NewPlanPage() {
     const [showSaveNudge, setShowSaveNudge] = useState(false);
     const [highlightSave, setHighlightSave] = useState(false);
 
+    // --- GATE 1: LIMIT STATE ---
+    const [isCreationBlocked, setIsCreationBlocked] = useState(false);
+    const [userTier, setUserTier] = useState('free');
+
     // --- EFFECTS ---
+    // --- GATE 1: LOGIC ENGINE ---
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); });
+        const checkGate = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+            setSession(session);
+
+            // 1. Fetch User Tier
+            const { data: sub } = await supabase
+                .from('user_subscriptions')
+                .select('tier')
+                .eq('user_id', session.user.id)
+                .eq('status', 'active')
+                .maybeSingle(); // Safe handle for no rows
+
+            const currentTier = sub?.tier || 'free';
+            setUserTier(currentTier);
+
+            // 2. Enforce Limits for Free Tier
+            if (currentTier === 'free') {
+                const today = new Date().toISOString().split('T')[0];
+                
+                // Count only ACTIVE plans that are in the FUTURE or TODAY
+                // Past plans (even if active) do not block creation
+                const { count, error } = await supabase
+                    .from('study_plans')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', session.user.id)
+                    .eq('is_active', true)
+                    .gte('exam_date', today);
+
+                if (count >= 1) {
+                    setIsCreationBlocked(true);
+                }
+            }
+        };
+        checkGate();
     }, []);
 
     useEffect(() => {
@@ -470,6 +511,32 @@ const handleProcessFile = async () => {
             `}</style>
 
             <Container size="xl" pt="md" px="md" style={{ overflowX: 'hidden', maxWidth: '100vw' } } className="no-scrollbar">
+                 {isCreationBlocked && (
+                    <Alert 
+                        variant="light" 
+                        color="orange" 
+                        title="Free Limit Reached" 
+                        icon={<IconLock size={16}/>} 
+                        mb="xl"
+                        styles={{ root: { backgroundColor: 'rgba(255, 149, 0, 0.1)', border: '1px solid rgba(255, 149, 0, 0.2)' } }}
+                    >
+                        <Text size="sm">
+                            You have an active plan in progress. The Free tier allows <strong>1 Active Future Plan</strong> at a time.
+                        </Text>
+                        <Group mt="xs">
+                            <Button variant="white" color="orange" size="xs" component="a" href="/plans">Manage Plans</Button>
+                            {/* We will wire this to the Upgrade Modal later */}
+                            <Button 
+                                variant="filled" 
+                                color="orange" 
+                                size="xs"
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-upgrade-modal'))}
+                            >
+                                Upgrade to Pro
+                            </Button>
+                        </Group>
+                    </Alert>
+                )}
                 <Box mb="xl">
                     <Title order={1} className="apple-text-gradient" style={{ fontSize: '3rem', letterSpacing: '-0.03em' }}>
                         Create New Plan
@@ -603,7 +670,7 @@ const handleProcessFile = async () => {
                                             size="xl" 
                                             py = "md"
                                             loading={isGenerating} 
-                                            disabled={isProcessing}
+                                            disabled={isProcessing || isCreationBlocked} 
                                             radius="xl" // Pill Shape
                                             style={{ 
                                                 width: '100%',

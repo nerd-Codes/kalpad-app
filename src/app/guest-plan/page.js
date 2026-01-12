@@ -5,48 +5,37 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AppLayout from '@/components/AppLayout';
 import { GlassCard } from '@/components/GlassCard';
+import { Interactive } from '@/components/Interactive';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { wittyFacts } from '@/lib/newplanFacts';
 import { TimelineDayCard } from '@/components/TimelineDayCard';
 import { useGuest } from '@/context/GuestContext';
-import { PlanModeModal } from '@/components/PlanModeModal'; // --- NEW IMPORT ---
-import { 
-    Container, Title, Text, TextInput, Textarea, Stack, Grid, NumberInput, 
-    Button, Paper, Group, Alert, Loader, Badge 
-} from '@mantine/core';
-import { 
-    IconCalendar, IconBooks, IconClock, IconRocket, IconLock, IconSettings, IconInfoCircle 
-} from '@tabler/icons-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useDisclosure } from '@mantine/hooks';
 
-// --- SAMPLE DATA FOR FALLBACK (TESTING ONLY) ---
-const FALLBACK_STRATEGY = {
-    estimated_coverage: 85,
-    overall_approach: "⚠️ GENERATION FAILED (TEST MODE ACTIVE). This is a sample strategy loaded because the API encountered an error. We will focus on high-yield topics to maximize your score in the limited time available.",
-    emphasized_topics: [{ topic: "Sample Core Concept", justification: "High exam weightage" }],
-    deprioritized_topics: [{ topic: "Niche Theory", justification: "Low ROI" }],
-    skipped_topics: []
-};
+import { 
+    Container, Title, Text, TextInput, Textarea, Stack, Grid, 
+    Button, Paper, Group, Alert, Loader, Badge, Slider, Box, 
+    ThemeIcon, ScrollArea, Collapse 
+} from '@mantine/core';
+import { 
+    IconCalendar, IconBooks, IconTargetArrow, IconX, IconListDetails,
+    IconRotateClockwise, IconBolt, IconSwords, IconTools, IconBrain, IconRocket
+} from '@tabler/icons-react';
 
-const FALLBACK_PLAN = [
-    {
-        day: 1,
-        date: new Date().toISOString().split('T')[0],
-        topic_name: "Day 1: The Foundations (Sample)",
-        study_hours: 4,
-        importance: 10,
-        day_difficulty: "Medium",
-        day_summary: "This is a generated sample day to allow testing of the Guest Flow UI.",
-        sub_topics: [
-            { text: "Understand the basic definitions", type: "Concept", difficulty: "Easy", completed: false },
-            { text: "Solve 3 fundamental problems", type: "Practice", difficulty: "Medium", completed: false },
-            { text: "Review previous year questions", type: "Review", difficulty: "Hard", completed: false }
-        ]
-    }
+import { SavePlanNudge } from '@/components/SavePlanNudge';
+import nudgeClasses from '@/components/SavePlanNudge.module.css'; 
+
+// --- 1. MODES (Shared Config) ---
+const PLAN_MODES = [
+    { value: 'default', label: 'Balanced', description: 'Smart focus.', icon: IconTargetArrow, color: 'teal' },
+    { value: 'revision', label: 'Revision', description: 'Rapid review.', icon: IconRotateClockwise, color: 'blue' },
+    { value: 'hardcore', label: 'Hardcore', description: '100% coverage.', icon: IconSwords, color: 'red' },
+    { value: 'sprint', label: 'Sprint', description: 'Max velocity.', icon: IconBolt, color: 'yellow' },
+    { value: 'skill', label: 'Skill Build', description: 'Project-based.', icon: IconTools, color: 'grape' }
 ];
 
-// Helper for the "AI Typing" effect
+// --- 2. HELPERS ---
 const useTypingEffect = (text = '', speed = 1) => {
     const [displayedText, setDisplayedText] = useState('');
     useEffect(() => {
@@ -61,11 +50,28 @@ const useTypingEffect = (text = '', speed = 1) => {
     return displayedText;
 };
 
+const getDayDifficultyColor = (difficulty) => {
+    switch (difficulty?.toLowerCase()) {
+        case 'easy': return 'green';
+        case 'medium': return 'yellow';
+        case 'hard': return 'orange';
+        case 'intense': return 'red';
+        default: return 'gray';
+    }
+};
+
+// --- 3. MAIN COMPONENT ---
 export default function GuestPlanPage() {
     const router = useRouter();
     const { saveGuestArtifact } = useGuest();
     
-    // --- STATE MANAGEMENT ---
+    // --- UI REFS & STATE ---
+    const strategyReportRef = useRef(null);
+    const planContainerRef = useRef(null);
+    const planScrollDivRef = useRef(null);
+    const [detailsOpened, { toggle: toggleDetails }] = useDisclosure(false);
+
+    // --- FORM STATE ---
     const [examName, setExamName] = useState('');
     const [syllabus, setSyllabus] = useState('');
     
@@ -78,29 +84,22 @@ export default function GuestPlanPage() {
     
     const [examDate, setExamDate] = useState(maxDateStr);
     const [studyHoursPerDay, setStudyHoursPerDay] = useState(4);
-    
-    // --- NEW: Plan Mode State ---
     const [planMode, setPlanMode] = useState('default');
-    const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
-
-    // Generation State
+    
+    // --- GENERATION STATE ---
     const [isGenerating, setIsGenerating] = useState(false);
     const [plan, setPlan] = useState([]); 
     const [strategy, setStrategy] = useState(null);
     const [generationContext, setGenerationContext] = useState(null);
     const [error, setError] = useState('');
     const [currentFact, setCurrentFact] = useState(wittyFacts[0]);
-    
-    // UI Refs
-    const strategyReportRef = useRef(null);
-    const planContainerRef = useRef(null);
-    const planScrollDivRef = useRef(null);
+    const [highlightSave, setHighlightSave] = useState(false);
     
     const typedApproach = useTypingEffect(strategy?.overall_approach);
 
     // --- EFFECTS ---
 
-    // 1. Cycling Facts during loading
+    // Cycling Facts
     useEffect(() => {
         let factInterval = null;
         if (isGenerating) {
@@ -108,31 +107,23 @@ export default function GuestPlanPage() {
                 const randomIndex = Math.floor(Math.random() * wittyFacts.length);
                 setCurrentFact(wittyFacts[randomIndex]);
             }, 4000);
-        } else {
-            if (factInterval) clearInterval(factInterval);
-        }
+        } else { if (factInterval) clearInterval(factInterval); }
         return () => { if (factInterval) clearInterval(factInterval); };
     }, [isGenerating]);
 
-    // 2. Auto-scroll to Strategy
+    // Auto-scroll to results (Mobile friendly)
     useEffect(() => {
-        if (strategy && strategyReportRef.current) {
-            setTimeout(() => {
-                strategyReportRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
+        if ((isGenerating || strategy) && strategyReportRef.current) {
+            // Scroll logic optimized for mobile linear flow
+            if (window.innerWidth < 768) {
+                setTimeout(() => {
+                    strategyReportRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 200);
+            }
         }
-    }, [strategy]);
+    }, [isGenerating, strategy]);
 
-    // 3. Auto-scroll to Plan Start
-    useEffect(() => {
-        if (plan.length === 1 && planContainerRef.current) {
-            setTimeout(() => {
-                planContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
-        }
-    }, [plan.length]);
-
-    // 4. Auto-scroll Plan Container as items stream in
+    // Auto-scroll plan list as items arrive
     useEffect(() => {
         if (isGenerating && planScrollDivRef.current) {
             const scrollDiv = planScrollDivRef.current;
@@ -140,39 +131,33 @@ export default function GuestPlanPage() {
         }
     }, [plan.length, isGenerating]);
 
+    useEffect(() => {
+        if (!isGenerating && plan.length > 0) setHighlightSave(true);
+    }, [isGenerating, plan]);
+
     // --- HANDLERS ---
 
     const handleGuestGeneration = async (e) => {
         e.preventDefault();
-        setError(''); 
-        setPlan([]); 
-        setStrategy(null); 
-        setGenerationContext(null); 
-        setIsGenerating(true);
+        setError(''); setPlan([]); setStrategy(null); setGenerationContext(null); setIsGenerating(true);
 
         try {
-            // Validate Date (Max 7 days for guests)
+            // Client-side date check
             const selectedDate = new Date(examDate);
             const diffTime = Math.abs(selectedDate - today);
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 
-            if (diffDays > 8) { 
-                 throw new Error("Guest plans are limited to 1 week. Please sign up for longer plans.");
-            }
+            if (diffDays > 8) throw new Error("Guest plans are limited to 1 week. Please sign up for longer plans.");
 
             const response = await fetch('/api/generate-plan', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'x-is-guest': 'true' // CRITICAL: Header to bypass Supabase session check
+                    'x-is-guest': 'true' 
                 },
                 body: JSON.stringify({ 
-                    examName, 
-                    syllabus, 
-                    examDate, 
-                    useDocuments: false, // Guests cannot use RAG
-                    studyHoursPerDay, 
-                    planMode: planMode // --- NEW: Pass the selected mode ---
+                    examName, syllabus, examDate, 
+                    useDocuments: false, studyHoursPerDay, planMode 
                 }),
             });
 
@@ -180,7 +165,6 @@ export default function GuestPlanPage() {
                 const errData = await response.json();
                 throw new Error(errData.error || "Generation failed.");
             }
-            
             if (!response.body) throw new Error("Streaming response not available.");
             
             const reader = response.body.getReader();
@@ -213,248 +197,245 @@ export default function GuestPlanPage() {
             }
         } catch (err) { 
             console.error("Guest Generation Error:", err);
-            
-            // --- FALLBACK PROTOCOL (TESTING MODE) ---
-            // If an error occurs, populate with sample data so the flow can be tested.
-            setError(`Error: ${err.message}. Loading SAMPLE PLAN for testing...`);
-            
-            setTimeout(() => {
-                setStrategy(FALLBACK_STRATEGY);
-                setGenerationContext(JSON.stringify(FALLBACK_STRATEGY));
-                setPlan(FALLBACK_PLAN);
-            }, 1000);
-
+            setError(`Error: ${err.message}`);
         } finally { 
             setIsGenerating(false); 
         }
     };
 
     const handleSaveAndSignup = () => {
-        // 1. Serialize state to Context (which saves to LocalStorage)
         saveGuestArtifact({
-            examName,
-            examDate,
-            syllabus,
-            plan,
-            generationContext,
-            generatedNotes: [] 
+            examName, examDate, syllabus, plan: plan.filter(Boolean),
+            generationContext, generatedNotes: [] 
         });
-        
-        // 2. Redirect to Sign Up with intent flag
         router.push('/sign-up?intent=guest_sync');
     };
 
     // --- RENDER ---
-
     return (
         <AppLayout isGuest={true}>
-            <Container size="lg" py="xl">
-                
-                {/* Header Section */}
-                <Stack gap="xs" mb="xl">
-                    <Group>
-                         <Title order={1} className="font-hand">Try KalPad Free</Title>
-                         <Badge size="lg" color="brandGreen" variant="filled">Guest Mode</Badge>
-                    </Group>
-                    <Text c="dimmed" size="lg">
-                        Generate a customized 1-week study plan instantly. No account required.
-                    </Text>
-                </Stack>
+            {/* Global Styles for Scrollbar Hiding */}
+            <style jsx global>{`
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
 
-                {/* FORM SECTION (Hidden after generation starts) */}
-                {!strategy && (
-                    <GlassCard>
+            <Container size="xl" pt="md" px="md" style={{ overflowX: 'hidden', maxWidth: '100vw' }}>
+                
+                {/* HEADER */}
+                <Box mb="xl">
+                    <Group align="center" gap="xs">
+                        <Title order={1} className="apple-text-gradient" style={{ fontSize: '3rem', letterSpacing: '-0.03em' }}>
+                            Try KalPad
+                        </Title>
+                        <Badge size="lg" color="brandGreen" variant="filled">Guest Mode</Badge>
+                    </Group>
+                    <Text c="dimmed" size="lg" mt={4}>Generate a 1-week strategy instantly.</Text>
+                </Box>
+
+                {/* GRID LAYOUT (Responsive: Linear on Mobile, Split on Desktop) */}
+                <Grid gutter={{ base: 0, lg: 40 }}>
+                    
+                    {/* --- LEFT COLUMN: INPUTS --- */}
+                    <Grid.Col span={{ base: 12, lg: 6 }} mb={{ base: 40, lg: 0 }} >
                          <form onSubmit={handleGuestGeneration}>
                             <Stack gap="xl">
-                                <Grid gutter="lg">
-                                    <Grid.Col span={{ base: 12, md: 6 }}>
-                                         <TextInput
-                                            label="Exam or Project Name"
-                                            placeholder="e.g. Physics Midterm, Hackathon"
-                                            leftSection={<IconBooks size={18} />}
-                                            value={examName}
-                                            onChange={(e) => setExamName(e.target.value)}
-                                            required
-                                            size="md"
-                                        />
-                                    </Grid.Col>
-                                    <Grid.Col span={{ base: 12, md: 6 }}>
-                                        <Grid>
-                                             <Grid.Col span={6}>
-                                                <TextInput
-                                                    type="date"
-                                                    label="Deadline (Max 7 Days)"
-                                                    leftSection={<IconCalendar size={18} />}
-                                                    value={examDate}
-                                                    onChange={(e) => setExamDate(e.target.value)}
-                                                    required
-                                                    min={minDateStr}
-                                                    max={maxDateStr}
-                                                    size="md"
+                                
+                                {/* MODULE 1: OBJECTIVE */}
+                                <Stack gap="md">
+                                    <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>01. The Objective</Text>
+                                    <GlassCard p="lg">
+                                        <Stack gap="lg">
+                                            <TextInput 
+                                                label="Mission Name" placeholder="e.g. Physics Midterm" 
+                                                size="md" radius="md" required 
+                                                value={examName} onChange={(e) => setExamName(e.target.value)}
+                                                leftSection={<IconBooks size={18} />}
+                                                styles={{ input: { backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' } }}
+                                            />
+                                            <TextInput 
+                                                type="date" label="Deadline (Max 7 Days)" 
+                                                size="md" radius="md" required 
+                                                value={examDate} onChange={(e) => setExamDate(e.target.value)}
+                                                leftSection={<IconCalendar size={18} />}
+                                                min={minDateStr} max={maxDateStr}
+                                                styles={{ input: { backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' } }}
+                                            />
+                                        </Stack>
+                                    </GlassCard>
+                                </Stack>
+
+                                {/* MODULE 2: STRATEGY */}
+                                <Stack gap="md">
+                                    <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>02. Strategy</Text>
+                                    <GlassCard p="lg">
+                                        <Stack gap="xl">
+                                            <Box>
+                                                <Group justify="space-between" mb="xs">
+                                                    <Text size="sm" fw={500}>Intensity Level</Text>
+                                                    <Badge variant="filled" color="violet">{studyHoursPerDay} Hours / Day</Badge>
+                                                </Group>
+                                                <Slider 
+                                                    value={studyHoursPerDay} onChange={setStudyHoursPerDay}
+                                                    min={1} max={12} step={1}
+                                                    color="violet" size="lg" thumbSize={24}
+                                                    marks={[{ value: 2, label: 'Casual' }, { value: 6, label: 'Focused' }, { value: 10, label: 'Monk' }]}
+                                                    styles={{ markLabel: { fontSize: '0.7rem', color: 'gray' } }}
                                                 />
-                                            </Grid.Col>
-                                            <Grid.Col span={6}>
-                                                <NumberInput
-                                                    label="Study Hours/Day"
-                                                    leftSection={<IconClock size={18} />}
-                                                    value={studyHoursPerDay}
-                                                    onChange={setStudyHoursPerDay}
-                                                    min={1}
-                                                    max={12}
-                                                    required
-                                                    size="md"
-                                                />
-                                            </Grid.Col>
-                                        </Grid>
-                                    </Grid.Col>
-                                </Grid>
+                                            </Box>
+                                            
+                                            <Textarea 
+                                                label="Intel (Syllabus)" 
+                                                placeholder="Paste your syllabus topics here..." 
+                                                minRows={6} autosize required 
+                                                value={syllabus} onChange={(e) => setSyllabus(e.target.value)}
+                                                styles={{ input: { backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' } }}
+                                            />
+                                        </Stack>
+                                    </GlassCard>
+                                </Stack>
 
-                                <Textarea
-                                    label="Syllabus or Topic List"
-                                    description="Paste your chapters, topics, or rough notes here."
-                                    placeholder="Chapter 1: Kinematics..."
-                                    value={syllabus}
-                                    onChange={(e) => setSyllabus(e.target.value)}
-                                    required
-                                    minRows={6}
-                                    autosize
-                                    size="md"
-                                />
+                                {/* MODULE 3: TACTICS (Scrollable Carousel) */}
+                                <Stack gap="md">
+                                    <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>03. Tactics</Text>
+                                    <Box py="md" style={{ width: '100%', overflow: 'hidden' }}>
+                                        <ScrollArea type="never">
+                                            <Group wrap="nowrap" gap="md" px="xs">
+                                                {PLAN_MODES.map((mode) => {
+                                                    const isActive = planMode === mode.value;
+                                                    return (
+                                                        <Interactive key={mode.value} onClick={() => setPlanMode(mode.value)}>
+                                                            <GlassCard p="md" style={{ 
+                                                                    minWidth: '160px', height: '140px',
+                                                                    backgroundColor: isActive ? 'rgba(191, 90, 242, 0.15)' : 'rgba(255,255,255,0.02)',
+                                                                    border: isActive ? `1px solid ${mode.color}` : '1px solid rgba(255,255,255,0.05)',
+                                                                    cursor: 'pointer'
+                                                                }}>
+                                                                <Stack h="100%" justify="space-between">
+                                                                    <ThemeIcon variant="light" size="lg" radius="md" color={mode.color}><mode.icon size={20} /></ThemeIcon>
+                                                                    <Box>
+                                                                        <Text size="sm" fw={700} c={isActive ? 'white' : 'dimmed'}>{mode.label}</Text>
+                                                                        <Text size="xs" c="dimmed" lineClamp={2} mt={2}>{mode.description}</Text>
+                                                                    </Box>
+                                                                </Stack>
+                                                            </GlassCard>
+                                                        </Interactive>
+                                                    );
+                                                })}
+                                            </Group>
+                                        </ScrollArea>
+                                    </Box>
+                                </Stack>
 
-                                {/* --- NEW: Plan Mode Selector --- */}
-                                <Group justify="flex-start">
-                                    <Button
-                                        leftSection={<IconSettings size={16} />}
-                                        variant="subtle"
-                                        onClick={openModal}
-                                    >
-                                        Advanced Settings (Mode: {planMode.charAt(0).toUpperCase() + planMode.slice(1)})
-                                    </Button>
-                                </Group>
-                                <PlanModeModal
-                                    opened={modalOpened}
-                                    close={closeModal}
-                                    currentMode={planMode}
-                                    onSelectMode={(mode) => {
-                                        setPlanMode(mode);
-                                        closeModal(); 
-                                    }}
-                                />
-
-                                <Alert icon={<IconInfoCircle size={16}/>} color="blue" variant="light">
-                                    Guest plans are limited to 1 week and text-only generation. 
-                                    Sign up to upload PDFs and generate long-term plans.
-                                </Alert>
-
-                                <Group justify="flex-end">
-                                    <ShimmerButton type="submit" size="lg" loading={isGenerating}>
-                                        Generate Instant Plan
-                                    </ShimmerButton>
+                                {/* ACTION */}
+                                <Group justify="flex-end" mt="xl">
+                                    <Interactive style={{ width: '100%' }}>
+                                        <Button 
+                                            type="submit" 
+                                            size="xl" 
+                                            loading={isGenerating} 
+                                            radius="xl"
+                                            style={{ 
+                                                width: '100%',
+                                                background: 'linear-gradient(135deg, #BF5AF2 0%, #5E5CE6 100%)',
+                                                boxShadow: '0 10px 25px -5px rgba(191, 90, 242, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+                                                border: 'none', color: 'white', fontSize: '1.1rem', fontWeight: 600
+                                            }}
+                                            rightSection={!isGenerating && <IconRocket size={22} />}
+                                        >
+                                            Launch Instant Plan
+                                        </Button>
+                                    </Interactive>
                                 </Group>
                             </Stack>
                          </form>
-                    </GlassCard>
-                )}
+                    </Grid.Col>
 
-                {/* --- ERROR ALERT (Visible even if fallback loads) --- */}
-                {error && (
-                    <Alert color="orange" title="Generation Interrupted" mt="xl" icon={<IconLock size={16}/>} withCloseButton onClose={() => setError('')}>
-                        {error}
-                    </Alert>
-                )}
-
-                {/* RESULTS SECTION */}
-                <Stack gap="xl" mt="xl">
-                    
-                    {/* 1. STRATEGY REPORT */}
-                    {(isGenerating || strategy) && (
-                        <GlassCard ref={strategyReportRef}>
-                            <Title order={3}>AI Strategy Report</Title>
-                            {strategy ? (
-                                <Stack gap="md" mt="md">
-                                     <Paper withBorder p="sm" radius="md" style={{backgroundColor: 'rgba(0,0,0,0.2)'}}>
-                                        <Text size="sm" fw={700} c="brandGreen" tt="uppercase">Estimated Coverage: {strategy.estimated_coverage}%</Text>
-                                    </Paper>
-                                    <Text size="lg" style={{ lineHeight: 1.6 }}>{typedApproach}</Text>
-                                    <Group gap="xs">
-                                        {strategy.emphasized_topics?.map((t, i) => (
-                                            <Badge key={i} color="brandGreen" variant="light">{t.topic}</Badge>
-                                        ))}
-                                    </Group>
-                                </Stack>
+                    {/* --- RIGHT COLUMN: SYSTEM OUTPUT --- */}
+                    <Grid.Col span={{ base: 12, lg: 6 }}>
+                        <Stack gap="md" style={{ position: 'sticky', top: 20 }}>
+                            <div ref={strategyReportRef} /> 
+                            <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>System Output</Text>
+                            
+                            {!strategy ? (
+                                <GlassCard p="xl" style={{ height: '600px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)', borderStyle: 'dashed' }}>
+                                    {isGenerating ? (
+                                        <Stack align="center" gap="lg">
+                                            <Loader size="lg" color="violet" type="dots" />
+                                            <AnimatePresence mode="wait">
+                                                <motion.div key={currentFact} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                                                    <Text c="dimmed" ta="center" maw={300}>{currentFact}</Text>
+                                                </motion.div>
+                                            </AnimatePresence>
+                                        </Stack>
+                                    ) : (
+                                        <Stack align="center" gap="xs">
+                                            <IconBrain size={48} color="rgb(119, 119, 119)" />
+                                            <Text c="dimmed" fw={500}>Ready to Architect</Text>
+                                            <Text c="dimmed" size="sm">Fill the modules to begin.</Text>
+                                        </Stack>
+                                    )}
+                                </GlassCard>
                             ) : (
-                                <Paper p="md" mt="md" withBorder style={{backgroundColor: 'rgba(0,0,0,0.1)'}}>
-                                   <Group>
-                                        <Loader size="sm" color="white" />
-                                        <AnimatePresence mode="wait">
-                                            <motion.div
-                                                key={currentFact}
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: -10 }}
-                                            >
-                                                <Text size="sm" c="dimmed">{currentFact}</Text>
-                                            </motion.div>
-                                        </AnimatePresence>
-                                    </Group>
-                                </Paper>
-                            )}
-                        </GlassCard>
-                    )}
+                                <>
+                                    {/* STRATEGY REPORT */}
+                                    <GlassCard p="lg" style={{ borderLeft: '4px solid #BF5AF2' }}>
+                                        <Stack gap="md">
+                                            <Group justify="space-between">
+                                                <Title order={3}>Strategic Analysis</Title>
+                                                <Badge size="lg" variant="dot" color="teal">{strategy.estimated_coverage}% Coverage</Badge>
+                                            </Group>
+                                            <Text style={{ lineHeight: 1.6 }}>{typedApproach}</Text>
+                                            <Button variant="subtle" size="xs" color="gray" leftSection={<IconListDetails size={16}/>} onClick={toggleDetails}>
+                                                {detailsOpened ? 'Hide Analysis' : 'View Breakdown'}
+                                            </Button>
+                                            <Collapse in={detailsOpened}>
+                                                <Stack gap="xs">
+                                                    <Text size="xs" fw={700} c="brandGreen">PRIORITY TARGETS</Text>
+                                                    {strategy.emphasized_topics?.map((t, i) => <Text key={i} size="sm">• {t.topic}</Text>)}
+                                                </Stack>
+                                            </Collapse>
+                                        </Stack>
+                                    </GlassCard>
 
-                    {/* 2. THE PLAN */}
-                    {strategy && (isGenerating || plan.length > 0) && (
-                        <GlassCard ref={planContainerRef}>
-                            <Stack gap="lg">
-                                <Group justify="space-between" align="center">
-                                    <Title order={2}>Your 1-Week Sprint</Title>
-                                    
-                                    {/* SAVE CTA - Only appears when generation stops */}
-                                    {!isGenerating && (
-                                        <Button 
-                                            leftSection={<IconRocket size={20} />}
-                                            size="lg"
-                                            color="brandGreen"
-                                            onClick={handleSaveAndSignup}
-                                            className="shimmer-effect"
-                                            style={{
-                                                boxShadow: '0 0 20px rgba(74, 222, 128, 0.4)',
-                                                border: '1px solid #4ade80'
-                                            }}
-                                        >
-                                            Save & Unlock Full Features
-                                        </Button>
-                                    )}
-                                </Group>
-                                
-                                <div ref={planScrollDivRef} style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: '0.5rem' }}>
-                                    {plan.map((item, index) => (
-                                        <TimelineDayCard 
-                                            key={index} 
-                                            dayTopic={item}
-                                            plan={{ exam_name: examName, exam_date: examDate }} 
-                                            isGuestMode={true} 
-                                            viewMode="plan"
-                                            onUpdate={() => {}} 
-                                        />
-                                    ))}
-                                    
-                                    {isGenerating && (
-                                        <Paper p="lg" withBorder style={{ opacity: 0.5 }}>
-                                            <Stack>
-                                                <Group justify="space-between">
-                                                    <Loader size="sm" />
-                                                    <Badge color="gray">Planning...</Badge>
-                                                </Group>
-                                                <Text size="sm" c="dimmed">The AI is structuring your next day...</Text>
+                                    {/* GENERATED PLAN SCROLL */}
+                                    <GlassCard p={0} ref={planContainerRef} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '600px' }}>
+                                        <Box p="md" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                                            <Group justify="space-between">
+                                                <Title order={4}>Blueprint</Title>
+                                                {!isGenerating && (
+                                                    <Group className={`${highlightSave ? nudgeClasses.pulseEffect : ''}`}>
+                                                        {highlightSave && <SavePlanNudge />}
+                                                        <Button onClick={handleSaveAndSignup} color="brandGreen" size="xs">
+                                                            Save & Unlock Full Features
+                                                        </Button>
+                                                    </Group>
+                                                )}
+                                            </Group>
+                                        </Box>
+                                        <Box ref={planScrollDivRef} className="no-scrollbar" p="md" style={{ overflowY: 'auto', flex: 1 }}>
+                                            <Stack gap="sm">
+                                                {plan.filter(Boolean).map((day, i) => (
+                                                    <TimelineDayCard 
+                                                        key={i} 
+                                                        dayTopic={day}
+                                                        plan={{ exam_name: examName, exam_date: examDate }} 
+                                                        isGuestMode={true} 
+                                                        viewMode="plan"
+                                                        onUpdate={() => {}} 
+                                                    />
+                                                ))}
+                                                {isGenerating && <Group justify="center" p="xl"><Loader size="sm" color="gray" /></Group>}
                                             </Stack>
-                                        </Paper>
-                                    )}
-                                </div>
-                            </Stack>
-                        </GlassCard>
-                    )}
-                </Stack>
+                                        </Box>
+                                    </GlassCard>
+                                </>
+                            )}
+                        </Stack>
+                    </Grid.Col>
+                </Grid>
+
+                {error && <Alert color="red" title="Generation Interrupted" mt="xl" icon={<IconX size={16}/>}>{error}</Alert>}
             </Container>
         </AppLayout>
     );

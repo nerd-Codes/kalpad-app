@@ -78,18 +78,18 @@ export function Navbar() {
                     {/* 2. Desktop Links */}
                     <Group gap="xs" visibleFrom="sm">
                         <Button 
-                            component={Link} href="#manifesto" 
+                            component={Link} href="/pricing" 
                             variant="subtle" color="gray" size="compact-sm" radius="xl"
                             style={{ color: 'rgba(255,255,255,0.7)' }}
                         >
-                            Manifesto
+                            Pricing
                         </Button>
                         <Button 
-                            component={Link} href="#community-section" 
+                            component={Link} href="/contact" 
                             variant="subtle" color="gray" size="compact-sm" radius="xl"
                             style={{ color: 'rgba(255,255,255,0.7)' }}
                         >
-                            Community
+                            Contact Us
                         </Button>
                     </Group>
 

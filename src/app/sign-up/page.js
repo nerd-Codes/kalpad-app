@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import supabase from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
+import { IconCloudUpload } from '@tabler/icons-react'; // Add IconCloudUpload
 
 // Mantine & UI Imports
 import { Container, Title, Text, TextInput, PasswordInput, Button, Group, Divider, Alert, Anchor, Popover, Progress, Box, Stack } from '@mantine/core';
@@ -137,18 +138,32 @@ export default function SignUpPage() {
         }
         setLoading(true);
         setError('');
-        setSuccess('');
+        
         try {
-            const { error } = await supabase.auth.signUp({
+            const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
-                options: { emailRedirectTo: `${window.location.origin}/sign-in` }
+                options: { 
+                    emailRedirectTo: `${window.location.origin}/sign-in`,
+                    // Metadata to track source
+                    data: { source: 'guest_conversion' }
+                }
             });
+
             if (error) throw error;
-            setSuccess("Success! Please check your email to verify your account.");
+
+            // --- CRITICAL FIX: Check if session was created immediately ---
+            if (data.session) {
+                // User is signed in! (Email confirmation might be off or auto-confirmed)
+                // Trigger the sync logic directly.
+                await performGuestSync(data.session);
+            } else {
+                // Standard flow: Email verification required
+                setSuccess("Success! Please check your email to verify your account.");
+                setLoading(false);
+            }
         } catch (err) {
             setError(err.message);
-        } finally {
             setLoading(false);
         }
     };
@@ -158,6 +173,32 @@ export default function SignUpPage() {
             provider: 'google',
             options: { redirectTo: `${window.location.origin}/dashboard` },
         });
+    };
+
+    const performGuestSync = async (currentSession) => {
+        const hasIntent = searchParams.get('intent') === 'guest_sync';
+        
+        if (hasIntent && guestArtifact) {
+            try {
+                const res = await fetch('/api/sync-guest-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(guestArtifact)
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    clearGuestArtifact();
+                    router.push(`/plan/${data.planId}`);
+                    return;
+                }
+            } catch (e) {
+                console.error("Sync error:", e);
+            }
+        }
+        
+        // Fallback or No Guest Data
+        router.push('/dashboard');
     };
 
     // --- STYLES ---
@@ -209,6 +250,23 @@ export default function SignUpPage() {
                             boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.7)'
                         }}
                     >
+                        {/* --- NEW: GUEST PLAN CONTEXT --- */}
+                        {guestArtifact && (
+                            <Alert 
+                                variant="light" 
+                                color="teal" 
+                                icon={<IconCloudUpload size={16} />} 
+                                title="Save Your Progress"
+                                mb="xl"
+                                styles={{ 
+                                    root: { backgroundColor: 'rgba(20, 184, 166, 0.1)', border: '1px solid rgba(20, 184, 166, 0.2)' },
+                                    message: { color: '#2dd4bf' },
+                                    title: { color: '#5eead4', fontFamily: 'var(--font-lexend)' }
+                                }}
+                            >
+                                Create an account using Email to permanently save your <strong>{guestArtifact.examName}</strong> strategy.
+                            </Alert>
+                        )}
                         <Stack gap="xl">
                             {/* Header */}
                             <div className="text-center">

@@ -5,11 +5,12 @@ import { useState, useEffect } from 'react';
 import { Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, Stack, Title, ActionIcon, Menu, Modal, ScrollArea, Paper } from '@mantine/core';
 import { 
     IconPencilPlus, IconBrain, IconPlayerPlay, IconClock, IconEye, 
-    IconChevronsDown, IconListCheck, IconDotsVertical,
+    IconChevronsDown, IconListCheck, IconDotsVertical, IconLock
 } from '@tabler/icons-react';
 import { FullscreenNoteViewer } from './FullscreenNoteViewer';
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays, isToday, parseISO } from 'date-fns';
 import Link from 'next/link';
+import supabase from '@/lib/supabaseClient'; 
 
 // --- IMPORTS FOR KALPAD OS DESIGN SYSTEM ---
 import { GlassCard } from '@/components/GlassCard';
@@ -44,6 +45,28 @@ const TYPE_COLORS = {
 export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan', isReadOnly = false, onConfirmBulkGenerate, isGuestMode = false }) {
     const { setIsLoading } = useLoading();
     const { guestArtifact, updateGuestNote } = useGuest();
+
+    // --- GATE 2: TIER STATE ---
+    const [userTier, setUserTier] = useState('free');
+    
+    useEffect(() => {
+        const checkTier = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+            const { data } = await supabase.from('user_subscriptions')
+                .select('tier').eq('user_id', session.user.id).eq('status', 'active').maybeSingle();
+            if (data) setUserTier(data.tier);
+        };
+        checkTier();
+    }, []);
+
+    // Lock logic: Locked if FREE tier AND date is NOT today
+    // --- LOCK LOGIC ---
+    // Guests: Locked if they already have >= 1 note.
+    // Free Users: Locked if date is NOT today.
+    const isNoteGenerationLocked = isGuestMode 
+        ? (guestArtifact?.generatedNotes?.length || 0) >= 1
+        : (userTier === 'free' && !isToday(parseISO(dayTopic.date)));
 
     const [generatingNotesFor, setGeneratingNotesFor] = useState(null);
     const [noteError, setNoteError] = useState('');
@@ -274,13 +297,13 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                                     <div onClick={(e) => e.stopPropagation()}>
                                         <Button 
                                             variant="light" 
-                                            color="violet"
+                                            color={isNoteGenerationLocked ? "orange" : "violet"}
                                             size="xs" 
-                                            leftSection={<IconListCheck size={16} />}
-                                            onClick={openBulkNoteModal}
-                                            style={{ boxShadow: '0 2px 10px rgba(139, 92, 246, 0.2)' }}
+                                            leftSection={isNoteGenerationLocked ? <IconLock size={16} /> : <IconListCheck size={16} />}
+                                            onClick={isNoteGenerationLocked ? () => window.dispatchEvent(new CustomEvent('open-upgrade-modal')) : openBulkNoteModal}
+                                            style={{ boxShadow: isNoteGenerationLocked ? 'none' : '0 2px 10px rgba(139, 92, 246, 0.2)' }}
                                         >
-                                            Bulk Actions
+                                            {isNoteGenerationLocked ? 'Unlock Bulk' : 'Bulk Actions'}
                                         </Button>
                                     </div>
                                 )}
@@ -375,6 +398,15 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                                 onClick={() => setNoteToView({ ...existingNote, sub_topic: subTopic, day_topic: dayTopic, exam_name: plan.exam_name })}
                             >
                                 Read Note
+                            </Menu.Item>
+                        ) : isNoteGenerationLocked ? (
+                            <Menu.Item 
+                                leftSection={<IconLock size={16} color="#FF9500" />}
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-upgrade-modal'))}
+                                color="orange"
+                                style={{ fontWeight: 600 }}
+                            >
+                                Unlock to Forge
                             </Menu.Item>
                         ) : (
                             <Menu.Item 

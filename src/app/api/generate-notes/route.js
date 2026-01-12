@@ -38,12 +38,37 @@ export async function POST(request) {
     const { plan_topic_id, sub_topic_text, exam_name, day_topic } = await request.json();
     
     // --- CONTEXT RETRIEVAL (RAG) ---
+    // --- CONTEXT RETRIEVAL (RAG & HISTORY) ---
     const { data: topicData, error: topicError } = await supabase
-      .from('plan_topics').select('relevant_page_images').eq('id', plan_topic_id).single();
+      .from('plan_topics')
+      .select('relevant_page_images, plan_id, day') // Fetch plan_id and day for history lookup
+      .eq('id', plan_topic_id)
+      .single();
       
-    if (topicError) {
-      throw new Error(`Failed to fetch topic images: ${topicError.message}`);
-    }
+    if (topicError) throw new Error(`Failed to fetch topic data: ${topicError.message}`);
+
+    // "Zero-Latency" Context: Fetch the 3 previous topics in this plan
+    let previousContext = "None. This is the first topic.";
+    try {
+        const { data: historyData } = await supabase
+            .from('plan_topics')
+            .select('sub_topics')
+            .eq('plan_id', topicData.plan_id)
+            .lte('day', topicData.day)
+            .order('day', { ascending: true });
+
+        if (historyData) {
+            // Flatten all subtopics into a sequential list
+            const allTopics = historyData.flatMap(d => d.sub_topics?.map(st => st.text) || []);
+            const currentIndex = allTopics.indexOf(sub_topic_text);
+            
+            if (currentIndex > 0) {
+                // Grab the 3 immediately preceding topics
+                const prevTopics = allTopics.slice(Math.max(0, currentIndex - 3), currentIndex);
+                if (prevTopics.length > 0) previousContext = prevTopics.join(' -> ');
+            }
+        }
+    } catch (e) { console.warn("Context fetch warning:", e); }
 
     const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
     const embeddingResult = await embeddingModel.embedContent(sub_topic_text);
@@ -114,6 +139,13 @@ const examPersona = JSON.parse(personaResult.response.candidates[0].content.part
       - Exam: "${exam_name}"
       - Main Chapter Topic: "${day_topic}"
       - Specific Sub-Topic for this Outline: "${sub_topic_text}"
+      - **PREVIOUSLY LEARNED:** [ ${previousContext} ]
+      
+      **NARRATIVE FLOW DIRECTIVE:**
+      The student has *just* finished studying the "Previously Learned" topics. 
+      - Do NOT re-explain them from scratch. 
+      - Explicitly build upon them (e.g., "Building on the concept of [Previous Topic]...").
+      - Ensure a seamless conceptual transition.
       
       Reference Material: Provided as multimodal input (text and images).
       
@@ -150,7 +182,9 @@ const examPersona = JSON.parse(personaResult.response.candidates[0].content.part
       **Full Context:**
       - Exam: "${exam_name}"
       - Main Chapter Topic: "${day_topic}"
-      - Specific Sub-Topic to Write About: "${sub_topic_text}"
+      - Specific Sub-Topic to Write About: "${sub_topic_text}".
+      - **PREREQUISITES (ALREADY KNOWN):** [ ${previousContext} ]
+      - *Constraint:* Do not waste tokens re-teaching the prerequisites. Use them as axioms.
       
       **UNBREAKABLE RULE #1: AUDIENCE IS EVERYTHING.** The "Exam" context is your most important filter. A note for "Class 10th Physics" MUST be simpler, use more basic analogies, and avoid complex graphs compared to a note for "Undergraduate Quantum Mechanics". You must tailor the depth, examples, and tone to this specific audience.  Your primary filter for tone, depth, and examples is this Exam Persona:
       ${JSON.stringify(examPersona)}
@@ -170,6 +204,13 @@ const examPersona = JSON.parse(personaResult.response.candidates[0].content.part
       5.  **Formatting:** Use beautiful, clean Markdown. Use LaTeX for all mathematical equations ($...$ for inline, $$...$$ for block-level).
       6.  **No Redundant Titles:** Your response must NOT repeat the main topic or sub-topic as a title. Begin directly with the first point of the outline (e.g., "### I. Introduction...").
 
+       **TEXTBOOK FORMATTING RULES (STRICT):**
+      1.  **Definitions:** Use Blockquotes for key definitions. (\`> **Definition:** ...\`)
+      2.  **Terminology:** **Bold** the first occurrence of new terms.
+      3.  **Visual Anchors:** If you describe a complex mechanism, insert a placeholder: *[Refer to diagram: description]*.
+      4.  **Math:** Use LaTeX ($...$ or $$...$$). Derive steps clearly.
+      5.  **Voice:** Authoritative but accessible. Use transitional phrases to link back to the "Previously Learned" context.
+      
       **LATEX STYLE GUIDE (THESE ARE UNBREAKABLE LAWS FOR KATEX COMPATIBILITY):**
     
     1.  **DELIMITERS:** You MUST use \`$ ... $\` for inline math and \`$$ ... $$\` for display math. You are FORBIDDEN from using \`\\[ ... \\]\` or \`\\( ... \\)\`.

@@ -50,6 +50,7 @@
     "postcss-simple-vars": "^7.0.1",
     "posthog-js": "^1.260.1",
     "posthog-node": "^5.9.5",
+    "razorpay": "^2.9.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-markdown": "^10.1.0",

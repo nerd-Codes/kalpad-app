@@ -2,9 +2,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Title, Text, Avatar, Group, Stack, Box, Menu, SimpleGrid, UnstyledButton } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { useRouter, usePathname } from 'next/navigation';
+import { Title, Text, Avatar, Group, Stack, Box, Menu, SimpleGrid, UnstyledButton, Modal, Button, ThemeIcon } from '@mantine/core';
+import { useMediaQuery, useDisclosure } from '@mantine/hooks';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useLoading } from '@/context/LoadingContext';
 import supabase from '@/lib/supabaseClient';
 import { useOnboarding } from '@/context/OnboardingContext';
@@ -16,24 +16,85 @@ import {
     IconPlus, 
     IconUser, 
     IconLogout,
-    IconChartBar,
     IconSettings,
+    IconDiamond,
+    IconCrown,
+    IconRocket,
+    IconCheck
 } from '@tabler/icons-react';
 import onboardingSteps from '@/lib/onboardingSteps';
 
 // --- IMPORTS ---
 import { GlassCard } from '@/components/GlassCard';
 import { Interactive } from '@/components/Interactive';
+import { UpgradeModal } from './payment/UpgradeModal';
+import { ShimmerButton } from './landing/ShimmerButton';
+
+import { usePaymentStatus } from '@/hooks/usePaymentStatus';
+import { TransactionStatusModal } from './payment/TransactionStatusModal';
+import { FounderWelcomeModal } from './payment/FounderWelcomeModal';
+
+// --- CONFIG: TIER VISUALS ---
+const TIER_CONFIG = {
+    'free': { 
+        label: 'Free Tier', 
+        color: 'white', 
+        icon: IconUser, 
+        ring: 'transparent',
+        badgeColor: 'gray',
+        isSpecial: false 
+    },
+    'pro_15': { 
+        label: 'Pro Sprint', 
+        color: '#CD7F32', 
+        icon: IconRocket, 
+        ring: '#CD7F32', 
+        badgeColor: 'orange',
+        isSpecial: false 
+    },
+    'pro_30': { 
+        label: 'Pro Marathon', 
+        color: '#E0E0E0', 
+        icon: IconDiamond, 
+        ring: '#E0E0E0', 
+        badgeColor: 'gray',
+        isSpecial: false 
+    },
+    'pro_90': { 
+        label: 'Pro Semester', 
+        color: '#FFD700', 
+        icon: IconCrown, 
+        ring: '#FFD700', 
+        badgeColor: 'yellow',
+        isSpecial: true 
+    },
+    'founder': { 
+        label: 'Founder Edition', 
+        color: '#BF5AF2', 
+        icon: IconCrown, 
+        ring: '#BF5AF2', 
+        badgeColor: 'grape',
+        isSpecial: true // Triggers extra shine
+    },
+    'pro_test': { label: 'Debug', color: '#F06595', icon: IconCheck, ring: '#F06595', badgeColor: 'pink', isSpecial: false }
+};
 
 // --- 1. THE FLOATING SIDEBAR (DESKTOP) ---
-function FloatingSidebar({ user, onNavigate, onSignOut }) {
+function FloatingSidebar({ user, tier, onNavigate, onSignOut }) {
     const pathname = usePathname();
+    const config = TIER_CONFIG[tier] || TIER_CONFIG['free'];
+    const TierIcon = config.icon;
+    
+    // Only show Upgrade if Free
     const navLinks = [
         { icon: IconLayoutDashboard, label: 'Dashboard', href: '/dashboard' },
         { icon: IconFileText, label: 'All Plans', href: '/plans' },
         { icon: IconPlus, label: 'New Plan', href: '/new-plan', id: 'new-plan-button' },
-        { icon: IconChartBar, label: 'Analytics', href: '#', disabled: true },
     ];
+
+    if (tier === 'free') {
+        navLinks.push({ icon: IconDiamond, label: 'Upgrade', action: 'upgrade', id: 'upgrade-button', color: '#BF5AF2' });
+    }
 
     return (
         <GlassCard 
@@ -42,16 +103,53 @@ function FloatingSidebar({ user, onNavigate, onSignOut }) {
                 position: 'fixed', left: '16px', top: '16px', bottom: '16px', width: '260px',
                 display: 'flex', flexDirection: 'column', padding: '24px', zIndex: 50 
             }}
-            animate={false} // Static container
+            animate={false} 
         >
-            {/* Logo Area - TEXT ONLY as requested */}
+            {/* Logo & Tier Badge */}
+            {/* Logo & Tier Badge */}
             <Box mb={40} px={8} pt={8}>
-                <Title order={2} className="apple-text-gradient" style={{ letterSpacing: '-0.03em', fontSize: '1.75rem' }}>
+                {/* Dynamic Wordmark */}
+                <Title 
+                    order={2} 
+                    style={{ 
+                        letterSpacing: '-0.03em', 
+                        fontSize: '1.75rem',
+                        // If free, use white. If paid, use the Tier Color with a slight gradient effect.
+                        color: tier === 'free' ? 'white' : 'transparent',
+                        backgroundImage: tier !== 'free' ? `linear-gradient(135deg, white 20%, ${config.color} 100%)` : 'none',
+                        backgroundClip: tier !== 'free' ? 'text' : 'border-box',
+                        WebkitBackgroundClip: tier !== 'free' ? 'text' : 'border-box'
+                    }}
+                >
                     KalPad
                 </Title>
-                <Text size="xs" c="dimmed" fw={500} style={{ letterSpacing: '0.1em' }} tt="uppercase">
-                    
-                </Text>
+                
+                {/* Flashy Tier Badge */}
+                <Box mt={6}>
+                     {config.isSpecial ? (
+                        <Box 
+                            style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                padding: '4px 10px', borderRadius: '99px',
+                                background: `linear-gradient(90deg, ${config.color}20, ${config.color}40)`,
+                                border: `1px solid ${config.color}`,
+                                boxShadow: `0 0 15px ${config.color}40`
+                            }}
+                        >
+                            <TierIcon size={12} color={config.color} fill={config.color} />
+                            <Text size="10px" fw={800} c={config.color} tt="uppercase" style={{ letterSpacing: '0.1em' }}>
+                                {config.label}
+                            </Text>
+                        </Box>
+                     ) : (
+                        <Group gap={6}>
+                            <TierIcon size={14} color={tier === 'free' ? 'gray' : config.color} />
+                            <Text size="xs" c={tier === 'free' ? 'dimmed' : 'white'} fw={700} tt="uppercase" style={{ letterSpacing: '0.1em' }}>
+                                {config.label}
+                            </Text>
+                        </Group>
+                     )}
+                </Box>
             </Box>
 
             {/* Navigation Links */}
@@ -61,38 +159,45 @@ function FloatingSidebar({ user, onNavigate, onSignOut }) {
                     const isActive = pathname === link.href;
                     return (
                         <Interactive key={link.label} onClick={() => {
-                            if (link.disabled) return;
-                            window.dispatchEvent(new CustomEvent('kalpad-onboarding-advance'));
-                            onNavigate(link.href);
+                            if (link.action === 'upgrade') {
+                                window.dispatchEvent(new CustomEvent('open-upgrade-modal'));
+                            } else {
+                                window.dispatchEvent(new CustomEvent('kalpad-onboarding-advance'));
+                                onNavigate(link.href);
+                            }
                         }}>
                             <Box
                                 id={link.id}
                                 py={10} px={12}
                                 style={{
                                     borderRadius: '12px',
-                                    backgroundColor: isActive ? 'rgba(191, 90, 242, 0.15)' : 'transparent', // Purple tint
-                                    color: isActive ? '#BF5AF2' : 'var(--apple-text-secondary)',
+                                    backgroundColor: isActive ? 'rgba(191, 90, 242, 0.15)' : 'transparent',
+                                    color: isActive ? '#BF5AF2' : link.color || 'var(--apple-text-secondary)', 
                                     display: 'flex', alignItems: 'center', gap: '12px',
                                     transition: 'color 0.2s ease',
-                                    opacity: link.disabled ? 0.5 : 1,
-                                    cursor: link.disabled ? 'not-allowed' : 'pointer'
+                                    cursor: 'pointer'
                                 }}
                             >
                                 <link.icon size={20} stroke={isActive ? 2 : 1.5} />
-                                <Text size="sm" fw={isActive ? 600 : 500}>{link.label}</Text>
+                                <Text size="sm" fw={isActive || link.action === 'upgrade' ? 600 : 500}>{link.label}</Text>
                             </Box>
                         </Interactive>
                     );
                 })}
             </Stack>
 
-            {/* User Profile (Bottom) */}
+            {/* User Profile */}
             <Menu shadow="md" width={220} position="top-start" withArrow>
                 <Menu.Target>
                     <Box pt={16} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                         <Interactive>
                             <Group style={{ cursor: 'pointer', padding: '8px', borderRadius: '12px' }}>
-                                <Avatar color="violet" radius="xl" size="md">{user?.email?.substring(0, 2).toUpperCase()}</Avatar>
+                                <Avatar 
+                                    color="violet" radius="xl" size="md"
+                                    style={{ border: `2px solid ${config.ring}` }}
+                                >
+                                    {user?.email?.substring(0, 2).toUpperCase()}
+                                </Avatar>
                                 <div style={{ flex: 1 }}>
                                     <Text size="sm" fw={600} c="var(--apple-text-primary)" truncate>{user?.email?.split('@')[0]}</Text>
                                     <Text size="xs" c="dimmed">Student</Text>
@@ -113,9 +218,11 @@ function FloatingSidebar({ user, onNavigate, onSignOut }) {
 }
 
 // --- 2. THE FLUID BOTTOM SHEET (MOBILE) ---
-// Reverted to fixed bottom, full width, but upgraded materials
-function MobileNavbar({ user, onNavigate, onSignOut }) {
+function MobileNavbar({ user, tier, onNavigate, onSignOut }) {
     const pathname = usePathname();
+    const config = TIER_CONFIG[tier] || TIER_CONFIG['free'];
+    
+    // Upgrade button is REMOVED from grid
     const navLinks = [
         { icon: IconLayoutDashboard, label: 'Home', href: '/dashboard' },
         { icon: IconPlus, label: 'Create', href: '/new-plan', id: 'new-plan-button' },
@@ -126,12 +233,12 @@ function MobileNavbar({ user, onNavigate, onSignOut }) {
         <Box
             style={{ 
                 position: 'fixed', bottom: 0, left: 0, right: 0,
-                backgroundColor: 'rgba(28, 28, 30, 0.85)', // Deep, substantial dark glass
+                backgroundColor: 'rgba(28, 28, 30, 0.85)', 
                 backdropFilter: 'blur(24px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(24px) saturate(180%)',
                 borderTop: '1px solid rgba(255, 255, 255, 0.1)',
                 paddingTop: '12px',
-                paddingBottom: 'max(12px, env(safe-area-inset-bottom))', // Respect iOS Home Indicator
+                paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
                 paddingLeft: '16px', paddingRight: '16px',
                 zIndex: 1000
             }}
@@ -142,21 +249,20 @@ function MobileNavbar({ user, onNavigate, onSignOut }) {
                     return (
                         <Interactive key={link.label} onClick={() => onNavigate(link.href)}>
                             <Stack align="center" gap={4} id={link.id} style={{ padding: '8px' }}>
-                                {/* The Fluid Active Indicator (Purple Glow) */}
                                 <Box
                                     style={{
                                         position: 'relative',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         padding: '6px 20px',
-                                        borderRadius: '20px', // Soft Pill shape
+                                        borderRadius: '20px',
                                         backgroundColor: isActive ? 'rgba(191, 90, 242, 0.2)' : 'transparent',
                                         transition: 'background-color 0.3s ease'
                                     }}
                                 >
                                     <link.icon 
-                                        size={22} 
+                                        size={26} 
                                         stroke={isActive ? 2 : 1.5} 
-                                        color={isActive ? '#BF5AF2' : 'var(--apple-text-secondary)'} 
+                                        color={isActive ? '#BF5AF2' : link.color || 'var(--apple-text-secondary)'} 
                                     />
                                 </Box>
                                 <Text size="10px" fw={600} c={isActive ? 'white' : 'dimmed'}>
@@ -166,20 +272,16 @@ function MobileNavbar({ user, onNavigate, onSignOut }) {
                         </Interactive>
                     );
                 })}
-
-                {/* Mobile Profile Menu */}
-                {/* Mobile Profile Menu */}
-                <Menu shadow="xl" width={200} position="top-end" withArrow offset={10}>
+                
+                {/* Profile Menu (Now includes Upgrade) */}
+                <Menu shadow="xl" width={220} position="top-end" withArrow offset={10} zIndex={1001}>
                     <Menu.Target>
-                        {/* FIX: Replaced <Interactive> with <UnstyledButton> to pass the ref correctly for positioning */}
                         <UnstyledButton style={{ cursor: 'pointer' }}>
                             <Stack align="center" gap={4} style={{ padding: '8px' }}>
                                 <Box style={{ padding: '6px 20px' }}>
                                     <Avatar 
-                                        color="violet" 
-                                        radius="xl" 
-                                        size={22} 
-                                        style={{ border: '1.5px solid rgba(255,255,255,0.2)' }}
+                                        color="violet" radius="xl" size={22} 
+                                        style={{ border: `2px solid ${config.ring}` }} // Tier-colored ring
                                     >
                                         {user?.email?.substring(0, 2).toUpperCase()}
                                     </Avatar>
@@ -189,7 +291,18 @@ function MobileNavbar({ user, onNavigate, onSignOut }) {
                         </UnstyledButton>
                     </Menu.Target>
                     <Menu.Dropdown style={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E', marginBottom: '10px' }}>
-                        <Menu.Item leftSection={<IconUser size={14} />} disabled>Profile</Menu.Item>
+                        <Menu.Label>Account: {config.label}</Menu.Label>
+                        {/* Mobile Upgrade Item */}
+                        {tier === 'free' && (
+                            <Menu.Item 
+                                leftSection={<IconDiamond size={14} color="#BF5AF2" />} 
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-upgrade-modal'))}
+                                style={{ fontWeight: 600, color: 'white' }}
+                            >
+                                Upgrade to Pro
+                            </Menu.Item>
+                        )}
+                        <Menu.Item leftSection={<IconUser size={14} />} disabled>Settings</Menu.Item>
                         <Menu.Divider color="#2C2C2E" />
                         <Menu.Item color="red" leftSection={<IconLogout size={14} />} onClick={onSignOut}>Sign Out</Menu.Item>
                     </Menu.Dropdown>
@@ -202,12 +315,72 @@ function MobileNavbar({ user, onNavigate, onSignOut }) {
 // --- 3. MAIN LAYOUT ---
 export default function AppLayout({ children, session, isGuest }) {
     const router = useRouter();
+    const searchParams = useSearchParams(); // To check for success param
     const { setIsLoading } = useLoading();
     const pathname = usePathname();
     const { profile, isLoading: isProfileLoading, startTour } = useOnboarding();
     const isDesktop = useMediaQuery('(min-width: 768px)'); 
 
-    // Tour Logic (Unchanged)
+    const [tier, setTier] = useState('free');
+    const [upgradeOpened, { open: openUpgrade, close: closeUpgrade }] = useDisclosure(false);
+    const [successModalOpened, { open: openSuccess, close: closeSuccess }] = useDisclosure(false);
+
+    const [founderModalOpened, setFounderModalOpened] = useState(false);
+
+    // --- FETCH TIER & NOTIFICATIONS ---
+    useEffect(() => {
+        if (!session) return;
+        const fetchTier = async () => {
+            const { data } = await supabase.from('user_subscriptions')
+                .select('tier, founder_notified') // Added founder_notified
+                .eq('user_id', session.user.id)
+                .eq('status', 'active')
+                .maybeSingle();
+            
+            if (data) {
+                setTier(data.tier);
+                // Trigger modal if they are a founder and haven't seen it yet
+                if (data.tier === 'founder' && data.founder_notified === false) {
+                    setFounderModalOpened(true);
+                }
+            }
+        };
+        fetchTier();
+    }, [session]);
+
+    const { failedTransaction, setFailedTransaction } = usePaymentStatus(session);
+    // --- FETCH TIER ---
+    useEffect(() => {
+        if (!session) return;
+        const fetchTier = async () => {
+            const { data } = await supabase.from('user_subscriptions')
+                .select('tier')
+                .eq('user_id', session.user.id)
+                .eq('status', 'active')
+                .maybeSingle();
+            
+            if (data) setTier(data.tier);
+        };
+        fetchTier();
+    }, [session]);
+
+    // --- HANDLE PAYMENT SUCCESS ---
+    useEffect(() => {
+        if (searchParams.get('payment') === 'success') {
+            openSuccess();
+            // Clear URL param to prevent reopening on refresh
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, '', newUrl);
+        }
+    }, [searchParams]);
+
+    // --- LISTENERS & TOURS ---
+    useEffect(() => {
+        const handleOpenUpgrade = () => openUpgrade();
+        window.addEventListener('open-upgrade-modal', handleOpenUpgrade);
+        return () => window.removeEventListener('open-upgrade-modal', handleOpenUpgrade);
+    }, []);
+
     useEffect(() => {
         const firstStep = onboardingSteps[0];
         if (!isProfileLoading && profile && !profile.has_completed_onboarding && pathname === firstStep.route && isDesktop) {
@@ -226,7 +399,6 @@ export default function AppLayout({ children, session, isGuest }) {
         supabase.auth.signOut().then(() => handleNavigation('/'));
     };
 
-    // Guest Mode: Simple Wrapper
     if (isGuest) {
         return (
             <Box style={{ minHeight: '100vh', padding: '24px' }}>
@@ -238,20 +410,66 @@ export default function AppLayout({ children, session, isGuest }) {
     if (!session) return <Box p="md">{children}</Box>;
 
     return (
+
+        
         <div style={{ minHeight: '100vh', display: 'flex' }}>
-            {/* Desktop Sidebar (Floating) */}
+            {/* FAILED PAYMENT RESOLUTION MODAL */}
+            {failedTransaction && (
+                <TransactionStatusModal 
+                    transaction={failedTransaction} 
+                    onClose={() => setFailedTransaction(null)} 
+                />
+            )}
+
             {isDesktop && (
-                 <FloatingSidebar user={session.user} onNavigate={handleNavigation} onSignOut={handleSignOut} />
+                 <FloatingSidebar user={session.user} tier={tier} onNavigate={handleNavigation} onSignOut={handleSignOut} />
             )}
 
             <OnboardingTour />
+            
+            {/* UPGRADE MODAL */}
+            <UpgradeModal opened={upgradeOpened} onClose={closeUpgrade} />
 
-            {/* Main Content Area */}
+            {/* FOUNDER CELEBRATION MODAL */}
+            <FounderWelcomeModal 
+                opened={founderModalOpened} 
+                onClose={() => setFounderModalOpened(false)} 
+            />
+
+            {/* SUCCESS MODAL */}
+            <Modal 
+                opened={successModalOpened} 
+                onClose={closeSuccess} 
+                withCloseButton={false} 
+                centered 
+                size="md"
+                styles={{ 
+                    content: { backgroundColor: 'rgba(20, 20, 25, 0.9)', backdropFilter: 'blur(20px)', borderRadius: '24px', border: '1px solid #BF5AF2' }, 
+                    body: { padding: '40px' } 
+                }}
+            >
+                <Stack align="center" gap="lg">
+                    <motion.div 
+                        initial={{ scale: 0 }} animate={{ scale: 1 }} 
+                        transition={{ type: "spring", stiffness: 200, damping: 10 }}
+                    >
+                        <ThemeIcon size={80} radius="100%" gradient={{ from: '#BF5AF2', to: '#5E5CE6', deg: 135 }} variant="gradient">
+                            <IconCrown size={40} />
+                        </ThemeIcon>
+                    </motion.div>
+                    <Box ta="center">
+                        <Title order={2} className="apple-text-gradient">Welcome to Pro</Title>
+                        <Text c="dimmed" mt="xs">Your account has been upgraded. All limits are removed.</Text>
+                    </Box>
+                    <ShimmerButton onClick={closeSuccess} size="lg" radius="xl">Start Dominating</ShimmerButton>
+                </Stack>
+            </Modal>
+
             <main style={{ 
                 flex: 1, 
-                marginLeft: isDesktop ? '300px' : '0', // Offset for sidebar
+                marginLeft: isDesktop ? '300px' : '0',
                 padding: isDesktop ? '32px' : '16px',
-                paddingBottom: isDesktop ? '32px' : '120px', // Extra padding for mobile navbar
+                paddingBottom: isDesktop ? '32px' : '120px',
                 maxWidth: '1600px', 
                 marginRight: 'auto'
             }}>
@@ -261,16 +479,15 @@ export default function AppLayout({ children, session, isGuest }) {
                         initial={{ opacity: 0, y: 10, scale: 0.99 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -10, scale: 0.99 }}
-                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} // Apple-style easing
+                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} 
                     >
                         {children}
                     </motion.div>
                 </AnimatePresence>
             </main>
 
-            {/* Mobile Navbar (Fixed Bottom) */}
             {!isDesktop && (
-                <MobileNavbar user={session.user} onNavigate={handleNavigation} onSignOut={handleSignOut} />
+                <MobileNavbar user={session.user} tier={tier} onNavigate={handleNavigation} onSignOut={handleSignOut} />
             )}
         </div>
     );

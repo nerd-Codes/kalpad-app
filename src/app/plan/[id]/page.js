@@ -11,11 +11,11 @@ import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { notifications } from '@mantine/notifications';
 import { isSameDay, parseISO, format, isToday } from 'date-fns';
 import { 
-    IconFlame, IconShare3, IconVideo, IconRefresh, IconPlayerPlay, IconChevronRight, IconChevronLeft
+    IconFlame, IconShare3, IconVideo, IconRefresh, IconPlayerPlay, IconChevronRight, IconChevronLeft, IconBrain, IconTrash
 } from '@tabler/icons-react';
 import { 
     Container, Title, Text, Loader, Alert, Group, Button, Box, 
-    Stack, Modal, Checkbox, TextInput, ScrollArea, Paper, Grid, CopyButton 
+    Stack, Modal, Checkbox, TextInput, ScrollArea, Paper, Grid, CopyButton, ThemeIcon
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useLoading } from '@/context/LoadingContext';
@@ -25,6 +25,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TimelineDayCard } from '@/components/TimelineDayCard';
 import { RegeneratePlanModal } from '@/components/RegeneratePlanModal';
 import { wittyFacts as cramSheetFacts } from '@/lib/newplanFacts';
+
+// Add Quiz Component Imports
+import { QuizSetupModal } from '@/components/QuizSetupModal';
+import { QuizRunner } from '@/components/QuizRunner';
+import { QuizResults } from '@/components/QuizResults';
+
+import Link from 'next/link';
 
 // --- VISUAL CONSTANTS ---
 const MOBILE_DAY_WIDTH = 70;
@@ -60,6 +67,52 @@ export default function PlanDetailPage() {
     const [selectedDayIndex, setSelectedDayIndex] = useState(0);
     const mobileScrubberRef = useRef(null);
     const desktopScrubberRef = useRef(null);
+
+    // --- QUIZ STATE (Page Level) ---
+    const [quizSetupOpened, { open: openQuizSetup, close: closeQuizSetup }] = useDisclosure(false);
+    const [quizQuestions, setQuizQuestions] = useState(null);
+    const [quizResults, setQuizResults] = useState(null);
+    const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+    const [isEvaluatingQuiz, setIsEvaluatingQuiz] = useState(false);
+    const [quizConfig, setQuizConfig] = useState(null);
+
+    // --- QUIZ HANDLERS ---
+    const handleStartDailyQuiz = async (config) => {
+        const currentDayTopic = plan.plan_topics[selectedDayIndex];
+        if (!currentDayTopic) return;
+
+        setIsGeneratingQuiz(true);
+        setQuizConfig(config);
+        closeQuizSetup();
+        try {
+            const response = await fetch('/api/generate-quiz', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan_topic_id: currentDayTopic.id, ...config }),
+            });
+            if (!response.ok) throw new Error((await response.json()).error);
+            setQuizQuestions((await response.json()).questions);
+        } catch (err) { notifications.show({ title: 'Error', message: err.message, color: 'red' }); } 
+        finally { setIsGeneratingQuiz(false); }
+    };
+    
+    const handleSubmitDailyQuiz = async (attempts) => {
+        const currentDayTopic = plan.plan_topics[selectedDayIndex];
+        setIsEvaluatingQuiz(true); 
+        setQuizQuestions(null);
+        try {
+             const response = await fetch('/api/evaluate-quiz-submission', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan_topic_id: currentDayTopic.id, attempts, quiz_mode: quizConfig.quiz_mode }),
+            });
+             if (!response.ok) throw new Error((await response.json()).error);
+             setQuizResults(await response.json());
+             // Optional: Refresh plan data to show updated confidence scores
+             fetchPlanData(session); 
+        } catch (err) { notifications.show({ title: 'Error', message: err.message, color: 'red' }); } 
+        finally { setIsEvaluatingQuiz(false); }
+    };
 
     // Modals & Jobs
     const [regenerateModalOpened, { open: openRegenerateModal, close: closeRegenerateModal }] = useDisclosure(false);
@@ -103,7 +156,7 @@ export default function PlanDetailPage() {
             const { data, error } = await supabase
                 .from('study_plans')
                 .select(`
-                    id, exam_name, exam_date, syllabus, generation_context,
+                    id, exam_name, exam_date, syllabus, generation_context, is_active,
                     plan_topics ( 
                         *, curated_lectures ( plan_topic_id, sub_topic_text, video_url ), 
                         topic_confidence ( score, activity_type ),
@@ -258,11 +311,31 @@ export default function PlanDetailPage() {
     };
 
     return (
-        <AppLayout session={session}>
-            {/* --- FIX: px={0} only on base/mobile, full padding on desktop --- */}
-            <Container size="xl" pt="sm" pb={120} px={{ base: 0, md: 'md' }}> 
-                {loading ? <Group justify="center"><Loader color="white" /></Group> : (
-                    <>
+    <AppLayout session={session}>
+        <Container size="xl" pt="sm" pb={120} px={{ base: 0, md: 'md' }}> 
+            {loading ? (
+                <Group justify="center"><Loader color="white" /></Group>
+            ) : !plan?.is_active ? (
+                // --- DELETED STATE ---
+                <Container size="sm" pt={100}>
+                    <GlassCard p="xl" style={{ textAlign: 'center', border: '1px solid rgba(255, 59, 48, 0.2)' }}>
+                        <Stack align="center" gap="lg">
+                            <ThemeIcon size={80} radius="100%" color="red" variant="light" style={{ backgroundColor: 'rgba(255, 59, 48, 0.1)' }}>
+                                <IconTrash size={40} />
+                            </ThemeIcon>
+                            <Box>
+                                <Title order={2} className="apple-text-gradient">Mission Archived</Title>
+                                <Text c="dimmed" mt="sm">This plan was deleted or archived by you. It is no longer active.</Text>
+                            </Box>
+                            <Button component={Link} href="/plans" variant="default" radius="xl" size="md">
+                                Return to Base
+                            </Button>
+                        </Stack>
+                    </GlassCard>
+                </Container>
+            ) : (
+                // --- ACTIVE STATE ---
+                <>
                         {/* --- TITLE --- */}
                         <Box mb="md" px={{ base: 'md', md: 0 }}>
                             <Text size="sm" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: '0.1em' }}>Active Mission</Text>
@@ -281,7 +354,14 @@ export default function PlanDetailPage() {
                         {/* --- MOBILE: ACTION RIBBON --- */}
                         <Box hiddenFrom="md" mb="lg" px="md">
                             <Group gap="xs" grow wrap="wrap"> 
-                                <Button variant="light" color="red" radius="xl" size="xs" leftSection={<IconVideo size={16}/>} onClick={handleStartCuration} loading={isCurating}>Lecture Scout</Button>
+                                <Button 
+                                    variant="light" color="teal" radius="xl" size="xs"
+                                    leftSection={<IconBrain size={16}/>} 
+                                    onClick={openQuizSetup} 
+                                    loading={isGeneratingQuiz}
+                                >
+                                    Start Quiz
+                                </Button>
                                 <Button variant="light" color="orange" radius="xl" size="xs" leftSection={<IconFlame size={16}/>} onClick={handleForgeCramSheet} loading={isForging}>Cram Sheet</Button>
                                 <Button variant="light" color="violet" radius="xl" size="xs" leftSection={<IconRefresh size={16}/>} onClick={openRegenerateModal}>Refine</Button>
                                 <Button variant="default" radius="xl" size="xs" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan}>Share</Button>
@@ -393,14 +473,19 @@ export default function PlanDetailPage() {
                                     <GlassCard p="lg">
                                         <Stack gap="md">
                                             <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Actions</Text>
-                                            
-                                            <Button fullWidth variant="light" color="red" leftSection={<IconVideo size={18}/>} onClick={handleStartCuration} loading={isCurating}>
-                                                Find Lectures
+                                            <Button 
+                                                fullWidth
+                                                variant="light" color="teal" radius="xl"
+                                                leftSection={<IconBrain size={16}/>} 
+                                                onClick={openQuizSetup} 
+                                                loading={isGeneratingQuiz}
+                                            >
+                                                Start Quiz
                                             </Button>
-                                            <Button fullWidth variant="default" leftSection={<IconFlame size={16} color="orange"/>} loading={isForging} onClick={handleForgeCramSheet}>
+                                            <Button fullWidth variant="light" color="yellow" leftSection={<IconFlame size={16} color="orange"/>} loading={isForging} onClick={handleForgeCramSheet}>
                                                 {cramSheet?.status === 'complete' ? 'View Cram Sheet' : 'Forge Cram Sheet'}
                                             </Button>
-                                            <Button fullWidth variant="default" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan} loading={isSharing}>Share</Button>
+                                            <Button fullWidth variant="light" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan} loading={isSharing}>Share</Button>
                                             <Button fullWidth variant="light" color="violet" onClick={openRegenerateModal} leftSection={<IconRefresh size={16} />}>Refine Plan</Button>
                                         </Stack>
                                     </GlassCard>
@@ -427,42 +512,16 @@ export default function PlanDetailPage() {
             </Container>
 
             {/* --- MODALS --- */}
-            {/* Lecture Scout Modal */}
-            <Modal opened={lectureModalOpened} onClose={closeLectureModal} title={<Title order={3}>Lecture Scout</Title>} centered size="lg" styles={glassModalStyles} overlayProps={{ blur: 4 }}>
-                <Stack>
-                    <Text c="dimmed" size="sm">Select topics to find videos for.</Text>
-                    <Group justify="flex-end">
-                        <Button variant="subtle" size="xs" onClick={() => {
-                            const uncurated = todaysTopics.filter(t => !plan.plan_topics.flatMap(pt => pt.curated_lectures || []).some(l => l.sub_topic_text === t.text)).map(t => JSON.stringify(t));
-                            setSelectedTopics(uncurated.length > selectedTopics.length ? uncurated : []);
-                        }}>Toggle All</Button>
-                    </Group>
-                    <ScrollArea.Autosize mah={350}>
-                        <Stack gap="xs">
-                            {todaysTopics.map((topic, i) => {
-                                const existing = plan.plan_topics.flatMap(pt => pt.curated_lectures || []).find(l => l.sub_topic_text === topic.text);
-                                const val = JSON.stringify(topic);
-                                return (
-                                    <Paper key={i} p="sm" radius="md" style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                        {existing ? (
-                                            <Group justify="space-between">
-                                                <Text size="sm" c="dimmed" td="line-through">{topic.text}</Text>
-                                                <Button component="a" href={existing.video_url} target="_blank" variant="light" color="red" size="xs" leftSection={<IconPlayerPlay size={14}/>}>View</Button>
-                                            </Group>
-                                        ) : (
-                                            <Checkbox checked={selectedTopics.includes(val)} onChange={(e) => setSelectedTopics(curr => e.target.checked ? [...curr, val] : curr.filter(t => t !== val))} label={topic.text} color="red" />
-                                        )}
-                                    </Paper>
-                                );
-                            })}
-                        </Stack>
-                    </ScrollArea.Autosize>
-                    <Group justify="flex-end" mt="md">
-                        <Button variant="default" onClick={closeLectureModal} radius="xl">Cancel</Button>
-                        <ShimmerButton color="red" onClick={confirmAndStartCuration} disabled={selectedTopics.length === 0} radius="xl">Find Lectures</ShimmerButton>
-                    </Group>
-                </Stack>
-            </Modal>
+
+            <QuizSetupModal opened={quizSetupOpened} onClose={closeQuizSetup} onStartQuiz={handleStartDailyQuiz} isLoading={isGeneratingQuiz} zIndex={7000} />
+            
+            {quizQuestions && (
+                <QuizRunner questions={quizQuestions} onClose={() => setQuizQuestions(null)} onSubmit={handleSubmitDailyQuiz} zIndex={7000}/>
+            )}
+            
+            {quizResults && (
+                <QuizResults results={quizResults} onClose={() => setQuizResults(null)} onRetake={() => { setQuizResults(null); openQuizSetup(); }} zIndex={7000}/>
+            )}
 
             <RegeneratePlanModal opened={regenerateModalOpened} onClose={closeRegenerateModal} plan={plan} />
             

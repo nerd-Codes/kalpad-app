@@ -35,9 +35,9 @@ export const metadata = {
 };
 
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
   // --- DEFINITIVE FIX: SERVER-SIDE PATH DETECTION ---
-  const heads = headers();
+  const heads = await headers();
   const pathname = heads.get('next-url') || '';
   
   // Determine the variant and color scheme based on the URL path.

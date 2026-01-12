@@ -7,6 +7,9 @@ import supabase from '@/lib/supabaseClient';
 import { useDisclosure, useMove } from '@mantine/hooks';
 import Link from 'next/link';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
+import { IconCloudUpload } from '@tabler/icons-react'; // Add IconCloudUpload
+import { useSearchParams } from 'next/navigation'; // Add this
+import { useGuest } from '@/context/GuestContext'; // Add this
 
 // Mantine & UI Imports
 import { Container, Title, Text, TextInput, PasswordInput, Button, Group, Divider, Alert, Anchor, Box, Stack } from '@mantine/core';
@@ -48,6 +51,8 @@ function AuthBackground() {
 
 export default function SignInPage() {
     const router = useRouter();
+    const searchParams = useSearchParams(); // Add this
+    const { guestArtifact, clearGuestArtifact } = useGuest(); // Add this
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -73,6 +78,29 @@ export default function SignInPage() {
         }
     }, []);
 
+    const performGuestSync = async () => {
+        // Check if we have a guest artifact pending
+        if (guestArtifact) {
+            try {
+                const res = await fetch('/api/sync-guest-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(guestArtifact)
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    clearGuestArtifact();
+                    router.push(`/plan/${data.planId}`);
+                    return;
+                }
+            } catch (e) {
+                console.error("Sync error:", e);
+            }
+        }
+        router.push('/dashboard');
+    };
+
     const handleEmailSignIn = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -80,10 +108,12 @@ export default function SignInPage() {
         try {
             const { error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
-            router.push('/dashboard');
+            
+            // --- FIX: Call Sync instead of direct push ---
+            await performGuestSync(); 
+
         } catch (err) {
             setError(err.message);
-        } finally {
             setLoading(false);
         }
     };
@@ -149,6 +179,23 @@ export default function SignInPage() {
                             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)'
                         }}
                     >
+                         {/* --- NEW: GUEST PLAN CONTEXT --- */}
+                        {guestArtifact && (
+                            <Alert 
+                                variant="light" 
+                                color="teal" 
+                                icon={<IconCloudUpload size={16} />} 
+                                title="Sync Pending Plan"
+                                mb="xl"
+                                styles={{ 
+                                    root: { backgroundColor: 'rgba(20, 184, 166, 0.1)', border: '1px solid rgba(20, 184, 166, 0.2)' },
+                                    message: { color: '#2dd4bf' },
+                                    title: { color: '#5eead4', fontFamily: 'var(--font-lexend)' }
+                                }}
+                            >
+                                Use Email Login to save <strong>{guestArtifact.examName}</strong> to your dashboard.
+                            </Alert>
+                        )}
                         <Stack gap="xl">
                             {/* Header */}
                             <div className="text-center">
