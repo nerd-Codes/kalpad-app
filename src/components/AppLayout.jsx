@@ -199,7 +199,10 @@ function FloatingSidebar({ user, tier, onNavigate, onSignOut }) {
                                     {user?.email?.substring(0, 2).toUpperCase()}
                                 </Avatar>
                                 <div style={{ flex: 1 }}>
-                                    <Text size="sm" fw={600} c="var(--apple-text-primary)" truncate>{user?.email?.split('@')[0]}</Text>
+                                    <Text size="sm" fw={600} c="var(--apple-text-primary)" truncate>
+                                    {user?.email ? `${user.email.split('@')[0].slice(0, 8)}...` : ''}
+                                    </Text>
+
                                     <Text size="xs" c="dimmed">Student</Text>
                                 </div>
                                 <IconSettings size={16} color="var(--apple-text-secondary)" />
@@ -280,7 +283,7 @@ function MobileNavbar({ user, tier, onNavigate, onSignOut }) {
                             <Stack align="center" gap={4} style={{ padding: '8px' }}>
                                 <Box style={{ padding: '6px 20px' }}>
                                     <Avatar 
-                                        color="violet" radius="xl" size={22} 
+                                        color="violet" radius="xl" size={26} 
                                         style={{ border: `2px solid ${config.ring}` }} // Tier-colored ring
                                     >
                                         {user?.email?.substring(0, 2).toUpperCase()}

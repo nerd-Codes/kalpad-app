@@ -78,7 +78,7 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
     const [bulkNoteModalOpened, { open: openBulkNoteModal, close: closeBulkNoteModal }] = useDisclosure(false);
     const [bulkNoteSelection, setBulkNoteSelection] = useState([]);
     const [isBulkGenerating, setIsBulkGenerating] = useState(false);
-
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
     // --- LOCAL STATE MANAGEMENT ---
     const [internalSubTopics, setInternalSubTopics] = useState(dayTopic.sub_topics || []);
 
@@ -283,7 +283,7 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                                         fontFamily: 'var(--font-lexend)', 
                                         letterSpacing: '-0.02em', 
                                         lineHeight: 1.2,
-                                        fontSize: '1.5rem'
+                                        fontSize: '1.5rem',
                                     }}
                                 >
                                     {dayTopic.topic_name}
@@ -303,7 +303,7 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                                             onClick={isNoteGenerationLocked ? () => window.dispatchEvent(new CustomEvent('open-upgrade-modal')) : openBulkNoteModal}
                                             style={{ boxShadow: isNoteGenerationLocked ? 'none' : '0 2px 10px rgba(139, 92, 246, 0.2)' }}
                                         >
-                                            {isNoteGenerationLocked ? 'Unlock Bulk' : 'Bulk Actions'}
+                                            {isNoteGenerationLocked ? 'Unlock Bulk' : 'Bulk Notes'}
                                         </Button>
                                     </div>
                                 )}
@@ -319,6 +319,23 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                                 {dayTopic.day_summary}
                             </Text>
                          </Collapse>
+                         <Group hiddenFrom="sm">
+                                {!isReadOnly && !isGuestMode && (
+                                    // STOP PROPAGATION on button click so it doesn't toggle collapse
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                        <Button 
+                                            variant="light" 
+                                            color={isNoteGenerationLocked ? "orange" : "violet"}
+                                            size="xs" 
+                                            leftSection={isNoteGenerationLocked ? <IconLock size={16} /> : <IconListCheck size={16} />}
+                                            onClick={isNoteGenerationLocked ? () => window.dispatchEvent(new CustomEvent('open-upgrade-modal')) : openBulkNoteModal}
+                                            style={{ boxShadow: isNoteGenerationLocked ? 'none' : '0 2px 10px rgba(139, 92, 246, 0.2)' }}
+                                        >
+                                            {isNoteGenerationLocked ? 'Unlock Bulk' : 'Bulk Notes'}
+                                        </Button>
+                                    </div>
+                                )}
+                            </Group>
                     </Stack>
                 </Box>
 

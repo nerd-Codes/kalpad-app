@@ -310,9 +310,14 @@ export default function PlanDetailPage() {
         }
     };
 
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+
     return (
     <AppLayout session={session}>
-        <Container size="xl" pt="sm" pb={120} px={{ base: 0, md: 'md' }}> 
+        <Container size="xl" pt="sm" pb={120} px={{ base: 0, md: 'md' }} style={{
+    position: 'relative',
+    maxWidth: isDesktop ? '76vw' : '100vw',
+  }}> 
             {loading ? (
                 <Group justify="center"><Loader color="white" /></Group>
             ) : !plan?.is_active ? (

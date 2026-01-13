@@ -497,6 +497,8 @@ const handleProcessFile = async () => {
         } catch (err) { setSaveError(err.message); } finally { setIsSaving(false); }
     };
 
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+
     return (
         <AppLayout session={session}>
             {/* 1. Global Style Injection for Hiding Scrollbars */}
@@ -510,7 +512,7 @@ const handleProcessFile = async () => {
                 }
             `}</style>
 
-            <Container size="xl" pt="md" px="md" style={{ overflowX: 'hidden', maxWidth: '100vw' } } className="no-scrollbar">
+            <Container size="xl" pt="md" px="md" style={{position: 'relative', maxWidth: isDesktop ? '100vw' : '90vw',}} className="no-scrollbar">
                  {isCreationBlocked && (
                     <Alert 
                         variant="light" 
