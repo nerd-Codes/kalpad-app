@@ -19,6 +19,7 @@ import { Devlog } from "@/components/landing/personality/Devlog";
 import { Community } from "@/components/landing/personality/Community"; 
 import { RealQuestion } from "@/components/landing/personality/RealQuestion"; 
 import { GoldPass } from "@/components/landing/personality/GoldPass";
+import { CookieConsent } from "@/components/landing/CookieConsent";
 
 // --- GLOBAL BACKGROUND: THE INFINITE VOID (FIXED) ---
 function InfiniteVoid() {
@@ -114,6 +115,7 @@ export default function LandingPage() {
             <AnimatePresence>
                 {showGoldPass && <GoldPass onClaim={handleClaimPass} />}
             </AnimatePresence>
+            <CookieConsent />
         </>
     );
 }

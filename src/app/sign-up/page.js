@@ -9,7 +9,7 @@ import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { IconCloudUpload } from '@tabler/icons-react'; // Add IconCloudUpload
 
 // Mantine & UI Imports
-import { Container, Title, Text, TextInput, PasswordInput, Button, Group, Divider, Alert, Anchor, Popover, Progress, Box, Stack } from '@mantine/core';
+import { Container, Title, Text, TextInput, PasswordInput, Button, Group, Divider, Alert, Anchor, Popover, Progress, Box, Stack, Checkbox } from '@mantine/core';
 import { IconMail, IconLock, IconUser, IconBrandGoogle, IconArrowLeft, IconCheck, IconX } from '@tabler/icons-react';
 import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { GlassCard } from '@/components/GlassCard';
@@ -70,6 +70,8 @@ export default function SignUpPage() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [isAndroidApp, setIsAndroidApp] = useState(false);
+
+    const [termsAccepted, setTermsAccepted] = useState(false);
 
     // --- 3D TILT PHYSICS ---
     const x = useMotionValue(200);
@@ -132,6 +134,12 @@ export default function SignUpPage() {
 
     const handleEmailSignUp = async (e) => {
         e.preventDefault();
+
+        if (!termsAccepted) {
+            setError("You must agree to the Terms & Privacy Policy.");
+            return;
+        }
+
         if (strength !== 100) {
             setError("Password does not meet all requirements.");
             return;
@@ -169,6 +177,11 @@ export default function SignUpPage() {
     };
   
     const handleGoogleSignIn = async () => {
+
+        if (!termsAccepted) {
+            setError("You must agree to the Terms & Privacy Policy.");
+            return;
+        }
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: { redirectTo: `${window.location.origin}/dashboard` },
@@ -319,6 +332,22 @@ export default function SignUpPage() {
                                                 {checks}
                                             </Popover.Dropdown>
                                         </Popover>
+
+                                        <Checkbox
+                                            checked={termsAccepted}
+                                            onChange={(event) => setTermsAccepted(event.currentTarget.checked)}
+                                            label={
+                                                <Text size="xs" c="dimmed" lh={1.4}>
+                                                    I agree to the <Anchor href="/terms" target="_blank" c="brandPurple">Terms of Service</Anchor> and <Anchor href="/privacy" target="_blank" c="brandPurple">Privacy Policy</Anchor>.
+                                                </Text>
+                                            }
+                                            color="violet"
+                                            size="xs"
+                                            styles={{ 
+                                                label: { paddingLeft: 8 },
+                                                input: { cursor: 'pointer', borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'transparent' }
+                                            }}
+                                        />
 
                                         <Interactive>
                                             <ShimmerButton type="submit" fullWidth size="lg" radius="xl" loading={loading} style={{ marginTop: 8 }}>
