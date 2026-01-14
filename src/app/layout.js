@@ -49,6 +49,19 @@ export default async function RootLayout({ children }) {
     <html lang="en" className={`${inter.variable} ${lexend.variable}`}>
       <head>
         <ColorSchemeScript defaultColorScheme={colorScheme} />
+         {/* Google tag (gtag.js) */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=AW-17875257691"
+          strategy="afterInteractive"
+        />
+        <Script id="google-ads">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'AW-17875257691');
+          `}
+        </Script>
       </head>
       <body>
         {/* Pass the determined variant and color scheme to the Providers */}

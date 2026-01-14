@@ -7,6 +7,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { AnimatePresence, motion } from 'framer-motion';
 
+
 import { PageLoader } from '@/components/PageLoader';
 import supabase from '@/lib/supabaseClient';
 
