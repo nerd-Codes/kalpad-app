@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { GlassCard } from './GlassCard';
 import { ShimmerButton } from './landing/ShimmerButton';
 import { Interactive } from '@/components/Interactive';
-
+import { useMediaQuery } from '@mantine/hooks';
 // --- VISUAL CONSTANTS ---
 const glassModalStyles = {
     content: { 
