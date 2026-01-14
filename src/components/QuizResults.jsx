@@ -77,6 +77,8 @@ export function QuizResults({ results, onClose, onRetake }) {
     const { score, feedback_summary, full_results } = results;
     const passed = score >= 50;
 
+    const isMobile = useMediaQuery('(max-width: 48em)');
+
     return (
         <Modal 
             opened={true} 
