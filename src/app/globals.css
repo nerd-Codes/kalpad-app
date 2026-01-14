@@ -61,3 +61,11 @@ html, body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+*:focus {
+  outline: none !important;
+}
