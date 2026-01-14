@@ -1,11 +1,11 @@
 // src/app/layout.js
 import "./globals.css";
-import { ColorSchemeScript } from '@mantine/core';
+import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import { Providers } from "@/components/Providers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from '@vercel/speed-insights/next';
-import { headers } from 'next/headers'; // Import the headers function
-import Script from 'next/script'; 
+import { headers } from 'next/headers';
+import Script from 'next/script';
 
 import { Inter, Lexend } from "next/font/google";
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
@@ -18,13 +18,12 @@ export const metadata = {
   verification: {
     google: 'K1qMc1fHGSFMOHtq6DDOxd7LrrHkKmdpIbrwwEUtgoo',
   },
-
-    openGraph: {
+  openGraph: {
     title: 'KalPad: Your AI Academic Strategist',
     description: 'The brutally honest AI partner that turns academic chaos into a clear battle plan. Built by a student, for students.',
     images: [
       {
-        url: 'https://kalpad-app.vercel.app/og-image.jpeg', // Absolute URL
+        url: 'https://kalpad-app.vercel.app/og-image.jpeg',
         width: 1890,
         height: 1035,
         alt: 'KalPad - The greatest minds did not waste their cognitive budget on menial tasks.',
@@ -34,13 +33,10 @@ export const metadata = {
   },
 };
 
-
 export default async function RootLayout({ children }) {
-  // --- DEFINITIVE FIX: SERVER-SIDE PATH DETECTION ---
   const heads = await headers();
   const pathname = heads.get('next-url') || '';
-  
-  // Determine the variant and color scheme based on the URL path.
+
   const isPrintPath = pathname.startsWith('/print');
   const layoutVariant = isPrintPath ? 'print' : 'app';
   const colorScheme = isPrintPath ? 'light' : 'dark';
@@ -49,7 +45,8 @@ export default async function RootLayout({ children }) {
     <html lang="en" className={`${inter.variable} ${lexend.variable}`}>
       <head>
         <ColorSchemeScript defaultColorScheme={colorScheme} />
-         {/* Google tag (gtag.js) */}
+
+        {/* Google tag (gtag.js) */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=AW-17875257691"
           strategy="afterInteractive"
@@ -64,8 +61,18 @@ export default async function RootLayout({ children }) {
         </Script>
       </head>
       <body>
-        {/* Pass the determined variant and color scheme to the Providers */}
-        <Providers variant={layoutVariant} colorScheme={colorScheme}>
+        <MantineProvider theme={{ focusRing: 'never' }}>
+          <Providers variant={layoutVariant} colorScheme={colorScheme}>
+            {children}
+          </Providers>
+        </MantineProvider>
+        
+        <Analytics />
+        <SpeedInsights />
+      </body>
+    </html>
+  );
+}        <Providers variant={layoutVariant} colorScheme={colorScheme}>
             {children}
         </Providers>
         <Analytics />
