@@ -494,7 +494,7 @@ export default function PlanDetailPage() {
                                             >
                                                 Start Quiz
                                             </Button>
-                                            <Button fullWidth variant="light" color="yellow" leftSection={<IconFlame size={16} color="orange"/>} loading={isForging} onClick={handleForgeCramSheet}>
+                                            <Button fullWidth variant="light" color="yellow" leftSection={<IconFlame size={16} color="orange"/>} loading={isForging} onClick={() => cramSheet?.status === 'complete' ? router.push(`/cram-sheet/${cramSheet.id}`) : handleForgeCramSheet()}>
                                                 {cramSheet?.status === 'complete' ? 'View Cram Sheet' : 'Forge Cram Sheet'}
                                             </Button>
                                             <Button fullWidth variant="light" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan} loading={isSharing}>Share</Button>
