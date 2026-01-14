@@ -61,3 +61,13 @@ html, body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Remove mobile tap highlight */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Remove default outline (mobile-only issue) */
+*:focus {
+  outline: none !important;
+}
