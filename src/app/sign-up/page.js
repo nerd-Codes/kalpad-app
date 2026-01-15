@@ -235,7 +235,6 @@ export default function SignUpPage() {
     return (
         <Box 
             style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
-            onMouseMove={handleMouse}
         >
             <AuthBackground />
 
@@ -283,10 +282,10 @@ export default function SignUpPage() {
                         <Stack gap="xl">
                             {/* Header */}
                             <div className="text-center">
-                                <Title order={2} className="apple-text-gradient" style={{ fontSize: '2rem', letterSpacing: '-0.03em' }}>
-                                    Initialize Identity
+                                <Title order={2} className="apple-text-gradient" style={{ fontSize: '2rem', letterSpacing: '-0.03em' }} align ="center">
+                                    Welcome to KalPad!
                                 </Title>
-                                <Text c="dimmed" size="sm" mt={4}>
+                                <Text c="dimmed" size="sm" mt={4} align="center">
                                     Create your secure profile.
                                 </Text>
                             </div>
@@ -304,7 +303,7 @@ export default function SignUpPage() {
                                             styles={inputStyles}
                                         />
                                         <TextInput 
-                                            label="Email Credentials" 
+                                            label="Email Address" 
                                             placeholder="you@kalpad.ai" 
                                             leftSection={<IconMail size={18} color="gray" />}
                                             value={email} onChange={(e) => setEmail(e.target.value)} 
@@ -316,7 +315,7 @@ export default function SignUpPage() {
                                             <Popover.Target>
                                                 <div onFocusCapture={() => setPopoverOpened(true)} onBlurCapture={() => setPopoverOpened(false)}>
                                                     <PasswordInput
-                                                        label="Passcode"
+                                                        label="Password"
                                                         placeholder="Create password"
                                                         leftSection={<IconLock size={18} color="gray" />}
                                                         value={password}
@@ -382,9 +381,9 @@ export default function SignUpPage() {
                             )}
 
                             <Text c="dimmed" size="xs" ta="center">
-                                Already have an identity? {' '}
+                                Already have an account? {' '}
                                 <Anchor component={Link} href="/sign-in" c="brandPurple" fw={600}>
-                                    Access Terminal
+                                    Log In
                                 </Anchor>
                             </Text>
                         </Stack>

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, Stack, Title, ActionIcon, Menu, Modal, ScrollArea, Paper } from '@mantine/core';
+import { Box, Group, Checkbox, Button, Collapse, Text, Alert, Badge, Stack, Title, ActionIcon, Menu, Modal, ScrollArea, Paper, Tooltip } from '@mantine/core';
 import { 
     IconPencilPlus, IconBrain, IconPlayerPlay, IconClock, IconEye, 
     IconChevronsDown, IconListCheck, IconDotsVertical, IconLock
@@ -402,51 +402,48 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
         {!isReadOnly && (
             // 3. ADDED: Stop propagation so clicking menu doesn't toggle the checkbox
             <div onClick={(e) => e.stopPropagation()}>
-                <Menu shadow="md" width={200} position="bottom-end">
-                    <Menu.Target>
-                        <ActionIcon variant="subtle" color="gray" size="md">
-                            <IconDotsVertical size={18} />
-                        </ActionIcon>
-                    </Menu.Target>
-                    <Menu.Dropdown style={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E' }}>
-                        {existingNote ? (
-                            <Menu.Item 
-                                leftSection={<IconEye size={16} />}
-                                onClick={() => setNoteToView({ ...existingNote, sub_topic: subTopic, day_topic: dayTopic, exam_name: plan.exam_name })}
-                            >
-                                Read Note
-                            </Menu.Item>
-                        ) : isNoteGenerationLocked ? (
-                            <Menu.Item 
-                                leftSection={<IconLock size={16} color="#FF9500" />}
-                                onClick={() => window.dispatchEvent(new CustomEvent('open-upgrade-modal'))}
-                                color="orange"
-                                style={{ fontWeight: 600 }}
-                            >
-                                Unlock to Forge
-                            </Menu.Item>
-                        ) : (
-                            <Menu.Item 
-                                leftSection={<IconPencilPlus size={16} />}
-                                onClick={() => handleGenerateNotes(subTopic.text)}
-                            >
-                                Forge Note
-                            </Menu.Item>
-                        )}
-                        {lecture && (
-                            <>
-                                <Menu.Divider />
-                                <Menu.Item color="red" leftSection={<IconPlayerPlay size={16} />} component="a" href={lecture.video_url} target="_blank">
-                                    Watch Lecture
-                                </Menu.Item>
-                            </>
-                        )}
-                    </Menu.Dropdown>
-                </Menu>
-            </div>
-        )}
-    </Group>
-);
+                                            {existingNote ? (
+                                                <Tooltip label="Read Notes" withArrow>
+                                                    <ActionIcon 
+                                                        variant="light" 
+                                                        color="teal" 
+                                                        size="md" 
+                                                        radius="xl"
+                                                        onClick={() => setNoteToView({ ...existingNote, sub_topic: subTopic, day_topic: dayTopic, exam_name: plan.exam_name })}
+                                                    >
+                                                        <IconEye size={18} />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                            ) : isNoteGenerationLocked ? (
+                                                <Tooltip label="Unlock to Create Notes" withArrow>
+                                                    <ActionIcon 
+                                                        variant="light" 
+                                                        color="orange" 
+                                                        size="md" 
+                                                        radius="xl"
+                                                        onClick={() => window.dispatchEvent(new CustomEvent('open-upgrade-modal'))}
+                                                    >
+                                                        <IconLock size={18} />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                            ) : (
+                                                <Tooltip label="Create Notes" withArrow>
+                                                    <ActionIcon 
+                                                        variant="subtle" 
+                                                        color="gray" 
+                                                        size="md" 
+                                                        radius="xl"
+                                                        onClick={() => handleGenerateNotes(subTopic.text)}
+                                                        loading={generatingNotesFor === subTopic.text}
+                                                    >
+                                                        <IconPencilPlus size={18} />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                            )}
+                                        </div>
+                                        )}
+                                    </Group>
+                                );
                             })}
                         </Stack>
                     </Box>

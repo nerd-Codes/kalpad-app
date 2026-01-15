@@ -4,6 +4,7 @@ import { Container, Title, Text, Stack, Button, Group, Box, Badge, Avatar, Avata
 import { IconBrandDiscord, IconBrandWhatsapp, IconUsers, IconActivity } from '@tabler/icons-react';
 import { GlassCard } from '../../GlassCard'; 
 import { Interactive } from '@/components/Interactive';
+import { ShimmerButton } from '../ShimmerButton';
 
 export function Community() {
     return (
@@ -69,13 +70,14 @@ export function Community() {
                         {/* 4. The Portals (Buttons) */}
                         <Group mt="lg" gap="lg">
                             <Interactive>
-                                <Button
+                                <ShimmerButton
                                     component="a"
                                     href="https://discord.gg/KmTCWwsD5u"
                                     target="_blank"
                                     size="xl"
                                     radius="xl"
                                     leftSection={<IconBrandDiscord size={24} />}
+                                    color='#5865F2'
                                     style={{
                                         backgroundColor: '#5865F2',
                                         color: 'white',
@@ -84,27 +86,21 @@ export function Community() {
                                         fontSize: '1.1rem'
                                     }}
                                 >
-                                    Join Discord
-                                </Button>
+                                    <IconBrandDiscord size={24} /> Join Discord
+                                </ShimmerButton>
                             </Interactive>
                             <Interactive>
-                                <Button
+                                <ShimmerButton
                                     component="a"
                                     href="https://chat.whatsapp.com/EMN3fzJCBWNFwDT25qWxq2?mode=ac_t"
                                     target="_blank"
                                     size="xl"
                                     radius="xl"
                                     variant="default"
-                                    leftSection={<IconBrandWhatsapp size={24} color="#25D366" />}
-                                    style={{
-                                        backgroundColor: 'rgba(255,255,255,0.05)',
-                                        color: 'white',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        fontSize: '1.1rem'
-                                    }}
+                                    color='#25D366'
                                 >
-                                    WhatsApp
-                                </Button>
+                                   <IconBrandWhatsapp size={24} /> WhatsApp
+                                </ShimmerButton>
                             </Interactive>
                         </Group>
 

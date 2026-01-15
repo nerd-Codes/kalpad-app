@@ -263,9 +263,10 @@ export default function AllPlansPage() {
                     </Box>
                     
                     {/* --- THE HOLOGRAPHIC BUTTON --- */}
-                    <Link href="/new-plan" style={{ textDecoration: 'none' }}>
+                    <Link href="/new-plan" style={{ textDecoration: 'none' }} >
                         <Box
                             className="group"
+                            visibleFrom="sm"
                             style={{
                                 position: 'relative',
                                 padding: '12px 24px',
@@ -283,9 +284,9 @@ export default function AllPlansPage() {
                                 backgroundSize: '200% 200%',
                                 animation: 'shimmer 3s infinite linear',
                                 pointerEvents: 'none'
-                            }} />
+                            }}/>
                             
-                            <Group gap="xs" style={{ position: 'relative', zIndex: 1 }}>
+                            <Group gap="xs" style={{ position: 'relative', zIndex: 1 }} >
                                 <IconPlus size={18} color="#BF5AF2" />
                                 <Text fw={600} size="sm" c="white" style={{ letterSpacing: '0.05em' }}>NEW MISSION</Text>
                             </Group>

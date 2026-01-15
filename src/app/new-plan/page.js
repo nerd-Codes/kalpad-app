@@ -661,9 +661,7 @@ const handleProcessFile = async () => {
                                     </GlassCard>
                                 </Stack>
 
-                                {/* ACTION BUTTONS */}
-                                <Group justify="flex-end" mt="xl">
-                                    {/* Simulation Button Removed */}
+                                
                                     
                                     <Interactive style={{ width: '100%' }}>
                                         <Button 
@@ -671,6 +669,7 @@ const handleProcessFile = async () => {
                                             type="submit" 
                                             size="xl" 
                                             py = "md"
+                                            fullWidth
                                             loading={isGenerating} 
                                             disabled={isProcessing || isCreationBlocked} 
                                             radius="xl" // Pill Shape
@@ -686,10 +685,9 @@ const handleProcessFile = async () => {
                                             }}
                                             rightSection={!isGenerating && <IconTargetArrow size={22} />}
                                         >
-                                            Initialize Sequence
+                                            Create Study Plan
                                         </Button>
                                     </Interactive>
-                                </Group>
                             </Stack>
                         </form>
                     </Grid.Col>
@@ -716,7 +714,7 @@ const handleProcessFile = async () => {
                                         <Stack align="center" gap="xs">
                                             <IconBrain size={48} color="rgba(101, 101, 101, 1)" />
                                             <Text c="dimmed" fw={500}>Ready to Architect</Text>
-                                            <Text c="dimmed" size="sm">Fill the modules to begin generation.</Text>
+                                            <Text c="dimmed" size="sm" align="center">Fill the modules to begin generation.</Text>
                                         </Stack>
                                     )}
                                 </GlassCard>

@@ -1,25 +1,86 @@
 /* src/components/landing/ShimmerButton.module.css */
-.shimmerButton {
+
+.buttonRoot {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
+  border-radius: 9999px; /* Full Pill */
+  padding: 1px; /* Space for the border */
+  text-decoration: none;
+  transition: transform 0.1s ease-out, box-shadow 0.2s ease-out;
+  isolation: isolate;
+  /* Default sizing if not overridden */
+  height: 50px;
+  padding-left: 2rem;
+  padding-right: 2rem;
 }
 
-.shimmerEffect {
+.buttonRoot:active {
+  transform: scale(0.98);
+}
+
+.buttonRoot:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+/* --- THE GLASS SURFACE (Background) --- */
+.surface {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  background-image: linear-gradient(
-    110deg,
-    transparent 40%,
-    rgba(255, 255, 255, 0.4) 50%,
-    transparent 60%
-  );
-  background-size: 200% 100%;
-  background-position: 200% 0;
-  transition: background-position 0.6s ease-in-out;
+  border-radius: 9999px;
+  z-index: 0;
+  /* Inner Lighting (Top Highlight) */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.shimmerButton:hover .shimmerEffect {
-  background-position: -200% 0;
+/* --- THE HOLOGRAPHIC SHIMMER --- */
+.shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.4) 40%, 
+    rgba(255, 255, 255, 0.7) 50%,
+    rgba(255, 255, 255, 0.4) 60%,
+    transparent 80%
+  );
+  transform: translateX(-150%) skewX(-20deg);
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+/* Hover State: Trigger the sweep */
+.buttonRoot:hover .shimmer {
+  transform: translateX(150%) skewX(-20deg);
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hover State: Lift & Glow */
+.buttonRoot:hover {
+  transform: translateY(-2px);
+  /* The shadow color is handled dynamically in JS, but we set a default here */
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* --- CONTENT --- */
+.content {
+  position: relative;
+  z-index: 2;
+  font-family: var(--font-lexend);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }

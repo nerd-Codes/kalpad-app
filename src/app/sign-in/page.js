@@ -150,7 +150,6 @@ export default function SignInPage() {
     return (
         <Box 
             style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
-            onMouseMove={handleMouse}
         >
             <AuthBackground />
 
@@ -199,11 +198,11 @@ export default function SignInPage() {
                         <Stack gap="xl">
                             {/* Header */}
                             <div className="text-center">
-                                <Title order={2} className="apple-text-gradient" style={{ fontSize: '2rem', letterSpacing: '-0.03em' }}>
-                                    Access Terminal
+                                <Title order={2} className="apple-text-gradient" style={{ fontSize: '2rem', letterSpacing: '-0.03em' }} align="center">
+                                    Welcome Back!
                                 </Title>
-                                <Text c="dimmed" size="sm" mt={4}>
-                                    Authenticate to continue your session.
+                                <Text c="dimmed" size="sm" mt={4}align="center">
+                                    Log In to continue your session.
                                 </Text>
                             </div>
 
@@ -216,7 +215,7 @@ export default function SignInPage() {
                             <form onSubmit={handleEmailSignIn}>
                                 <Stack gap="md">
                                     <TextInput 
-                                        label="Email Credentials" 
+                                        label="Email Address" 
                                         placeholder="student@university.edu" 
                                         leftSection={<IconMail size={18} color="gray" />}
                                         value={email} onChange={(e) => setEmail(e.target.value)} 
@@ -224,7 +223,7 @@ export default function SignInPage() {
                                         styles={inputStyles}
                                     />
                                     <PasswordInput 
-                                        label="Passcode" 
+                                        label="Password" 
                                         placeholder="••••••••" 
                                         leftSection={<IconLock size={18} color="gray" />}
                                         value={password} onChange={(e) => setPassword(e.target.value)} 
@@ -234,13 +233,13 @@ export default function SignInPage() {
                                     
                                     <Group justify="flex-end">
                                         <Anchor component="button" type="button" size="xs" c="dimmed" onClick={openForgotModal}>
-                                            Forgot passcode?
+                                            Forgot password?
                                         </Anchor>
                                     </Group>
 
                                     <Interactive>
                                         <ShimmerButton type="submit" fullWidth size="lg" radius="xl" loading={loading}>
-                                            Initialize Session
+                                            Log In
                                         </ShimmerButton>
                                     </Interactive>
                                 </Stack>
@@ -272,7 +271,7 @@ export default function SignInPage() {
                             <Text c="dimmed" size="xs" ta="center">
                                 No account found? {' '}
                                 <Anchor component={Link} href="/sign-up" c="brandPurple" fw={600}>
-                                    Create Identity
+                                    Create Account
                                 </Anchor>
                             </Text>
                         </Stack>
