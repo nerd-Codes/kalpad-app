@@ -7,6 +7,7 @@ import '@mantine/notifications/styles.css';
 import '@mantine/core/styles.css'; // Ensure base styles are always included
 import { OnboardingProvider } from '@/context/OnboardingContext';
 import { GuestProvider } from '@/context/GuestContext'; // --- NEW IMPORT ---
+import {PerformanceProvider } from '@/context/PerformanceContext';
 
 import { BackgroundBlobs } from "@/components/BackgroundBlobs";
 import { PageLoader } from "@/components/PageLoader";
@@ -69,6 +70,7 @@ export function Providers({ children, variant = 'app', colorScheme = 'dark' }) {
   return (
     <LoadingProvider>
       <MantineProvider theme={theme} defaultColorScheme={colorScheme}>
+        <PerformanceProvider>
         {/* --- WRAP APP WITH GUEST PROVIDER --- */}
         <GuestProvider> 
             <OnboardingProvider>
@@ -89,6 +91,7 @@ export function Providers({ children, variant = 'app', colorScheme = 'dark' }) {
                 </PostHogProvider>
             </OnboardingProvider>
         </GuestProvider>
+        </PerformanceProvider>
       </MantineProvider>
     </LoadingProvider>
   );

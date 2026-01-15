@@ -1,3 +1,4 @@
+// src/components/landing/personality/Devlog.jsx
 "use client";
 
 import { Container, Title, Text, Stack, Box, Badge, Group } from '@mantine/core';
@@ -53,22 +54,25 @@ function LogNode({ log, index }) {
                 <motion.div
                     initial={{ scale: 0 }}
                     whileInView={{ scale: 1 }}
-                    transition={{ delay: 0.2 }}
+                    transition={{ delay: 0.1, duration: 0.4 }}
+                    viewport={{ once: true, margin: "-50px" }} // FIX: Play once
                     style={{
                         width: '16px', height: '16px', borderRadius: '50%',
                         backgroundColor: '#000', border: `2px solid ${log.color}`,
-                        boxShadow: `0 0 15px ${log.color}`
+                        boxShadow: `0 0 15px ${log.color}`,
+                        willChange: 'transform' // FIX: GPU Hint
                     }}
                 />
             </div>
 
             {/* 3. The Content Card */}
             <motion.div
-                initial={{ opacity: 0, x: isLeft ? -50 : 50 }}
+                initial={{ opacity: 0, x: isLeft ? -20 : 20 }} // FIX: Reduced distance for performance
                 whileInView={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6 }}
-                viewport={{ margin: "-100px" }}
+                transition={{ duration: 0.5, ease: "easeOut" }} // FIX: Faster, simpler easing
+                viewport={{ once: true, margin: "-100px" }} // FIX: Play once, prevents lag on scroll back
                 className="w-full pl-12 md:pl-0 md:w-5/12"
+                style={{ willChange: 'transform, opacity' }} // FIX: GPU Hint
             >
                 <GlassCard 
                     p="lg"
@@ -78,6 +82,7 @@ function LogNode({ log, index }) {
                         position: 'relative',
                         overflow: 'hidden'
                     }}
+                    animate={false} // Disable inner GlassCard physics to save CPU
                 >
                     {/* Status Strip */}
                     <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', backgroundColor: log.color }} />

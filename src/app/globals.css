@@ -69,3 +69,17 @@ html, body {
 *:focus {
   outline: none !important;
 }
+
+/* --- LITE MODE OVERRIDES --- */
+body.lite-mode {
+  --glass-bg: #0F0F10;
+  --glass-blur: 0px;
+  background-color: #000000 !important;
+  background-image: none !important;
+}
+
+/* Disable expensive animations in Lite Mode */
+body.lite-mode * {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}

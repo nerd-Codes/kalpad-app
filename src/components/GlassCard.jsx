@@ -2,8 +2,10 @@
 "use client";
 import { Paper } from '@mantine/core';
 import { motion } from 'framer-motion';
+import { usePerformance } from '@/context/PerformanceContext';
 
 export function GlassCard({ children, style, className, animate = true, ...props }) {
+  const { isLiteMode } = usePerformance(); 
   
   const cardStyle = {
     // The "Deep Glass" Material

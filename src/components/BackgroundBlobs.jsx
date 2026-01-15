@@ -4,13 +4,16 @@
 import { usePathname } from 'next/navigation';
 import { Box } from '@mantine/core';
 import classes from './BackgroundBlobs.module.css';
+import { usePerformance } from '@/context/PerformanceContext';
 
 export function BackgroundBlobs() {
   const pathname = usePathname();
+  const { isLiteMode } = usePerformance();
 
   // --- INTELLIGENCE LAYER ---
   // Hide on Landing, Auth, and Print pages
   const isExcluded = 
+    isLiteMode ||
     pathname === '/' || 
     pathname.startsWith('/sign-') || 
     pathname.startsWith('/reset-password') ||

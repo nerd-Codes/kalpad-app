@@ -58,7 +58,7 @@ function ScoreReactor({ score }) {
                     label={
                         <Center>
                             <Stack align="center" gap={0}>
-                                <Text c={color} fw={800} style={{ fontSize: '4rem', fontFamily: 'var(--font-lexend)', lineHeight: 0.9 }}>
+                                <Text c={color} fw={800} style={{ fontSize: '3rem', fontFamily: 'var(--font-lexend)', lineHeight: 0.9 }}>
                                     {score}%
                                 </Text>
                                 <Text size="xs" c="dimmed" fw={700} tt="uppercase" style={{ letterSpacing: '0.15em' }}>

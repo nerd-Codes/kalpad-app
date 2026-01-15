@@ -358,7 +358,8 @@ export default function PlanDetailPage() {
 
                         {/* --- MOBILE: ACTION RIBBON --- */}
                         <Box hiddenFrom="md" mb="lg" px="md">
-                            <Group gap="xs" grow wrap="wrap"> 
+                            <ScrollArea type="never" scrollbars="x" offsetScrollbars>
+                            <Group gap="2px" wrap="nowrap" style={{ width: 'max-content' }}>
                                 <Button 
                                     variant="light" color="teal" radius="xl" size="xs"
                                     leftSection={<IconBrain size={16}/>} 
@@ -375,9 +376,10 @@ export default function PlanDetailPage() {
                                 >
                                     {cramSheet?.status === 'complete' ? 'View Sheet' : 'Cram Sheet'}
                                 </Button>
-                                <Button variant="light" color="violet" radius="xl" size="xs" leftSection={<IconRefresh size={16}/>} onClick={openRegenerateModal}>Refine</Button>
+                                <Button variant="light" color="violet" radius="xl" size="xs" leftSection={<IconRefresh size={16}/>} onClick={openRegenerateModal}>Refine Plan</Button>
                                 <Button variant="default" radius="xl" size="xs" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan}>Share</Button>
                             </Group>
+                            </ScrollArea>
                         </Box>
 
                         {/* --- MOBILE: TIMELINE SCRUBBER (Edge-to-Edge) --- */}

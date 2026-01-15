@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Title, Text, Avatar, Group, Stack, Box, Menu, SimpleGrid, UnstyledButton, Modal, Button, ThemeIcon } from '@mantine/core';
+import { Title, Text, Avatar, Group, Stack, Box, Menu, SimpleGrid, UnstyledButton, Modal, Button, ThemeIcon, Tooltip } from '@mantine/core';
 import { useMediaQuery, useDisclosure } from '@mantine/hooks';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useLoading } from '@/context/LoadingContext';
@@ -20,9 +20,10 @@ import {
     IconDiamond,
     IconCrown,
     IconRocket,
-    IconCheck
+    IconCheck, IconBolt
 } from '@tabler/icons-react';
 import onboardingSteps from '@/lib/onboardingSteps';
+import { usePerformance } from '@/context/PerformanceContext'; // Add this import
 
 // --- IMPORTS ---
 import { GlassCard } from '@/components/GlassCard';
@@ -187,6 +188,20 @@ function FloatingSidebar({ user, tier, onNavigate, onSignOut }) {
             </Stack>
 
             {/* User Profile */}
+            <Group justify="center" mb="md">
+                    <Tooltip label="Reduce animations for slower devices" withArrow position="right">
+                        <Button 
+                            variant="subtle" 
+                            size="xs" 
+                            color="gray" 
+                            radius="xl"
+                            onClick={() => window.dispatchEvent(new CustomEvent('toggle-lite-mode'))}
+                            leftSection={<IconBolt size={14} />}
+                        >
+                            Toggle Lite Mode
+                        </Button>
+                    </Tooltip>
+                </Group>
             <Menu shadow="md" width={220} position="top-start" withArrow>
                 <Menu.Target>
                     <Box pt={16} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
@@ -305,6 +320,12 @@ function MobileNavbar({ user, tier, onNavigate, onSignOut }) {
                                 Upgrade to Pro
                             </Menu.Item>
                         )}
+                        <Menu.Item 
+                            leftSection={<IconBolt size={14} />} 
+                            onClick={() => window.dispatchEvent(new CustomEvent('toggle-lite-mode'))}
+                        >
+                            Toggle Lite Mode
+                        </Menu.Item>
                         <Menu.Item leftSection={<IconUser size={14} />} disabled>Settings</Menu.Item>
                         <Menu.Divider color="#2C2C2E" />
                         <Menu.Item color="red" leftSection={<IconLogout size={14} />} onClick={onSignOut}>Sign Out</Menu.Item>
@@ -329,6 +350,13 @@ export default function AppLayout({ children, session, isGuest }) {
     const [successModalOpened, { open: openSuccess, close: closeSuccess }] = useDisclosure(false);
 
     const [founderModalOpened, setFounderModalOpened] = useState(false);
+    const { toggleMode } = usePerformance(); // Use the hook
+
+    useEffect(() => {
+        const handleToggle = () => toggleMode(); // Toggles current state
+        window.addEventListener('toggle-lite-mode', handleToggle);
+        return () => window.removeEventListener('toggle-lite-mode', handleToggle);
+    }, [toggleMode]);
 
     // --- FETCH TIER & NOTIFICATIONS ---
     useEffect(() => {

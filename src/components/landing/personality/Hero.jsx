@@ -1,420 +1,274 @@
+// src/components/landing/personality/Hero.jsx
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Container, Title, Text, Box, Group, Stack, Button } from '@mantine/core';
-import { ShimmerButton } from '../ShimmerButton';
-import { useAuthRedirect } from '@/hooks/useAuthRedirect';
-import { motion, AnimatePresence } from 'framer-motion';
-import { IconBrandDiscord, IconBrandWhatsapp, IconArrowRight, IconSparkles, IconBolt, IconBrandAndroid  } from '@tabler/icons-react';
+import { Container, Title, Text, Box, Group, Stack, Button, Badge, ThemeIcon, SimpleGrid } from '@mantine/core';
+import { IconArrowRight, IconBrandAndroid, IconCheck, IconClock, IconBrain, IconFlame, IconRefresh, IconShare3, IconListCheck, IconEye, IconLayoutDashboard, IconPlus, IconFileText } from '@tabler/icons-react';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { Interactive } from '@/components/Interactive';
 import { GlassCard } from '@/components/GlassCard';
-import Link from 'next/link';
+import { ShimmerButton } from '../ShimmerButton';
 
-// --- SUB-COMPONENT: THE LIVING MESH ---
-
-function GradientMesh({ mode }) {
-
-    const isPanic = mode === 'panic';
-
-
-
-    // Configuration for the orb movements
-
-    const transition = {
-
-        duration: 8,
-
-        repeat: Infinity,
-
-        repeatType: "mirror",
-
-        ease: "easeInOut"
-
-    };
-
-
-
+// --- SUB-COMPONENT: FAKE APP SCREEN (The "Screenshot") ---
+function AppScreenMockup() {
     return (
-
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0 }}>
-
-            {/* Base Background Color */}
-
-            <motion.div 
-
-                animate={{ backgroundColor: isPanic ? '#1a0505' : '#0a0514' }}
-
-                style={{ position: 'absolute', inset: 0, transition: 'background-color 2s ease' }}
-
-            />
-
-
-
-            {/* Orb 1: Top Left (The Primary Light) */}
-
-            <motion.div
-
-                animate={{
-
-                    x: ['-20%', '10%', '-20%'],
-
-                    y: ['-20%', '10%', '-20%'],
-
-                    scale: [1, 1.2, 1],
-
-                    backgroundColor: isPanic ? '#ff3a30a2' : '#bf5af2c0', // Red vs Purple
-
-                }}
-
-                transition={transition}
-
-                style={{
-
-                    position: 'absolute', top: 0, left: 0,
-
-                    width: '60vw', height: '60vw', borderRadius: '50%',
-
-                    filter: 'blur(100px)', opacity: 0.4
-
-                }}
-
-            />
-
-
-
-            {/* Orb 2: Bottom Right (The Counter Weight) */}
-
-            <motion.div
-
-                animate={{
-
-                    x: ['20%', '-10%', '20%'],
-
-                    y: ['20%', '-10%', '20%'],
-
-                    scale: [1, 1.3, 1],
-
-                    backgroundColor: isPanic ? '#ff9500ac' : '#34c759ae', // Orange vs Green
-
-                }}
-
-                transition={{ ...transition, duration: 12 }}
-
-                style={{
-
-                    position: 'absolute', bottom: 0, right: 0,
-
-                    width: '50vw', height: '50vw', borderRadius: '50%',
-
-                    filter: 'blur(120px)', opacity: 0.3
-
-                }}
-
-            />
-
-
-
-            {/* Orb 3: Center Floating (The Accent) */}
-
-            <motion.div
-
-                animate={{
-
-                    x: ['-50%', '50%', '-50%'],
-
-                    y: ['-30%', '30%', '-30%'],
-
-                    backgroundColor: isPanic ? '#5c00009e' : '#007bffa1', // Dark Red vs Blue
-
-                }}
-
-                transition={{ ...transition, duration: 15 }}
-
-                style={{
-
-                    position: 'absolute', top: '40%', left: '40%',
-
-                    width: '40vw', height: '40vw', borderRadius: '50%',
-
-                    filter: 'blur(90px)', opacity: 0.2
-
-                }}
-
-            />
-
-
-
-            {/* Technical Grid Overlay (Stripe Style) */}
-
-            <div style={{
-
-                position: 'absolute', inset: 0,
-
-                backgroundImage: `linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)`,
-
-                backgroundSize: '100px 100px',
-
-                transform: 'skewY(-5deg) scale(1.2)', // The "Stripe Tilt"
-
-                opacity: 0.5,
-
-                zIndex: 1
-
-            }} />
-
-        </div>
-
+        <Box style={{ height: '100%', width: '100%', backgroundColor: '#050505', position: 'relative', overflow: 'hidden', fontFamily: 'var(--font-inter)' }}>
+            
+            {/* 1. Header Section */}
+            <Box pt={60} px={24} pb="sm">
+                <Text size="10px" c="dimmed" tt="uppercase" fw={700} style={{ letterSpacing: '0.15em' }}>Active Mission</Text>
+                <Title order={3} c="white" mt={4} style={{ fontFamily: 'var(--font-lexend)', letterSpacing: '-0.02em', fontSize: '1.75rem' }}>
+                    JEE Mains Sprint
+                </Title>
+                
+                {/* Action Ribbon */}
+                <SimpleGrid cols={2} spacing={8} mt={20}>
+                    <Button size="xs" radius="lg" variant="light" color="teal" leftSection={<IconBrain size={14}/>} style={{ height: '36px', fontSize: '11px', justifyContent: 'flex-start' }}>Start Quiz</Button>
+                    <Button size="xs" radius="lg" variant="filled" color="dark" c="orange" leftSection={<IconFlame size={14}/>} style={{ height: '36px', fontSize: '11px', backgroundColor: 'rgba(255, 149, 0, 0.15)', justifyContent: 'flex-start' }}>Cram Sheet</Button>
+                    <Button size="xs" radius="lg" variant="filled" color="dark" c="violet" leftSection={<IconRefresh size={14}/>} style={{ height: '36px', fontSize: '11px', backgroundColor: 'rgba(191, 90, 242, 0.15)', justifyContent: 'flex-start' }}>Refine Plan</Button>
+                    <Button size="xs" radius="lg" variant="filled" color="dark" c="gray" leftSection={<IconShare3 size={14}/>} style={{ height: '36px', fontSize: '11px', backgroundColor: 'rgba(255, 255, 255, 0.1)', justifyContent: 'flex-start' }}>Share Plan</Button>
+                </SimpleGrid>
+            </Box>
+
+            {/* 2. Timeline Strip */}
+            <Box pl={24} mb={24} style={{ display: 'flex', gap: '10px', overflow: 'hidden' }}>
+                {[11, 12, 13, 14, 15].map((day, i) => {
+                    const isActive = day === 14; // Simulating Day 4/14 as active
+                    return (
+                        <Box key={day} style={{ 
+                            minWidth: '60px', height: '64px', borderRadius: '14px', 
+                            backgroundColor: isActive ? 'rgba(191, 90, 242, 0.15)' : 'rgba(255,255,255,0.03)',
+                            border: isActive ? '1px solid #BF5AF2' : '1px solid rgba(255,255,255,0.05)',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                            <Text size="9px" c="dimmed" fw={700} tt="uppercase">DAY</Text>
+                            <Text size="lg" c={isActive ? 'white' : 'dimmed'} fw={700} lh={1}>{day}</Text>
+                            {isActive && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#34C759', marginTop: 4 }} />}
+                        </Box>
+                    );
+                })}
+            </Box>
+
+            {/* 3. The Active Card (Electrostatics) */}
+            <Box px={24}>
+                <GlassCard p={0} style={{ borderLeft: '4px solid #FF3B30', backgroundColor: 'rgba(20, 20, 25, 0.8)', overflow: 'hidden' }}>
+                    <Stack gap={0} p={20}>
+                        <Group gap="xs" mb="sm">
+                            <Badge color="dark" variant="filled" size="sm" c="dimmed" radius="sm">DAY 14</Badge>
+                            <Badge color="red" variant="filled" size="sm" radius="sm">HARD</Badge>
+                        </Group>
+                        
+                        <Title order={4} c="white" style={{ fontFamily: 'var(--font-lexend)', fontSize: '1.4rem', lineHeight: 1.2 }}>
+                            Electrostatics & Fields
+                        </Title>
+                        
+                        <Button 
+                            variant="light" color="violet" size="xs" radius="md" mt="lg" w="fit-content"
+                            leftSection={<IconListCheck size={14}/>}
+                        >
+                            Bulk Notes
+                        </Button>
+                    </Stack>
+                    
+                    {/* The Task Item (Inside the card) */}
+                    <Box p={20} pt={0}>
+                        <Box p="md" style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <Group justify="space-between" align="start" wrap="nowrap">
+                                <Group gap="md" align="start" wrap="nowrap">
+                                    <div style={{ 
+                                        width: 20, height: 10, borderRadius: '50%', 
+                                        border: '2px solid rgba(255,255,255,0.3)', marginTop: 2 
+                                    }} />
+                                    <Box>
+                                        <Text size="sm" c="white" fw={500} lh={1.4}>
+                                            Derive Electric Field due to a Dipole
+                                        </Text>
+                                        <Group gap={6} mt={6}>
+                                            <Badge size="xs" color="gray" variant="outline" style={{ fontSize: '9px', height: '18px' }}>DERIVATION</Badge>
+                                            <Badge size="xs" color="teal" variant="filled" style={{ fontSize: '9px', height: '18px' }}>NOTE READY</Badge>
+                                        </Group>
+                                    </Box>
+                                </Group>
+                                <ThemeIcon variant="light" color="teal" radius="xl" size="md">
+                                    <IconEye size={14} />
+                                </ThemeIcon>
+                            </Group>
+                        </Box>
+                    </Box>
+                </GlassCard>
+            </Box>
+
+            {/* Bottom Fade (To simulate scroll) */}
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '120px', background: 'linear-gradient(to top, #050505 20%, transparent)', zIndex: 20 }} />
+            
+            {/* Bottom Nav Mockup */}
+            <div style={{ position: 'absolute', bottom: 20, left: 0, right: 0, zIndex: 30, padding: '0 30px' }}>
+                <Group justify="space-between" style={{ opacity: 0.5 }}>
+                     <Stack gap={2} align="center"><IconLayoutDashboard size={20} /><Text size="8px" fw={600}>Home</Text></Stack>
+                     <Stack gap={2} align="center"><IconPlus size={20} /><Text size="8px" fw={600}>Create</Text></Stack>
+                     <Stack gap={2} align="center"><IconFileText size={20} /><Text size="8px" fw={600}>Plans</Text></Stack>
+                     <Stack gap={2} align="center"><div style={{width: 20, height: 20, borderRadius: '50%', background: '#BF5AF2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color:'black', fontWeight:'bold'}}>SR</div><Text size="8px" fw={600}>Profile</Text></Stack>
+                </Group>
+            </div>
+        </Box>
     );
-
 }
 
 export function Hero() {
-    const handleGetStarted = useAuthRedirect();
-    const [phase, setPhase] = useState('problem'); // 'problem' (Kal Padhunga) | 'solution' (KalPad)
-    const [mode, setMode] = useState('panic'); 
-    
-     useEffect(() => {
-
-        const interval = setInterval(() => {
-
-            setMode(prev => prev === 'panic' ? 'power' : 'panic');
-
-        }, 5000); 
-
-        return () => clearInterval(interval);
-
-    }, []);
-
-    useEffect(() => {
-
-        const interval = setInterval(() => {
-
-            setPhase(prev => prev === 'problem' ? 'solution' : 'problem');
-
-        }, 5000); // 4 Second cycle
-
-        return () => clearInterval(interval);
-
-    }, []);
-
-
-
-    const isPanic = mode === 'panic';
-     const isSolution = phase === 'solution';
-
     return (
         <Box
             style={{
                 position: 'relative',
-                height: '100vh',
-                width: '100vw',
+                minHeight: '100vh',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
                 overflow: 'hidden',
+                paddingTop: '100px', // Header offset
+                paddingBottom: '60px',
+                paddingLeft: '20px',
+                paddingRight: '20px',
+                background: 'transparent', // FIX: Transparent to let Global Void show
             }}
         >
-            {/* --- BACKGROUND LAYER --- */}
-
-            <GradientMesh mode={mode} />
-
-            {/* --- 2. THE PERSPECTIVE GRID (Floor) --- */}
+            {/* --- BACKGROUND AMBIENCE (The Local Glow) --- */}
             <div style={{
-                position: 'absolute', bottom: '-20%', left: '-50%', right: '-50%', height: '80vh',
-                backgroundSize: '60px 60px',
-                backgroundImage: `
-                    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px)
-                `,
-                transform: 'perspective(500px) rotateX(60deg)', // The 3D Floor Effect
-                maskImage: 'linear-gradient(to bottom, transparent 0%, black 40%)',
-                zIndex: 0,
-                pointerEvents: 'none',
+                position: 'absolute', top: '20%', right: '-10%',
+                width: '60vw', height: '60vw',
+                background: 'radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, transparent 60%)',
+                filter: 'blur(100px)', zIndex: 0
             }} />
 
-            {/* --- 3. THE 3D TEXT ENGINE --- */}
-            <Box style={{ position: 'relative', zIndex: 10, height: '30vh', display: 'flex', alignItems: 'center' }}>
-                <AnimatePresence mode="wait">
-                    {isSolution ? (
-                        <motion.div
-                            key="solution"
-                            initial={{ opacity: 0, scale: 2, filter: 'blur(20px)' }}
-                            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                            exit={{ opacity: 0, scale: 0.8, filter: 'blur(10px)' }}
-                            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} // Apple-style spring
-                        >
-                            <Title
-                                style={{
-                                    fontSize: 'clamp(5rem, 15vw, 12rem)',
-                                    fontFamily: 'var(--font-lexend)',
-                                    fontWeight: 900,
-                                    lineHeight: 0.9,
-                                    textAlign: 'center',
-                                    color: 'transparent',
-                                    background: 'linear-gradient(180deg, #FFFFFF 0%, #A78BFA 100%)', // Crisp White to Soft Purple
-                                    backgroundClip: 'text',
-                                    WebkitBackgroundClip: 'text',
-                                    filter: 'drop-shadow(0 0 30px rgba(167, 139, 250, 0.6))', // Glowing Aura
-                                    letterSpacing: '-0.04em'
-                                }}
-                            >
-                                KalPad
-                            </Title>
-                        </motion.div>
-                    ) : (
-                        <motion.div
-                            key="problem"
-                            initial={{ opacity: 0, y: 50, rotateX: -45 }}
-                            animate={{ opacity: 0.4, y: 0, rotateX: 0 }}
-                            exit={{ opacity: 0, y: -50, rotateX: 45, filter: 'blur(20px)' }}
-                            transition={{ duration: 0.8 }}
-                        >
-                            <Title
-                                style={{
-                                    fontSize: 'clamp(4rem, 10vw, 8rem)',
-                                    fontFamily: 'var(--font-lexend)',
-                                    fontWeight: 800,
-                                    lineHeight: 0.9,
-                                    textAlign: 'center',
-                                    color: 'transparent',
-                                    WebkitTextStroke: '2px rgba(255, 255, 255, 0.3)', // Hollow Outline style
-                                    letterSpacing: '0.05em',
-                                    whiteSpace: 'pre-line' // Allow stacking
-                                }}
-                            >
-                                KAL{"\n"}PADHUNGA
-                            </Title>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </Box>
-
-            {/* --- 4. THE GLASS INTERFACE (Bottom Anchored) --- */}
-              {/* --- FOREGROUND INTERFACE --- */}
-
-            <Container size="md" style={{ position: 'relative', zIndex: 10 }}>
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.8, delay: 0.2 }}
-                >
-                    <GlassCard 
-                        p={{ base: 'xl'}} 
-                        style={{ 
-                            // Thinner, brighter glass for the Stripe feel
-                            backdropFilter: 'blur(40px)',
-                            backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            boxShadow: '0 40px 100px -20px rgba(0,0,0,0.5)',
-                            textAlign: 'center'
-                        }}
-                    >
-                        <Stack align="center">
-                            {/* Status Pill */}
-                            <motion.div
-                                animate={{ 
-                                    backgroundColor: isPanic ? 'rgba(255, 59, 48, 0.1)' : 'rgba(52, 199, 89, 0.1)',
-                                    color: isPanic ? '#FF3B30' : '#34C759',
-                                    borderColor: isPanic ? 'rgba(255, 59, 48, 0.2)' : 'rgba(52, 199, 89, 0.2)'
-                                }}
-                                style={{
-                                    padding: '8px 20px',
-                                    borderRadius: '99px',
-                                    border: '1px solid',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 700,
-                                    letterSpacing: '0.05em',
-                                    textTransform: 'uppercase',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '8px'
-                                }}
-                            >
-                                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'currentColor' }} />
-                                {isPanic ? "Current State: Panic" : "Target State: Control"}
-                            </motion.div>
+            <Container size="xl" style={{ position: 'relative', zIndex: 10 }}>
+                {/* FIX: Use SimpleGrid for reliable responsive layout */}
+                <SimpleGrid cols={{ base: 1, lg: 2 }} spacing={80} verticalSpacing={60}>
+                    
+                    {/* --- LEFT COLUMN: THE PITCH --- */}
+                    <Stack gap="xl" justify="center">
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
+                            <Group gap="xs" mb="xs">
+                                <ThemeIcon size="sm" radius="xl" color="white" variant="white"><IconCheck size={10} color="black"/></ThemeIcon>
+                                <Text size="sm" fw={700} c="white" tt="uppercase" style={{ letterSpacing: '0.1em' }}>
+                                    AI-Powered Strategist
+                                </Text>
+                            </Group>
 
                             <Title 
-                                order={2} 
+                                order={1} 
                                 style={{ 
                                     fontFamily: 'var(--font-lexend)', 
-                                    fontSize: 'clamp(2rem, 5vw, 3rem)',
-                                    fontWeight: 800,
-                                    lineHeight: 1.1,
-                                    letterSpacing: '-0.03em',
+                                    fontSize: 'clamp(3rem, 5vw, 5rem)', 
+                                    fontWeight: 800, 
+                                    lineHeight: 1,
+                                    letterSpacing: '-0.04em',
                                     color: 'white'
                                 }}
                             >
-                                Stop negotiating with <br/> your syllabus.
+                                <span className="apple-text-gradient">
+                                    FIGHT THE<br/>SYLLABUS.
+                                </span>
                             </Title>
+                        </motion.div>
 
-                            <Text size="sm" c="dimmed" maw={600} mx="auto" style={{ lineHeight: 1.6 }}>
-                                You have 10 days. The syllabus is 500 pages. 
-                                <span style={{ color: '#fff', fontWeight: 600 }}> We build the strategy that makes it possible.</span>
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }}>
+                            <Text size="xl" c="gray.4" lh={1.6} maw={600}>
+                                It's a trap designed to make you panic. I got tired of losing, so I built our weapon. KalPad generates a ruthless, adaptive study plan that turns 
+                                <span style={{ color: '#fff', fontWeight: 600 }}> "Kal Padhunga"</span> into 
+                                <span style={{ color: '#34C759', fontWeight: 600 }}> "Done."</span>
                             </Text>
+                        </motion.div>
 
-                            <Group mt="md" gap="md" justify="center">
-                                {/* 1. Existing Web App Button */}
-                                <Stack gap={10} align="center">
-                                    
-                                    <Interactive>
-                                        <ShimmerButton
-                                            component={Link}
-                                            href="/guest-plan"
-                                            size="xl"
-                                            radius="xl"
-                                        >
-                                            Try It Out <IconArrowRight size={22} />
-                                        </ShimmerButton>
-                                    </Interactive>
-                                    
-                                   
-                                </Stack>
+                        {/* Buttons */}
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.4 }}>
+                            <Group gap="md" mt="sm">
+                                {/* FIX: Replaced with ShimmerButton */}
+                                <Interactive>
+                                    <ShimmerButton
+                                        component={Link}
+                                        href="/guest-plan"
+                                        size="xl"
+                                        radius="xl"
+                                        style={{ height: '60px', padding: '0 40px', fontSize: '1.1rem' }}
+                                    >
+                                        Try it Now <IconArrowRight size={20} style={{ marginLeft: 8 }}/>
+                                    </ShimmerButton>
+                                </Interactive>
 
-                                {/* 2. New Android Download Button */}
                                 <Interactive>
                                     <Button
-                                        component="a" // Force it to be a standard anchor tag
-                                        href="https://fwibambhxyjklrcnqdse.supabase.co/storage/v1/object/public/androoid/KalPad.apk" 
-                                        target="_blank" // Opens in new context to force browser download handler
-                                        rel="noopener noreferrer" // Security best practice
-                                        download // Explicit HTML5 download attribute
+                                        component="a"
+                                        href="/android/kalpad.apk"
+                                        target="_blank"
+                                        download="KalPad.apk"
                                         size="xl"
                                         radius="xl"
                                         variant="default"
-                                        leftSection={<IconBrandAndroid size={24} color="#3DDC84" />} 
+                                        leftSection={<IconBrandAndroid size={22} color="#3DDC84"/>}
                                         style={{ 
                                             height: '60px',
                                             fontSize: '1.1rem',
-                                            backgroundColor: 'rgba(61, 220, 132, 0.05)', 
-                                            border: '1px solid rgba(61, 220, 132, 0.3)',
+                                            backgroundColor: 'rgba(255,255,255,0.05)',
+                                            border: '1px solid rgba(255,255,255,0.1)',
                                             color: 'white',
-                                            boxShadow: '0 0 20px rgba(61, 220, 132, 0.1)'
                                         }}
                                     >
                                         Download App
                                     </Button>
                                 </Interactive>
                             </Group>
+                            
+                            <Text size="sm" c="dimmed" mt="md" fs="italic">
+                                *No Sign Up required to try
+                            </Text>
+                        </motion.div>
+                    </Stack>
 
-                            <Group gap="xl" mt="sm" style={{ opacity: 0.7 }}>
-                                <Interactive>
-                                    <Group gap={6} style={{ cursor: 'pointer' }}>
-                                        <IconBrandDiscord size={20} />
-                                        <Text size="sm" fw={500}>Join the Community</Text>
-                                    </Group>
-                                </Interactive>
-                                <Interactive>
-                                    <Group gap={6} style={{ cursor: 'pointer' }}>
-                                        <IconBolt size={20} />
-                                        <Text size="sm" fw={500}>v2.5 Now Live</Text>
-                                    </Group>
-                                </Interactive>
-                            </Group>
-                        </Stack>
-                    </GlassCard>
-                </motion.div>
+                    {/* --- RIGHT COLUMN: THE PROOF (PHONE MOCKUP) --- */}
+                    <Box style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        {/* Background Decor */}
+                        <svg width="600" height="600" viewBox="0 0 600 600" fill="none" style={{ position: 'absolute', zIndex: 0, opacity: 0.3, transform: 'scale(1.2)' }}>
+                            <path d="M50 300 C 150 500, 450 100, 550 300" stroke="url(#grad1)" strokeWidth="40" strokeLinecap="round" fill="none" />
+                            <defs>
+                                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" style={{ stopColor: '#7C3AED', stopOpacity: 0 }} />
+                                    <stop offset="50%" style={{ stopColor: '#BF5AF2', stopOpacity: 1 }} />
+                                    <stop offset="100%" style={{ stopColor: '#34C759', stopOpacity: 0 }} />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+
+                        {/* The Phone Chassis */}
+                        <motion.div 
+                            initial={{ y: 50, opacity: 0, rotate: -5 }}
+                            animate={{ y: 0, opacity: 1, rotate: 0 }}
+                            transition={{ duration: 1, ease: "circOut", delay: 0.2 }}
+                            style={{
+                                width: '320px',
+                                height: '650px',
+                                borderRadius: '50px',
+                                border: '8px solid #2d2d2d',
+                                backgroundColor: '#000',
+                                boxShadow: `
+                                    0 0 0 2px #444, /* Outer Bezel */
+                                    0 20px 50px -10px rgba(0,0,0,0.8), /* Drop Shadow */
+                                    inset 0 0 20px rgba(255,255,255,0.1) /* Inner Gloss */
+                                `,
+                                position: 'relative',
+                                zIndex: 10,
+                                overflow: 'hidden'
+                            }}
+                        >
+                            {/* Dynamic Island */}
+                            <div style={{
+                                position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)',
+                                width: '100px', height: '28px', backgroundColor: '#000', borderRadius: '20px', zIndex: 50
+                            }} />
+
+                            {/* Screen Content */}
+                            <AppScreenMockup />
+                        </motion.div>
+                    </Box>
+
+                </SimpleGrid>
             </Container>
         </Box>
     );

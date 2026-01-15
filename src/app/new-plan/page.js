@@ -664,29 +664,28 @@ const handleProcessFile = async () => {
                                 
                                     
                                     <Interactive style={{ width: '100%' }}>
-                                        <Button 
+                                        <ShimmerButton 
                                             id="generate-plan-button"
                                             type="submit" 
                                             size="xl" 
-                                            py = "md"
                                             fullWidth
                                             loading={isGenerating} 
                                             disabled={isProcessing || isCreationBlocked} 
-                                            radius="xl" // Pill Shape
+                                            radius="xl" 
+                                            color="#3300eb" // Base color for the Shimmer engine
                                             style={{ 
-                                                width: '100%',
-                                                background: 'linear-gradient(135deg, #3300ebff 0%, #5c5ce6ff 100%)', // Apple-style Gradient
-                                                boxShadow: '0 10px 25px -5px rgba(191, 90, 242, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)', // Deep Glow + Top highlight
-                                                border: 'none',
-                                                color: 'white',
                                                 fontSize: '1.1rem',
                                                 fontWeight: 600,
-                                                letterSpacing: '0.02em'
+                                                letterSpacing: '0.02em',
+                                                // We let the component handle the background/shadow 
+                                                // to preserve the holographic animation
                                             }}
-                                            rightSection={!isGenerating && <IconTargetArrow size={22} />}
                                         >
-                                            Create Study Plan
-                                        </Button>
+                                            <Group gap="xs">
+                                                <span>Create Study Plan</span>
+                                                {!isGenerating && <IconTargetArrow size={22} />}
+                                            </Group>
+                                        </ShimmerButton>
                                     </Interactive>
                             </Stack>
                         </form>
