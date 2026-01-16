@@ -21,6 +21,11 @@ import { Community } from "@/components/landing/personality/Community";
 import { RealQuestion } from "@/components/landing/personality/RealQuestion"; 
 import { GoldPass } from "@/components/landing/personality/GoldPass";
 import { CookieConsent } from "@/components/landing/CookieConsent";
+import { TheBrain } from "@/components/landing/personality/TheBrain";
+import { TheToolkit } from '@/components/landing/personality/TheToolkit';
+import { GuestCTA } from '@/components/landing/personality/GuestCTA';
+import { TheShift } from '@/components/landing/personality/TheShift';
+import { ThePledge } from '@/components/landing/personality/ThePledge';
 
 // --- GLOBAL BACKGROUND: THE INFINITE VOID (FIXED) ---
 function InfiniteVoid() {
@@ -102,12 +107,18 @@ export default function LandingPage() {
             <Navbar />
             
             <main style={{ position: 'relative', zIndex: 1 }}>
+                 {/* 1. THE HOOK */}
                 <Hero />
-                <Manifesto />
                 <Arsenal />
+                <TheBrain />
+                <TheToolkit />
+                <TheShift />
+                <ThePledge />
+                <GuestCTA />
                 <Playground />
                 <Devlog />
                 <Community />
+                <Manifesto />
                 <RealQuestion />
             </main>
             

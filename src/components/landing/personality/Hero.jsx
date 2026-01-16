@@ -145,10 +145,10 @@ export function Hero() {
                     {/* --- LEFT COLUMN: THE PITCH --- */}
                     <Stack gap="xl" justify="center">
                         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-                            <Group gap="xs" mb="xs">
+                            <Group gap="xs" mb="xs" visibleFrom='sm'>
                                 <ThemeIcon size="sm" radius="xl" color="white" variant="white"><IconCheck size={10} color="black"/></ThemeIcon>
                                 <Text size="sm" fw={700} c="white" tt="uppercase" style={{ letterSpacing: '0.1em' }}>
-                                    AI-Powered Strategist
+                                    AI academic mentor {'('}not just a study tool{')'}
                                 </Text>
                             </Group>
 
@@ -164,7 +164,7 @@ export function Hero() {
                                 }}
                             >
                                 <span className="apple-text-gradient">
-                                    FIGHT THE<br/>SYLLABUS.
+                                    FIGHT THE<br/>SYLLABUS
                                 </span>
                             </Title>
                         </motion.div>
