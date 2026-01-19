@@ -155,6 +155,7 @@ function getModeSpecificCommunicator(mode, context) {
               - Estimated Topics to be Reviewed: ${triageData.estimated_coverage}%.
               - Core Focus Topics (More Practice): ${JSON.stringify(triageData.emphasized_topics.map(t => t.topic))}
               - Quick Review Topics (Formulas/Defs): ${JSON.stringify(triageData.deprioritized_topics.map(t => t.topic))}
+              - Estimated Syllaus Coverage: ${triageData.estimated_coverage}%.
 
               **YOUR TASK & TONE (EXECUTE THIS PRECISELY):**
 
