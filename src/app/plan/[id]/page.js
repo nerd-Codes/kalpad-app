@@ -402,8 +402,7 @@ export default function PlanDetailPage() {
                                 </Box>
                             </Box>
                         </Box>
-
-                        {/* --- DESKTOP: TIMELINE SCRUBBER (GlassCard Container) --- */}
+                        
                         {/* --- DESKTOP: TIMELINE SCRUBBER (GlassCard Container) --- */}
 <Box visibleFrom="md" mb="xl">
     <GlassCard p={0} style={{ overflow: 'hidden' }}>

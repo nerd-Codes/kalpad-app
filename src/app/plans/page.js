@@ -263,35 +263,15 @@ export default function AllPlansPage() {
                     </Box>
                     
                     {/* --- THE HOLOGRAPHIC BUTTON --- */}
-                    <Link href="/new-plan" style={{ textDecoration: 'none' }} >
-                        <Box
-                            className="group"
-                            visibleFrom="sm"
-                            style={{
-                                position: 'relative',
-                                padding: '12px 24px',
-                                borderRadius: '999px',
-                                background: 'rgba(191, 90, 242, 0.1)',
-                                border: '1px solid rgba(191, 90, 242, 0.3)',
-                                cursor: 'pointer',
-                                overflow: 'hidden',
-                                transition: 'all 0.3s ease'
-                            }}
-                        >
-                            <div style={{
-                                position: 'absolute', inset: 0,
-                                background: 'linear-gradient(45deg, transparent 40%, rgba(191, 90, 242, 0.4) 50%, transparent 60%)',
-                                backgroundSize: '200% 200%',
-                                animation: 'shimmer 3s infinite linear',
-                                pointerEvents: 'none'
-                            }}/>
-                            
-                            <Group gap="xs" style={{ position: 'relative', zIndex: 1 }} >
-                                <IconPlus size={18} color="#BF5AF2" />
-                                <Text fw={600} size="sm" c="white" style={{ letterSpacing: '0.05em' }}>NEW MISSION</Text>
-                            </Group>
-                        </Box>
-                    </Link>
+                    <ShimmerButton 
+                                onClick={() => router.push('/new-plan')}
+                                loading={loading}
+                                size="lg"
+                                radius="xl"
+
+                             >
+                                <IconPlus size={18} /> New Mission
+                    </ShimmerButton>
                 </Group>
 
                 {/* --- THE COMMAND BAR (Floating Toolbar) --- */}

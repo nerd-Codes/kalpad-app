@@ -129,8 +129,8 @@ export default function DashboardPage() {
                 </Box>
 
                 {loading ? <Group justify="center"><Loader color="white"/></Group> : (
-                    <Grid gutter="xl">
-                        {/* --- LEFT COLUMN (FOCUS & METRICS) - Spans 8 cols --- */}
+                    <Grid gutter="xl" maxWidth="90vw">
+                        {/* --- LEFT COLUMN (FOCUS & Timeline) - Spans 8 cols --- */}
                         <Grid.Col span={{ base: 12, lg: 8 }}>
                             <Stack gap="lg">
                                 <HeroTile 
@@ -139,14 +139,7 @@ export default function DashboardPage() {
                                     todaysTopic={todaysTopic} 
                                     onJumpBackIn={(id) => { setIsLoading(true); router.push(`/plan/${id}`); }} 
                                 />
-                                <MetricsDeck stats={stats} />
-                            </Stack>
-                        </Grid.Col>
-
-                        {/* --- RIGHT COLUMN (TIMELINE) - Spans 4 cols --- */}
-                        <Grid.Col span={{ base: 12, lg: 4 }}>
-                            <Stack gap="lg">
-                                <GlassCard p="lg">
+                                <GlassCard p="lg" maxWidth="90vw">
                                     <CalendarStrip 
                                         selectedDate={selectedDate} 
                                         setSelectedDate={setSelectedDate} 
@@ -154,7 +147,7 @@ export default function DashboardPage() {
                                     />
                                 </GlassCard>
 
-                                <Stack gap="md">
+                                <Stack gap="md" maxWidth="90vw">
                                     <Group justify="space-between" px="xs">
                                         <Text size="sm" fw={600} c="dimmed" tt="uppercase">Agenda</Text>
                                         <Text size="xs" c="dimmed">{dailyTasks.length} Sessions</Text>
@@ -176,10 +169,19 @@ export default function DashboardPage() {
                                             dayTopic={planWithTopic.plan_topics[0]}
                                             onUpdate={handleUpdateTaskGroup}
                                             onNoteGenerated={() => {}}
-                                            isInitiallyCollapsed={false}
+                                            isInitiallyCollapsed={true}
+                                            maxWidth="90vw"
                                         />
                                     ))}
                                 </Stack>
+                                
+                            </Stack>
+                        </Grid.Col>
+
+                        {/* --- RIGHT COLUMN (METRICS) - Spans 4 cols --- */}
+                        <Grid.Col span={{ base: 12, lg: 4 }}>
+                            <Stack gap="lg">
+                                <MetricsDeck stats={stats} />
                             </Stack>
                         </Grid.Col>
                     </Grid>

@@ -62,7 +62,7 @@ function getModeSpecificTriage(mode, context) {
               **PRIME DIRECTIVE: 100% COVERAGE IS NON-NEGOTIABLE**
               1.  **Comprehensive Analysis:** Analyze the entire syllabus for depth, complexity, and dependencies.
               2.  **Calculate Required Pace:** Based on your analysis, calculate the realistic, minimum number of focused study hours required *per day* to fully learn and understand every single topic within the given timeframe. This is your most critical calculation.
-              3.  **Set 'recommended_study_hours_per_day':** Your output for "recommended_study_hours_per_day" MUST be the realistic number you calculated in the previous step.
+              3.  **Set 'recommended_study_hours_per_day':** Your output for "recommended_study_hours_per_day" MUST be the realistic number you calculated in the previous step. Must never be more than 24 hours.
               4.  **No Skipped Topics:** The "skipped_topics" array in your JSON output MUST always be empty '[]'. You are forbidden from skipping topics.
               5.  **Prioritize Order, Not Omission:** Use the "emphasized_topics" and "deprioritized_topics" arrays to structure the learning path logically (e.g., foundational topics first), but every topic must be included in the final plan.
               6.  **Set 'estimated_coverage':** This value MUST always be '100'.
@@ -147,6 +147,8 @@ function getModeSpecificCommunicator(mode, context) {
 
               - YOUR MISSION: Write the "overall_approach" narrative for a revision plan. Translate the strategic data below into a clear, motivating final game plan.
 
+              **USER REQUEST:** "${userRequest}" (ACKNOWLEDGE THIS EXPLICITLY IF NOT EMPTY OR NONE).
+
               **FINAL STRATEGIC DECISIONS (THE GROUND TRUTH):**
               - Revision Pace: ${triageData.recommended_study_hours_per_day} hours/day.
               - User's Requested Pace: ${studyHoursPerDay} hours/day.
@@ -174,6 +176,8 @@ function getModeSpecificCommunicator(mode, context) {
             - YOUR PERSONA: You are KalPad, in "Hardcore" mode. Your persona is a direct, intense, and motivating drill sergeant. Your job is to set clear, high expectations and lay out the demanding path to 100% syllabus mastery. There are no shortcuts, only discipline.
 
             - YOUR MISSION: Write the "overall_approach" narrative for a 100% coverage plan. Translate the strategic data below into a clear, no-nonsense mission briefing.
+
+            **USER REQUEST:** "${userRequest}" (ACKNOWLEDGE THIS EXPLICITLY IF NOT EMPTY OR NONE).
 
             **FINAL STRATEGIC DECISIONS (THE GROUND TRUTH):**
             - **Calculated Required Pace for 100% Coverage:** ${triageData.recommended_study_hours_per_day} hours/day.
@@ -203,6 +207,8 @@ function getModeSpecificCommunicator(mode, context) {
 
             - YOUR MISSION: Write the "overall_approach" narrative for a last-minute sprint plan. Translate the strategic data below into an intense, focused battle plan.
 
+            **USER REQUEST:** "${userRequest}" (ACKNOWLEDGE THIS EXPLICITLY IF NOT EMPTY OR NONE).
+
             **FINAL STRATEGIC DECISIONS (THE GROUND TRUTH):**
             - Sprint Pace: ${triageData.recommended_study_hours_per_day} hours/day.
             - Estimated Syllabus Coverage: ${triageData.estimated_coverage}%.
@@ -229,6 +235,8 @@ function getModeSpecificCommunicator(mode, context) {
               - YOUR PERSONA: You are KalPad, in "Skill Builder" mode. Your persona is a supportive, experienced mentor, tech lead, or senior professional in the user's target field. Your tone is encouraging, practical, and focused on real-world application. You're here to guide them from zero to shipping their first project.
 
               - YOUR MISSION: Write the "overall_approach" narrative for a project-based skill-building plan. Translate the curriculum data below into a clear, motivating roadmap.
+              
+              **USER REQUEST:** "${userRequest}" (ACKNOWLEDGE THIS EXPLICITLY IF NOT EMPTY OR NONE).
 
               **FINAL CURRICULUM DECISIONS (THE GROUND TRUTH):**
               - Daily Time Commitment: ${triageData.recommended_study_hours_per_day} hours/day.
@@ -257,7 +265,7 @@ function getModeSpecificCommunicator(mode, context) {
             - YOUR PERSONA: You are KalPad, the super-smart, brutally honest senior from an Indian college. Your language is Hinglish-aware, witty, and direct. You cut through the BS.
             - YOUR MISSION: Write the "overall_approach". Translate the data below into a concrete battle plan.
             
-            **USER REQUEST:** "${userRequest}" (ACKNOWLEDGE THIS EXPLICITLY).
+            **USER REQUEST:** "${userRequest}" (ACKNOWLEDGE THIS EXPLICITLY IF NOT EMPTY OR NONE).
 
             **STRATEGY DATA:**
             - Pace: ${triageData.recommended_study_hours_per_day} hrs/day.
@@ -458,6 +466,7 @@ export async function POST(request) {
         
         // --- VERTEX AI MIGRATION: USE CENTRALIZED GENERATIVE MODEL ---
         const plannerModel = await getVertexAIModel('gemini-2.5-flash', { responseMimeType: "application/json" });
+        const communicatorModel = await getVertexAIModel('gemini-2.5-flash-lite', { responseMimeType: "application/json" });
         const { triageDirectives } = getModeSpecificTriage(planMode, {
             examName,
             daysLeft,
@@ -528,7 +537,7 @@ export async function POST(request) {
             
             
         // --- VERTEX AI MIGRATION: UPDATE GENERATE CONTENT CALL SYNTAX ---
-        const communicatorResult = await plannerModel.generateContent({
+        const communicatorResult = await communicatorModel.generateContent({
             contents: [{ role: 'user', parts: [{ text: communicatorPrompt }] }]
         });
         

@@ -64,7 +64,7 @@ export function MetricsDeck({ stats }) {
     return (
         <GlassCard p={0} style={{ overflow: 'hidden' }}>
             {/* The layout splits into two distinct zones */}
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing={0}>
+            <SimpleGrid  spacing={0}>
                 
                 {/* ZONE 1: ACTIVITY (The Heatmap) */}
                 <Box 
