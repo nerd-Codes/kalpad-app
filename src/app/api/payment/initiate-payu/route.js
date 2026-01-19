@@ -86,7 +86,7 @@ export async function POST(request) {
         // 5. Return Form Data
         // The frontend will create a hidden form with these values and submit it.
         return NextResponse.json({
-            action: 'https://test.payu.in/_payment', // Use https://test.payu.in/_payment for testing
+            action: 'https://secure.payu.in/_payment', // Use https://test.payu.in/_payment for testing
             params: {
                 key,
                 txnid,
