@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
+import { useMediaQuery } from "@mantine/hooks"; 
 import supabase from '@/lib/supabaseClient';
 import Link from 'next/link';
 import AppLayout from '@/components/AppLayout';
@@ -28,6 +29,7 @@ export default function AllPlansPage() {
     const [plans, setPlans] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const isMobile = useMediaQuery('(max-width: 768px)');
 
     // --- STATE MANAGEMENT ---
     const [sortOrder, setSortOrder] = useState('newest');
@@ -270,7 +272,7 @@ export default function AllPlansPage() {
                                 radius="xl"
 
                              >
-                                <IconPlus size={18} /> New Mission
+                                 {isMobile ? <IconPlus size={18} /> : <><IconPlus size={18} /><Text>New Mission</Text></>}
                     </ShimmerButton>
                 </Group>
 

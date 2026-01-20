@@ -3,14 +3,19 @@
 
 import { Group, Text, Box, ActionIcon } from "@mantine/core";
 import { addDays, subDays, format, isSameDay } from "date-fns";
+import { useMediaQuery } from "@mantine/hooks"; // Added for responsive check
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion"; // Added AnimatePresence
 import { Interactive } from "./Interactive";
 
 export function CalendarStrip({ selectedDate, setSelectedDate, examDates = [] }) {
+
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const daysToShow = isMobile ? 5 : 7;
+  const offset = Math.floor(daysToShow / 2); // Centers the selected date
   // Show 5 days on desktop to fit the column better, or keep 7 but tight
-  const windowStart = subDays(selectedDate, 2); 
-  const days = Array.from({ length: 5 }).map((_, i) => addDays(windowStart, i));
+  const windowStart = subDays(selectedDate, offset); 
+  const days = Array.from({ length: daysToShow }).map((_, i) => addDays(windowStart, i));
 
   return (
     <Box>

@@ -236,7 +236,7 @@ function FloatingSidebar({ user, tier, onNavigate, onSignOut }) {
 }
 
 // --- 2. THE FLUID BOTTOM SHEET (MOBILE) ---
-function MobileNavbar({ user, tier, onNavigate, onSignOut }) {
+function MobileNavbar({ user, tier, onNavigate, onSignOut, isLiteMode }) {
     const pathname = usePathname();
     const config = TIER_CONFIG[tier] || TIER_CONFIG['free'];
     
@@ -247,14 +247,23 @@ function MobileNavbar({ user, tier, onNavigate, onSignOut }) {
         { icon: IconFileText, label: 'Plans', href: '/plans' },
     ];
 
+    const backgroundStyle = isLiteMode ? {
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 60%, rgba(0,0,0,1) 100%)',
+        backdropFilter: 'none',
+        WebkitBackdropFilter: 'none',
+        borderTop: 'none'
+    } : {
+        backgroundColor: 'rgba(28, 28, 30, 0.85)', 
+        backdropFilter: 'blur(24px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+    };
+
     return (
         <Box
             style={{ 
                 position: 'fixed', bottom: 0, left: 0, right: 0,
-                backgroundColor: 'rgba(28, 28, 30, 0.85)', 
-                backdropFilter: 'blur(24px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                ...backgroundStyle,
                 paddingTop: '12px',
                 paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
                 paddingLeft: '16px', paddingRight: '16px',
@@ -344,13 +353,14 @@ export default function AppLayout({ children, session, isGuest }) {
     const pathname = usePathname();
     const { profile, isLoading: isProfileLoading, startTour } = useOnboarding();
     const isDesktop = useMediaQuery('(min-width: 768px)'); 
+    
 
     const [tier, setTier] = useState('free');
     const [upgradeOpened, { open: openUpgrade, close: closeUpgrade }] = useDisclosure(false);
     const [successModalOpened, { open: openSuccess, close: closeSuccess }] = useDisclosure(false);
 
     const [founderModalOpened, setFounderModalOpened] = useState(false);
-    const { toggleMode } = usePerformance(); // Use the hook
+    const { toggleMode, isLiteMode } = usePerformance();
 
     useEffect(() => {
         const handleToggle = () => toggleMode(); // Toggles current state
@@ -518,7 +528,7 @@ export default function AppLayout({ children, session, isGuest }) {
             </main>
 
             {!isDesktop && (
-                <MobileNavbar user={session.user} tier={tier} onNavigate={handleNavigation} onSignOut={handleSignOut} />
+                <MobileNavbar user={session.user} tier={tier} onNavigate={handleNavigation} onSignOut={handleSignOut} isLiteMode={isLiteMode} />
             )}
         </div>
     );

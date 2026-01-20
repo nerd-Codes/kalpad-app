@@ -1,43 +1,190 @@
 /* src/app/print/print.css */
 
-/* Font imports are now handled in the page's <head> for reliability. */
-
-body {
-    background-color: #ffffff !important;
-    font-family: 'Inter', sans-serif;
-    font-size: 11pt;
-    line-height: 1.7;
-    color: #000000 !important;
+/* --- GLOBAL RESET & FONTS --- */
+:root {
+    color-scheme: light;
 }
 
+body {
+    background-color: #e0e0e0 !important; /* Darker gray background for contrast on screen */
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    margin: 0;
+    padding: 2rem 0; /* Vertical spacing for the paper sheet on screen */
+    color: #111;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+/* --- THE PAPER SHEET (On Screen) --- */
+.paper-sheet {
+    background-color: white;
+    max-width: 210mm; /* A4 Width */
+    min-height: 297mm; /* A4 Height */
+    margin: 0 auto;
+    padding: 2cm; /* Visual margins on screen */
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15); /* Drop shadow */
+    box-sizing: border-box;
+}
+
+/* --- TYPOGRAPHY --- */
+.printable-content {
+    font-size: 11pt;
+    line-height: 1.6;
+    text-align: justify; /* JUSTIFIED ALIGNMENT */
+    color: #000000 !important; /* Force black body text */
+}
+
+/* 
+   FIX: Added explicit color: #000 !important to all heading selectors 
+   to override Mantine's dark theme defaults.
+*/
 .printable-content h1,
 .printable-content h2,
 .printable-content h3,
-.printable-content h4,
-.printable-content h5,
-.printable-content h6 {
-    font-family: 'Lexend', sans-serif; /* This rule will now work correctly */
+.printable-content h4 {
+    font-family: 'Lexend', sans-serif;
     font-weight: 700;
-    color: #000000 !important;
+    color: #000000 !important; /* CRITICAL FIX */
     margin-top: 1.5em;
     margin-bottom: 0.5em;
-    line-height: 1.3;
+    line-height: 1.2;
+    text-align: left; 
+    page-break-after: avoid;
 }
-.printable-content h1 { font-size: 24pt; font-weight: 900; }
-.printable-content h2 { font-size: 18pt; }
-.printable-content h3 { font-size: 14pt; }
 
-.printable-content p { margin-bottom: 1em; }
-.printable-content strong { font-weight: 700; }
-.printable-content ul, .printable-content ol { padding-left: 2em; margin-bottom: 1em; }
-.printable-content blockquote { margin-left: 0; padding-left: 1.5em; border-left: 4px solid #cccccc; color: #333333 !important; font-style: italic; }
-.printable-content pre { background-color: #f5f5f5 !important; color: #000000 !important; padding: 1em !important; border-radius: 6px; font-size: 0.9em; border: 1px solid #dddddd; white-space: pre-wrap; }
-.printable-content code:not(pre > code) { background-color: #e9e9e9; color: #000000 !important; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }
-.printable-content img { max-width: 100%; height: auto; }
-.printable-content .katex-display { overflow-x: auto; overflow-y: hidden; }
+.print-title {
+    font-size: 24pt !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.1em !important;
+    color: #000000 !important; /* CRITICAL FIX */
+    line-height: 1.1 !important;
+}
 
+.print-subtitle {
+    font-size: 14pt !important;
+    font-weight: 500 !important;
+    color: #555555 !important; /* Dark Gray for subtitle */
+    margin-top: 0 !important;
+    margin-bottom: 1.5em !important;
+    border-bottom: 2px solid #000;
+    padding-bottom: 1em;
+    line-height: 1.3 !important;
+}
+
+/* --- TEXT ELEMENTS --- */
+.printable-content p {
+    margin-bottom: 1em;
+    orphans: 3;
+    widows: 3;
+    color: #000000 !important;
+}
+
+.printable-content strong { font-weight: 700; color: #000000 !important; }
+.printable-content em { font-style: italic; color: #333333 !important; }
+
+/* Lists */
+.printable-content ul, 
+.printable-content ol {
+    margin-bottom: 1em;
+    padding-left: 1.5em;
+    color: #000000 !important;
+}
+.printable-content li {
+    margin-bottom: 0.3em;
+    padding-left: 0.5em;
+}
+
+/* Blockquotes */
+.printable-content blockquote {
+    margin: 1.5em 0;
+    padding-left: 1em;
+    border-left: 4px solid #333;
+    font-style: italic;
+    background: #f9f9f9;
+    padding: 1em;
+    color: #333333 !important;
+}
+
+/* Code */
+.printable-content pre {
+    background-color: #f5f5f5 !important;
+    border: 1px solid #ddd;
+    padding: 1em;
+    border-radius: 4px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85em;
+    white-space: pre-wrap;
+    page-break-inside: avoid;
+    color: #000000 !important;
+}
+
+/* --- TABLES (Academic Standard) --- */
+.printable-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 2em 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+    border: 1px solid #000;
+    color: #000000 !important;
+}
+
+.printable-content th,
+.printable-content td {
+    border: 1px solid #000;
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+    color: #000000 !important;
+}
+
+.printable-content th {
+    background-color: #eee !important;
+    font-weight: 700;
+}
+
+/* --- IMAGES & MATH --- */
+.printable-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1.5em auto;
+}
+
+.printable-content .katex { 
+    font-size: 1.1em; 
+    color: #000000 !important; 
+}
+
+/* --- PRINT MEDIA QUERY (The "Ink" Engine) --- */
 @media print {
+
+    html, body {
+        height: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    @page {
+        size: A4;
+        margin: 2cm; /* PHYSICAL MARGINS ON PAPER */
+    }
+
+    .paper-sheet {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+        min-height: auto;
+        background: transparent !important;
+    }
+
     .no-print { display: none !important; }
-    body { margin: 0; }
-    pre, blockquote, img { page-break-inside: avoid; }
+    
+    a { color: #000 !important; text-decoration: underline; }
 }

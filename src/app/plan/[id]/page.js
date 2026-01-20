@@ -316,7 +316,7 @@ export default function PlanDetailPage() {
     <AppLayout session={session}>
         <Container size="xl" pt="sm" pb={120} px={{ base: 0, md: 'md' }} style={{
     position: 'relative',
-    maxWidth: isDesktop ? '76vw' : '100vw',
+    maxWidth: isDesktop ? '76vw' : '93vw',
   }}> 
             {loading ? (
                 <Group justify="center"><Loader color="white" /></Group>

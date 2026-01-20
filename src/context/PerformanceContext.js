@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { notifications } from '@mantine/notifications';
 import { IconBolt, IconCheck } from '@tabler/icons-react';
 import { Button, Group, Text } from '@mantine/core';
+import { usePathname } from 'next/navigation';
 
 const PerformanceContext = createContext();
 
@@ -17,6 +18,8 @@ export const PerformanceProvider = ({ children }) => {
     const fpsStartTime = useRef(0);
     const rafId = useRef(null);
 
+    const pathname = usePathname();
+
     // --- 1. INITIALIZATION & STORAGE CHECK ---
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -24,20 +27,29 @@ export const PerformanceProvider = ({ children }) => {
         const storedMode = localStorage.getItem('kalpad_perf_mode');
         
         if (storedMode === 'lite') {
-            // If already in Lite Mode, respect it and skip benchmark (save resources)
             setIsLiteMode(true);
             setIsLoaded(true);
         } else {
-            // If High Mode (or null), we ALWAYS run the benchmark to verify stability.
-            // The Watchdog never sleeps.
+            // Logic Update: 
+            // 1. Skip check on Landing Page ('/')
+            // 2. Delay check by 10 seconds to avoid initialization noise
+            
             if (storedMode === 'high') setIsLiteMode(false);
-            runBenchmark();
-        }
 
-        return () => {
-            if (rafId.current) cancelAnimationFrame(rafId.current);
-        };
-    }, []);
+            if (pathname !== '/') {
+                const timer = setTimeout(() => {
+                    runBenchmark();
+                }, 10000); // 10-second delay
+
+                return () => {
+                    clearTimeout(timer);
+                    if (rafId.current) cancelAnimationFrame(rafId.current);
+                };
+            } else {
+                setIsLoaded(true);
+            }
+        }
+    }, [pathname]); // Added pathname dependency
 
     // --- 2. THE FPS BENCHMARK ---
     const runBenchmark = () => {
@@ -60,15 +72,6 @@ export const PerformanceProvider = ({ children }) => {
                 // Threshold: If FPS < 35, suggest Lite Mode
                 if (fps < 35) {
                     promptForLiteMode(fps);
-                } else {
-                    // --- TEST: CONFIRM HIGH PERFORMANCE ---
-                    notifications.show({
-                        title: 'System Optimized',
-                        message: `Running smoothly at ${fps} FPS. High-fidelity visuals enabled.`,
-                        color: 'teal',
-                        icon: <IconCheck size={18} />,
-                        autoClose: 3000
-                    });
                 }
                 setIsLoaded(true);
             }
