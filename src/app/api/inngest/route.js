@@ -499,17 +499,102 @@ const scripterAgent = inngest.createFunction(
     // The rest of the logic remains the same
     updatedMarkdown = updatedMarkdown.replace(placeholder, `![${placeholderData.description}](${imageUrl})`);
 
-} else if (placeholderData.engine === 'mermaid') {
-                await step.sendEvent("dispatch-svg-render-job", {
-                    name: 'notes/svg.render.requested',
-                    data: {
-                        note_id,
-                        user_id,
-                        engine: 'mermaid',
-                        description: placeholderData.description,
-                        placeholder_text: placeholder
+} else if (placeholderData.engine === 'mermaid' || placeholderData.engine === 'd2') {
+                
+                // --- ATOMIC GENERATION & RENDER LOOP ---
+                // We combine generation and rendering into one step to allow for "Self-Healing"
+                // If the renderer rejects the code, we ask the AI to fix it immediately.
+                const imageUrl = await step.run(`atomic-heal-render-${placeholderData.engine}-${placeholderData.description.slice(0, 15)}`, async () => {
+                    const model = await getVertexAIModel("gemini-2.5-flash");
+                    const forgeUrl = process.env.MERMAID_FORGE_URL; // Assuming d2 uses same or similar service endpoint structure
+                    if (!forgeUrl) throw new Error("MERMAID_FORGE_URL not set");
+
+                    let lastError = null;
+                    let lastCode = null;
+                    let attempts = 0;
+                    const MAX_ATTEMPTS = 3;
+
+                    while (attempts < MAX_ATTEMPTS) {
+                        try {
+                            // 1. Generate Script
+                            let prompt = `You are an expert script generator for Mermaid.js diagrams. Convert the natural language description into a valid, complete script. Respond ONLY with the raw script code.
+            
+                            Engine: mermaid       
+                            Description: "${placeholderData.description}"
+
+                            CRITICAL MERMAID SYNTAX RULES (UNBREAKABLE):
+                            1.  Node Text: All text inside nodes MUST be enclosed in double quotes. Example: \`A["This is my text"]\`
+                            2.  Escaping Characters: You MUST replace special characters like \`[\`, \`]\`, \`{\`, \`}\`, \`(\`, \`)\` inside node text with their HTML entity codes. Example: To show \`arr[j]\`, you must write \`"arr&lsqb;j&rsqb;"\`.
+                            3.  Flowchart Declaration: Always start the script with \`graph TD;\`.
+                            4.  Do not add comments, markdown, explanations, or any other text.
+                            `;
+
+                            if (lastError) {
+                                prompt += `
+                                \n\nPREVIOUS ATTEMPT FAILED.
+                                Previous Code:
+                                ${lastCode}
+                                
+                                Error Message from Renderer:
+                                "${lastError}"
+                                
+                                TASK: Fix the syntax error based on the message above. Return ONLY the corrected code.
+                                `;
+                            }
+
+                            const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+                            const rawText = result.response.candidates[0].content.parts[0].text;
+                            
+                            // Sanitize
+                            const scriptMatch = rawText.match(/```(?:mermaid|d2)?([\s\S]*?)```/);
+                            const script = scriptMatch ? scriptMatch[1].trim() : rawText.trim();
+                            lastCode = script;
+
+                            // 2. Attempt Render (Call Microservice)
+                            // Note: Assuming your Forge service accepts { script: "..." } and returns SVG/PNG buffer
+                            const renderRes = await fetch(`${forgeUrl}/render`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    script, 
+                                    engine: placeholderData.engine // Pass engine if your service supports d2 switching
+                                })
+                            });
+
+                            if (!renderRes.ok) {
+                                const errText = await renderRes.text();
+                                // Capture the error to feed back to AI
+                                throw new Error(errText); 
+                            }
+
+                            // 3. Upload Result
+                            const imageContent = await renderRes.text(); // SVG string or Buffer
+                            const ext = placeholderData.engine === 'mermaid' ? '.svg' : '.png'; // Adjust based on your service output
+                            const contentType = placeholderData.engine === 'mermaid' ? 'image/svg+xml' : 'image/png';
+                            
+                            const storagePath = `generated-illustrations/${note_id}-${placeholderData.engine}-${Date.now()}${ext}`;
+                            const { error: uploadError } = await supabaseAdmin.storage
+                                .from('generated-illustrations')
+                                .upload(storagePath, imageContent, { contentType, upsert: true });
+
+                            if (uploadError) throw new Error(`Upload Failed: ${uploadError.message}`);
+
+                            const { data: { publicUrl } } = supabaseAdmin.storage.from('generated-illustrations').getPublicUrl(storagePath);
+                            
+                            return publicUrl; // Success! Break the loop.
+
+                        } catch (e) {
+                            console.warn(`Attempt ${attempts + 1} failed for ${placeholderData.engine}:`, e.message);
+                            lastError = e.message;
+                            attempts++;
+                        }
                     }
+                    
+                    throw new Error(`Failed to render ${placeholderData.engine} diagram after ${MAX_ATTEMPTS} attempts. Last error: ${lastError}`);
                 });
+
+                // Replace placeholder with the successful image
+                updatedMarkdown = updatedMarkdown.replace(placeholder, `![${placeholderData.description}](${imageUrl})`);
                 svgJobsDispatched++;
             }
         }
