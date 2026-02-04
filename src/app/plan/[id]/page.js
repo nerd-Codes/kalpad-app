@@ -268,7 +268,7 @@ export default function PlanDetailPage() {
 
     return (
     <AppLayout session={session}>
-        <Container size="xl" pt="sm" pb={120} pl={0} pr={0} style={{
+        <Container size="xl" pt="sm" pb={120} style={{
     maxWidth: isDesktop ? '76vw' : '93vw',
   }}> 
             {loading ? (
