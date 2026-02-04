@@ -92,7 +92,7 @@ function FloatingSidebar({ user, tier, onNavigate, onSignOut }) {
         { icon: IconLayoutDashboard, label: 'Dashboard', href: '/dashboard' },
         { icon: IconFileText, label: 'All Plans', href: '/plans' },
         { icon: IconPlus, label: 'New Plan', href: '/new-plan', id: 'new-plan-button' },
-        { icon: IconFlask, label: 'Research', href: '/research' }, 
+        // { icon: IconFlask, label: 'Research', href: '/research' }, 
     ];
 
     if (tier === 'free') {
@@ -247,7 +247,7 @@ function MobileNavbar({ user, tier, onNavigate, onSignOut, isLiteMode }) {
         { icon: IconLayoutDashboard, label: 'Home', href: '/dashboard' },
         { icon: IconPlus, label: 'Create', href: '/new-plan', id: 'new-plan-button' },
         { icon: IconFileText, label: 'Plans', href: '/plans' },
-        { icon: IconFlask, label: 'Research', href: '/research' }, 
+        // { icon: IconFlask, label: 'Research', href: '/research' }, 
     ];
 
     const backgroundStyle = isLiteMode ? {
