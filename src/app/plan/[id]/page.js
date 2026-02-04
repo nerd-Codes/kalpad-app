@@ -26,10 +26,7 @@ import { TimelineDayCard } from '@/components/TimelineDayCard';
 import { RegeneratePlanModal } from '@/components/RegeneratePlanModal';
 import { wittyFacts as cramSheetFacts } from '@/lib/newplanFacts';
 
-// Add Quiz Component Imports
-import { QuizSetupModal } from '@/components/QuizSetupModal';
-import { QuizRunner } from '@/components/QuizRunner';
-import { QuizResults } from '@/components/QuizResults';
+import { QuizOrchestratorModal } from '@/components/QuizOrchestratorModal';
 
 import Link from 'next/link';
 
@@ -68,51 +65,8 @@ export default function PlanDetailPage() {
     const mobileScrubberRef = useRef(null);
     const desktopScrubberRef = useRef(null);
 
-    // --- QUIZ STATE (Page Level) ---
-    const [quizSetupOpened, { open: openQuizSetup, close: closeQuizSetup }] = useDisclosure(false);
-    const [quizQuestions, setQuizQuestions] = useState(null);
-    const [quizResults, setQuizResults] = useState(null);
-    const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
-    const [isEvaluatingQuiz, setIsEvaluatingQuiz] = useState(false);
-    const [quizConfig, setQuizConfig] = useState(null);
+    const [quizOpened, { open: openQuiz, close: closeQuiz }] = useDisclosure(false);
 
-    // --- QUIZ HANDLERS ---
-    const handleStartDailyQuiz = async (config) => {
-        const currentDayTopic = plan.plan_topics[selectedDayIndex];
-        if (!currentDayTopic) return;
-
-        setIsGeneratingQuiz(true);
-        setQuizConfig(config);
-        closeQuizSetup();
-        try {
-            const response = await fetch('/api/generate-quiz', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan_topic_id: currentDayTopic.id, ...config }),
-            });
-            if (!response.ok) throw new Error((await response.json()).error);
-            setQuizQuestions((await response.json()).questions);
-        } catch (err) { notifications.show({ title: 'Error', message: err.message, color: 'red' }); } 
-        finally { setIsGeneratingQuiz(false); }
-    };
-    
-    const handleSubmitDailyQuiz = async (attempts) => {
-        const currentDayTopic = plan.plan_topics[selectedDayIndex];
-        setIsEvaluatingQuiz(true); 
-        setQuizQuestions(null);
-        try {
-             const response = await fetch('/api/evaluate-quiz-submission', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan_topic_id: currentDayTopic.id, attempts, quiz_mode: quizConfig.quiz_mode }),
-            });
-             if (!response.ok) throw new Error((await response.json()).error);
-             setQuizResults(await response.json());
-             // Optional: Refresh plan data to show updated confidence scores
-             fetchPlanData(session); 
-        } catch (err) { notifications.show({ title: 'Error', message: err.message, color: 'red' }); } 
-        finally { setIsEvaluatingQuiz(false); }
-    };
 
     // Modals & Jobs
     const [regenerateModalOpened, { open: openRegenerateModal, close: closeRegenerateModal }] = useDisclosure(false);
@@ -314,8 +268,7 @@ export default function PlanDetailPage() {
 
     return (
     <AppLayout session={session}>
-        <Container size="xl" pt="sm" pb={120} px={{ base: 0, md: 'md' }} style={{
-    position: 'relative',
+        <Container size="xl" pt="sm" pb={120} pl={0} pr={0} style={{
     maxWidth: isDesktop ? '76vw' : '93vw',
   }}> 
             {loading ? (
@@ -363,8 +316,7 @@ export default function PlanDetailPage() {
                                 <Button 
                                     variant="light" color="teal" radius="xl" size="xs"
                                     leftSection={<IconBrain size={16}/>} 
-                                    onClick={openQuizSetup} 
-                                    loading={isGeneratingQuiz}
+                                    onClick={openQuiz} 
                                 >
                                     Start Quiz
                                 </Button>
@@ -490,8 +442,7 @@ export default function PlanDetailPage() {
                                                 fullWidth
                                                 variant="light" color="teal" radius="xl"
                                                 leftSection={<IconBrain size={16}/>} 
-                                                onClick={openQuizSetup} 
-                                                loading={isGeneratingQuiz}
+                                                onClick={openQuiz} 
                                             >
                                                 Start Quiz
                                             </Button>
@@ -526,15 +477,12 @@ export default function PlanDetailPage() {
 
             {/* --- MODALS --- */}
 
-            <QuizSetupModal opened={quizSetupOpened} onClose={closeQuizSetup} onStartQuiz={handleStartDailyQuiz} isLoading={isGeneratingQuiz} zIndex={7000} />
-            
-            {quizQuestions && (
-                <QuizRunner questions={quizQuestions} onClose={() => setQuizQuestions(null)} onSubmit={handleSubmitDailyQuiz} zIndex={7000}/>
-            )}
-            
-            {quizResults && (
-                <QuizResults results={quizResults} onClose={() => setQuizResults(null)} onRetake={() => { setQuizResults(null); openQuizSetup(); }} zIndex={7000}/>
-            )}
+            {/* UNIFIED QUIZ ORCHESTRATOR */}
+            <QuizOrchestratorModal 
+                opened={quizOpened} 
+                onClose={closeQuiz} 
+                planTopicId={plan?.plan_topics[selectedDayIndex]?.id} 
+            />
 
             <RegeneratePlanModal opened={regenerateModalOpened} onClose={closeRegenerateModal} plan={plan} />
             

@@ -83,3 +83,18 @@ body.lite-mode * {
   animation-duration: 0s !important;
   transition-duration: 0s !important;
 }
+
+mark {
+  background: rgba(255, 255, 0, 0.2); /* Transparent Yellow */
+  color: inherit;
+  border-bottom: 2px solid #FFD700;
+  border-radius: 4px;
+  padding: 0 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+mark:hover {
+  background: rgba(255, 255, 0, 0.4);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}

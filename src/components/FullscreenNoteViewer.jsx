@@ -8,13 +8,15 @@ import {
 } from '@mantine/core';
 import { 
     IconCircleCheck, IconMessageQuestion, IconMessageCircle, IconBook, 
-    IconBulb, IconSparkles, IconFileExport, IconBolt, IconAward, IconX 
+    IconBulb, IconSparkles, IconFileExport, IconBolt, IconAward, IconX, IconHighlight 
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { Popover } from '@mantine/core';
 import { useTextSelection } from '../hooks/useTextSelection';
 import { notifications } from '@mantine/notifications';
 import { AnimatePresence, motion } from 'framer-motion';
+
+import supabase from '@/lib/supabaseClient'; 
 
 // --- KALPAD OS IMPORTS ---
 import { GlassCard } from '@/components/GlassCard';
@@ -65,6 +67,10 @@ const glassPopupStyles = {
 };
 
 export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet = false }) {
+    // --- 1. DATA EXTRACTION (MOVED UP) ---
+    // We must destructure this first so we can use `notes_markdown` in useState
+    const { notes_markdown = "No content available.", sub_topic = {}, day_topic = {}, exam_name = "Study Plan" } = noteData || {};
+
     const [renderContent, setRenderContent] = useState(false);
     const { selection, clearSelection } = useTextSelection();
     
@@ -78,6 +84,15 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
     const [aiResponse, setAiResponse] = useState(null);
     const [isExporting, setIsExporting] = useState(false);
 
+    // --- LOCAL STATE FOR INSTANT UPDATES ---
+    // Now valid because notes_markdown is defined above
+    const [localMarkdown, setLocalMarkdown] = useState(notes_markdown);
+
+    // Sync local state when the prop changes (e.g., opening a different note)
+    useEffect(() => {
+        setLocalMarkdown(notes_markdown);
+    }, [notes_markdown]);
+
     // --- EFFECTS ---
     useEffect(() => {
         if (noteData) {
@@ -90,17 +105,20 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
 
     if (!noteData) return null;
     
-    const { notes_markdown = "No content available.", sub_topic = {}, day_topic = {}, exam_name = "Study Plan" } = noteData;
-    
     // --- HANDLERS ---
-    const handleDoubtRequest = async (action, questionText = '') => {
+    const handleDoubtRequest = async (action, textOverride = null) => {
         setIsLoading(true); setError(null); setAiResponse(null); clearSelection(); closeFollowUpModal();
+        
+        // Determine the text to analyze: Override > Selection > undefined
+        const textToAnalyze = textOverride || selection.text;
+
         const bodyPayload = {
-            fullNoteContent: notes_markdown,
+            fullNoteContent: localMarkdown, // Use local state here too
             context: { examName: exam_name, dayTopic: day_topic.topic_name, subTopic: sub_topic.text },
             action: action,
-            highlightedText: action !== 'custom' ? selection.text : undefined,
-            question: action === 'custom' ? questionText : undefined,
+            // Logic: If action is custom, we don't need highlighted text. Otherwise, we do.
+            highlightedText: action !== 'custom' ? textToAnalyze : undefined,
+            question: action === 'custom' ? textOverride : undefined, // reused parameter name for custom question
         };
         try {
             const response = await fetch('/api/solve-doubt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyPayload) });
@@ -155,6 +173,56 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
             const finalStyle = isSvg ? { maxWidth: '100%', maxHeight: '1500px', borderRadius: '8px', background: 'black', padding: '0.5rem' } : { maxWidth: '100%', maxHeight: '1500px', borderRadius: '8px' };
             return <span style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}><img {...props} style={finalStyle} /></span>;
         },
+         mark: ({ node, ...props }) => {
+            // Convert children to string safely
+            const textContent = Array.isArray(props.children) 
+                ? props.children.join('') 
+                : props.children.toString();
+
+            return (
+                <Tooltip label="Click to Ask AI" withArrow zIndex={3100}>
+                    <mark 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            // Pass textContent as the second argument (textOverride)
+                            handleDoubtRequest('explain', textContent);
+                        }}
+                    >
+                        {props.children}
+                    </mark>
+                </Tooltip>
+            );
+        }
+    };
+
+    // --- HIGHLIGHT HANDLER ---
+    const handleHighlightSelection = async () => {
+        if (!selection.text) return;
+
+        // 1. Wrap in HTML using the CURRENT local state
+        const newMarkdown = localMarkdown.replace(
+            selection.text, 
+            `<mark>${selection.text}</mark>`
+        );
+
+        // 2. Optimistic UI Update (Instant)
+        setLocalMarkdown(newMarkdown);
+        clearSelection(); // Clear the browser selection immediately
+        
+        // 3. Persist to Database (Background)
+        try {
+            if (noteData.id) {
+                await supabase
+                    .from('generated_notes')
+                    .update({ notes_markdown: newMarkdown })
+                    .eq('id', noteData.id);
+                
+                // Optional: Update parent if needed, but local state handles the view
+                if (onUpdate) onUpdate(day_topic.id, { generated_notes: newMarkdown });
+            }
+        } catch (e) {
+            console.error("Highlight save failed", e);
+        }
     };
 
     // --- RENDER ---
@@ -187,9 +255,18 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
                         borderRadius: '99px'
                     }}>
                         <Group gap="xs">
-                            <Tooltip label="Explain" withArrow><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('explain')}><IconBook size={18} /></ActionIcon></Tooltip>
-                            <Tooltip label="Analogy" withArrow><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('analogy')}><IconBulb size={18} /></ActionIcon></Tooltip>
-                            <Tooltip label="Importance" withArrow><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('importance')}><IconMessageCircle size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Highlight & Save" withArrow zIndex={3100}>
+                                <ActionIcon 
+                                    variant="transparent" 
+                                    color="yellow" 
+                                    onClick={handleHighlightSelection}
+                                >
+                                    <IconHighlight size={18} />
+                                </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Explain" withArrow zIndex={3100}><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('explain')} ><IconBook size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Analogy" withArrow zIndex={3100}><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('analogy')} zIndex={3100}><IconBulb size={18} /></ActionIcon></Tooltip>
+                            <Tooltip label="Importance" withArrow zIndex={3100}><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('importance')} zIndex={3100}><IconMessageCircle size={18} /></ActionIcon></Tooltip>
                         </Group>
                     </Popover.Dropdown>
                 </Popover>
@@ -256,7 +333,7 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
                                         rehypePlugins={[rehypeRaw, rehypeKatex]}
                                         components={customRenderers}
                                     >
-                                        {notes_markdown}
+                                        {localMarkdown}
                                     </ReactMarkdown>
                                 </Box>
                             ) : (
@@ -270,7 +347,7 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
                 <Box 
                     style={{ 
                         position: 'fixed', 
-                        bottom: '2.5vh', 
+                        bottom: '32px', 
                         left: '50%', 
                         transform: 'translateX(-50%)', 
                         zIndex: 40 

@@ -116,9 +116,11 @@ export default function DashboardPage() {
     const todaysTopic = mostRecentPlan?.plan_topics.find(t => isToday(new Date(t.date)));
     const examDates = plans.map(p => p.exam_date);
 
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+
     return (
         <AppLayout session={session}>
-            <Container size="xl" pt="sm">
+            <Container size="xl" pt="sm" pl={0} pr={0} style={{ maxWidth: isDesktop ? '100vw' : '90vw', }}>
                 <Box mb={32}>
                     <Text size="sm" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: '0.1em' }}>
                         {format(new Date(), 'EEEE, MMMM do')}
@@ -129,7 +131,7 @@ export default function DashboardPage() {
                 </Box>
 
                 {loading ? <Group justify="center"><Loader color="white"/></Group> : (
-                    <Grid gutter="xl" maxWidth="90vw">
+                    <Grid gutter="xl" >
                         {/* --- LEFT COLUMN (FOCUS & Timeline) - Spans 8 cols --- */}
                         <Grid.Col span={{ base: 12, lg: 8 }}>
                             <Stack gap="lg">
@@ -139,6 +141,10 @@ export default function DashboardPage() {
                                     todaysTopic={todaysTopic} 
                                     onJumpBackIn={(id) => { setIsLoading(true); router.push(`/plan/${id}`); }} 
                                 />
+                                <Group justify="space-between" px="xs">
+                                        <Text size="sm" fw={600} c="dimmed" tt="uppercase">Today's Tasks</Text>
+                                        <Text size="xs" c="dimmed">{dailyTasks.length} Study Plans</Text>
+                                    </Group>
                                 <GlassCard p="lg" maxWidth="90vw">
                                     <CalendarStrip 
                                         selectedDate={selectedDate} 
@@ -148,10 +154,7 @@ export default function DashboardPage() {
                                 </GlassCard>
 
                                 <Stack gap="md" maxWidth="90vw">
-                                    <Group justify="space-between" px="xs">
-                                        <Text size="sm" fw={600} c="dimmed" tt="uppercase">Agenda</Text>
-                                        <Text size="xs" c="dimmed">{dailyTasks.length} Sessions</Text>
-                                    </Group>
+                                    
 
                                     {timelineLoading && <Loader size="sm" mx="auto" />}
                                     

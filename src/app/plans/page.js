@@ -249,9 +249,11 @@ export default function AllPlansPage() {
         );
     };
 
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+
     return (
         <AppLayout session={session}>
-            <Container size="xl" pt="sm">
+            <Container size="xl" pt="sm" pl={0} pr={0} style={{ maxWidth: isDesktop ? '100vw' : '90vw', }}>
                 
                 {/* --- HEADER: TITLE & STATS --- */}
                 <Group justify="space-between" align="end" mb={40}>

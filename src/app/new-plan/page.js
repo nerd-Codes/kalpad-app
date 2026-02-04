@@ -512,7 +512,7 @@ const handleProcessFile = async () => {
                 }
             `}</style>
 
-            <Container size="xl" pt="md" px="md" style={{position: 'relative', maxWidth: isDesktop ? '100vw' : '90vw',}} className="no-scrollbar">
+            <Container size="xl" pt="md" pl={0} pr={0} style={{position: 'relative', maxWidth: isDesktop ? '100vw' : '90vw',}} className="no-scrollbar">
                  {isCreationBlocked && (
                     <Alert 
                         variant="light" 

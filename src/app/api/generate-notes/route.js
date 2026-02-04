@@ -231,7 +231,7 @@ const examPersona = JSON.parse(personaResult.response.candidates[0].content.part
      **ILLUSTRATION & DIAGRAMS (STRICT GUIDELINES):**
       Your goal is to be a brilliant author, not just a graph generator.
       1.  **UNBREAKABLE RULE #2: EXTREME CONSERVATISM.** Illustrations are a high-cost feature. You must only request one if a core concept is **truly impossible** to explain clearly with text and examples alone.
-      2.  **UNBREAKABLE RULE #3: SUPPORTED ENGINES ONLY.** You are authorized to use ONLY two engines: **'mermaid'** for flowcharts/diagrams and **'matplotlib'** for graphs/plots.** Do not request any other type of illustration.
+      2.  **UNBREAKABLE RULE #3: SUPPORTED ENGINES ONLY.** You are authorized to use ONLY two engines: **'mermaid'** for flowcharts and **'matplotlib'** for graphs/plots.** Do not request any other type of illustration.
       3.  **Placement:** Insert the placeholder immediately after the paragraph that explains the concept.
       
       Example for a Flowchart:
