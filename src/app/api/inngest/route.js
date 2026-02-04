@@ -11,6 +11,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { getVertexAIModel } from "@/lib/vertexai";
+import axios from 'axios'; // Using Axios for robust binary handling
+import { generateEmbeddings } from "@/lib/vertexEmbedding";
 
 import which from 'which'; 
 
@@ -499,17 +501,102 @@ const scripterAgent = inngest.createFunction(
     // The rest of the logic remains the same
     updatedMarkdown = updatedMarkdown.replace(placeholder, `![${placeholderData.description}](${imageUrl})`);
 
-} else if (placeholderData.engine === 'mermaid') {
-                await step.sendEvent("dispatch-svg-render-job", {
-                    name: 'notes/svg.render.requested',
-                    data: {
-                        note_id,
-                        user_id,
-                        engine: 'mermaid',
-                        description: placeholderData.description,
-                        placeholder_text: placeholder
+ } else if (placeholderData.engine === 'mermaid' || placeholderData.engine === 'd2') {
+                
+                // --- ATOMIC GENERATION & RENDER LOOP ---
+                // We combine generation and rendering into one step to allow for "Self-Healing"
+                // If the renderer rejects the code, we ask the AI to fix it immediately.
+                const imageUrl = await step.run(`atomic-heal-render-${placeholderData.engine}-${placeholderData.description.slice(0, 15)}`, async () => {
+                    const model = await getVertexAIModel("gemini-2.5-flash");
+                    const forgeUrl = process.env.MERMAID_FORGE_URL; // Assuming d2 uses same or similar service endpoint structure
+                    if (!forgeUrl) throw new Error("MERMAID_FORGE_URL not set");
+
+                    let lastError = null;
+                    let lastCode = null;
+                    let attempts = 0;
+                    const MAX_ATTEMPTS = 3;
+
+                    while (attempts < MAX_ATTEMPTS) {
+                        try {
+                            // 1. Generate Script
+                            let prompt = `You are an expert script generator for Mermaid.js diagrams. Convert the natural language description into a valid, complete script. Respond ONLY with the raw script code.
+            
+                            Engine: mermaid       
+                            Description: "${placeholderData.description}"
+
+                            CRITICAL MERMAID SYNTAX RULES (UNBREAKABLE):
+                            1.  Node Text: All text inside nodes MUST be enclosed in double quotes. Example: \`A["This is my text"]\`
+                            2.  Escaping Characters: You MUST replace special characters like \`[\`, \`]\`, \`{\`, \`}\`, \`(\`, \`)\` inside node text with their HTML entity codes. Example: To show \`arr[j]\`, you must write \`"arr&lsqb;j&rsqb;"\`.
+                            3.  Flowchart Declaration: Always start the script with \`graph TD;\`.
+                            4.  Do not add comments, markdown, explanations, or any other text.
+                            `;
+
+                            if (lastError) {
+                                prompt += `
+                                \n\nPREVIOUS ATTEMPT FAILED.
+                                Previous Code:
+                                ${lastCode}
+                                
+                                Error Message from Renderer:
+                                "${lastError}"
+                                
+                                TASK: Fix the syntax error based on the message above. Return ONLY the corrected code.
+                                `;
+                            }
+
+                            const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+                            const rawText = result.response.candidates[0].content.parts[0].text;
+                            
+                            // Sanitize
+                            const scriptMatch = rawText.match(/```(?:mermaid|d2)?([\s\S]*?)```/);
+                            const script = scriptMatch ? scriptMatch[1].trim() : rawText.trim();
+                            lastCode = script;
+
+                            // 2. Attempt Render (Call Microservice)
+                            // Note: Assuming your Forge service accepts { script: "..." } and returns SVG/PNG buffer
+                            const renderRes = await fetch(`${forgeUrl}/render`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    script, 
+                                    engine: placeholderData.engine // Pass engine if your service supports d2 switching
+                                })
+                            });
+
+                            if (!renderRes.ok) {
+                                const errText = await renderRes.text();
+                                // Capture the error to feed back to AI
+                                throw new Error(errText); 
+                            }
+
+                            // 3. Upload Result
+                            const imageContent = await renderRes.text(); // SVG string or Buffer
+                            const ext = placeholderData.engine === 'mermaid' ? '.svg' : '.png'; // Adjust based on your service output
+                            const contentType = placeholderData.engine === 'mermaid' ? 'image/svg+xml' : 'image/png';
+                            
+                            const storagePath = `generated-illustrations/${note_id}-${placeholderData.engine}-${Date.now()}${ext}`;
+                            const { error: uploadError } = await supabaseAdmin.storage
+                                .from('generated-illustrations')
+                                .upload(storagePath, imageContent, { contentType, upsert: true });
+
+                            if (uploadError) throw new Error(`Upload Failed: ${uploadError.message}`);
+
+                            const { data: { publicUrl } } = supabaseAdmin.storage.from('generated-illustrations').getPublicUrl(storagePath);
+                            
+                            return publicUrl; // Success! Break the loop.
+
+                        } catch (e) {
+                            console.warn(`Attempt ${attempts + 1} failed for ${placeholderData.engine}:`, e.message);
+                            lastError = e.message;
+                            attempts++;
+                        }
                     }
+                    
+                    throw new Error(`Failed to render ${placeholderData.engine} diagram after ${MAX_ATTEMPTS} attempts. Last error: ${lastError}`);
                 });
+
+                // Replace placeholder with the successful image
+                updatedMarkdown = updatedMarkdown.replace(placeholder, `![${placeholderData.description}](${imageUrl})`);
                 svgJobsDispatched++;
             }
         }
@@ -653,6 +740,247 @@ const finalUpdaterAgent = inngest.createFunction(
     }
 );
 
+// --- ANALYST AGENT (Version 5: Fallback Enabled) ---
+const analystAgent = inngest.createFunction(
+    { 
+        id: "curie-analyst-agent", 
+        name: "Research Analyst: PDF Processor",
+        concurrency: 2,
+        retries: 0 // No retries. If it fails, we want to know immediately.
+    },
+    { event: "research/paper.added" },
+    async ({ event, step }) => {
+        const { paper_id } = event.data;
+        const CORTEX_URL = process.env.CORTEX_URL;
+
+        if (!CORTEX_URL) throw new Error("CORTEX_URL is not set.");
+
+        // 1. Update Status to 'Processing'
+        await step.run("update-status-processing", async () => {
+            await supabaseAdmin
+                .from('research_papers')
+                .update({ status: 'processing' })
+                .eq('id', paper_id);
+        });
+
+        // 2. Fetch Metadata
+        const paper = await step.run("fetch-metadata", async () => {
+            const { data, error } = await supabaseAdmin
+                .from('research_papers')
+                .select('*')
+                .eq('id', paper_id)
+                .single();
+            if (error) throw new Error(error.message);
+            return data;
+        });
+
+        // 3. Acquire PDF Buffer (With Fallback Logic)
+        const pdfResult = await step.run("acquire-pdf-buffer", async () => {
+            try {
+                // A. User Upload (Supabase) - TRUSTED SOURCE
+                // If this exists, the user manually uploaded it, or we fetched it successfully before.
+                if (paper.pdf_path) {
+                    const { data, error } = await supabaseAdmin.storage
+                        .from('study-materials')
+                        .download(paper.pdf_path);
+                    
+                    if (error) throw new Error(`Storage Download Failed: ${error.message}`);
+                    const buffer = await data.arrayBuffer();
+                    return { success: true, buffer: Buffer.from(buffer).toString('base64') };
+                } 
+                
+                // B. Open Access URL - HOSTILE SOURCE
+                // Only try this if we don't have a local copy
+                if (paper.source_url) {
+                    let targetUrl = paper.source_url;
+
+                    // ArXiv HTML -> PDF Fix
+                    if (targetUrl.includes('arxiv.org/abs/')) {
+                        targetUrl = targetUrl.replace('/abs/', '/pdf/');
+                    }
+                    if (targetUrl.includes('arxiv.org') && !targetUrl.endsWith('.pdf')) {
+                        targetUrl += '.pdf';
+                    }
+
+                    console.log(`Attempting Download: ${targetUrl}`);
+
+                    // Stealth Request
+                    const response = await axios.get(targetUrl, {
+                        responseType: 'arraybuffer',
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                            'Referer': 'https://www.google.com/'
+                        },
+                        timeout: 15000 // 15s timeout
+                    });
+
+                    // Check for valid PDF content type
+                    const contentType = response.headers['content-type'];
+                    if (contentType && !contentType.includes('pdf') && !contentType.includes('octet-stream')) {
+                        throw new Error(`Invalid Content-Type: ${contentType}. Likely a landing page.`);
+                    }
+
+                    return { success: true, buffer: Buffer.from(response.data).toString('base64') };
+                }
+
+                throw new Error("No source URL or Upload found.");
+
+            } catch (error) {
+                console.error("Download Error:", error.message);
+                // Return failure object instead of throwing, so we can handle it in the next step
+                return { success: false, error: error.message };
+            }
+        });
+
+        // 3.5 HANDLE FAILURE (The Logic You Requested)
+        if (!pdfResult.success) {
+            await step.run("mark-as-upload-needed", async () => {
+                await supabaseAdmin
+                    .from('research_papers')
+                    .update({ 
+                        status: 'upload_needed', // <--- THE KEY CHANGE
+                        analyst_output: { 
+                            error: `Automatic access failed (${pdfResult.error}). Please upload the PDF manually.` 
+                        } 
+                    })
+                    .eq('id', paper_id);
+            });
+            
+            // Stop the function cleanly. 
+            // The frontend will now see 'upload_needed' and show the Orange button.
+            return { message: "Analysis paused. Waiting for user upload.", error: pdfResult.error };
+        }
+
+        // --- IF SUCCESSFUL, PROCEED TO CORTEX ---
+        const pdfBuffer = Buffer.from(pdfResult.buffer, 'base64');
+
+        // 4. Send to Cortex
+        const markdown = await step.run("cortex-extraction", async () => {
+            const formData = new FormData();
+            const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
+            formData.append('file', blob, 'paper.pdf');
+
+            const response = await fetch(`${CORTEX_URL}/process`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error(`Cortex Error: ${await response.text()}`);
+            const data = await response.json();
+            return data.markdown;
+        });
+
+        // 5. Gemini Analysis
+        const analysis = await step.run("gemini-analysis", async () => {
+            const model = await getVertexAIModel("gemini-2.5-pro", { responseMimeType: "application/json" });
+            const prompt = `
+            You are an Expert Research Analyst. Analyze this academic paper.
+            
+            **TASK:** Extract the following into a strict JSON structure.
+            1. **core_hypothesis**: What is the main claim or problem being solved? (2-3 sentences)
+            2. **methodology**: How did they do it? (Bullet points)
+            3. **key_findings**: What were the results? (Bullet points)
+            4. **limitations**: What did the authors admit they didn't solve?
+            5. **future_work**: What do they suggest for next steps?
+            6. **research_gaps**: Based on the limitations, what is a specific, viable research direction for a new student?
+            
+            **INPUT TEXT (MARKDOWN):**
+            ${markdown} 
+            `;
+            
+            const result = await model.generateContent(prompt);
+            return JSON.parse(result.response.candidates[0].content.parts[0].text);
+        });
+
+        // 6. Save Analysis
+        await step.run("save-analysis", async () => {
+            await supabaseAdmin
+                .from('research_papers')
+                .update({
+                    full_text_markdown: markdown,
+                    analyst_output: analysis,
+                    status: 'analyzed'
+                })
+                .eq('id', paper_id);
+        });
+
+        // 7. Trigger Step 2: Vectorization
+        await step.sendEvent("trigger-vectorizer", {
+            name: "research/vectorization.requested",
+            data: { paper_id, project_id: paper.project_id }
+        });
+
+        return { success: true };
+    }
+);
+
+
+const vectorizerAgent = inngest.createFunction(
+    { 
+        id: "curie-vectorizer-agent", 
+        name: "Research Vectorizer: Memory Maker",
+        concurrency: 4 
+    },
+    { event: "research/vectorization.requested" },
+    async ({ event, step }) => {
+        const { paper_id, project_id } = event.data;
+
+        // 1. Fetch Clean Markdown
+        const paper = await step.run("fetch-markdown", async () => {
+            const { data } = await supabaseAdmin
+                .from('research_papers')
+                .select('full_text_markdown')
+                .eq('id', paper_id)
+                .single();
+            return data;
+        });
+
+        if (!paper.full_text_markdown) return { message: "No text to vectorize." };
+
+        // 2. Smart Chunking (Sliding Window)
+        const chunks = await step.run("chunk-text", async () => {
+            const text = paper.full_text_markdown;
+            const CHUNK_SIZE = 1000; // Characters approx
+            const OVERLAP = 100;
+            
+            const chunks = [];
+            for (let i = 0; i < text.length; i += (CHUNK_SIZE - OVERLAP)) {
+                chunks.push(text.substring(i, i + CHUNK_SIZE));
+            }
+            return chunks;
+        });
+
+        // 3. Generate Embeddings (Batch Process)
+        // Vertex AI limits batch size (usually 5-20 per call). We'll batch carefully.
+        const BATCH_SIZE = 5; 
+        
+        for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+            await step.run(`vectorize-batch-${i}`, async () => {
+                const batch = chunks.slice(i, i + BATCH_SIZE);
+                
+                // Call our new utility
+                const vectors = await generateEmbeddings(batch, 'RETRIEVAL_DOCUMENT');
+
+                // Prepare DB Insert payload
+                const rows = batch.map((chunk, idx) => ({
+                    paper_id: paper_id,
+                    content_chunk: chunk,
+                    embedding: vectors[idx] // This is the [float, float...] array
+                }));
+
+                const { error } = await supabaseAdmin
+                    .from('research_vectors')
+                    .insert(rows);
+
+                if (error) throw new Error(error.message);
+            });
+        }
+
+        return { message: `Vectorized ${chunks.length} chunks.` };
+    }
+);
+
 // --- FINAL STEP: REGISTER THE NEW FUNCTIONS ---
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -660,7 +988,9 @@ export const { GET, POST, PUT } = serve({
         curationPipeline, 
         scripterAgent, 
         svgRendererAgent,
-        finalUpdaterAgent
+        finalUpdaterAgent,
+        analystAgent,
+        vectorizerAgent
 
     ],
 });

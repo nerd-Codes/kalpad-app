@@ -72,3 +72,23 @@
   .blob2 { width: 350px; height: 350px; }
   .blob3 { width: 250px; height: 250px; }
 }
+
+/* Add these to your CSS module */
+
+.blobResearch1 {
+  width: 600px;
+  height: 600px;
+  background: rgba(85, 56, 248, 0.15); /* Lab Blue */
+  bottom: -20%;
+  left: 10%;
+  animation: animate-blob 20s infinite alternate;
+}
+
+.blobResearch2 {
+  width: 500px;
+  height: 500px;
+  background: rgba(56, 189, 248, 0.1); /* Cyan */
+  top: -10%;
+  right: -10%;
+  animation: animate-blob 25s infinite alternate-reverse;
+}
