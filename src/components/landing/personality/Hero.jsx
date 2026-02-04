@@ -196,7 +196,7 @@ export function Hero() {
                                 <Interactive>
                                     <Button
                                         component="a"
-                                        href="/android/kalpad.apk"
+                                        href="https://fwibambhxyjklrcnqdse.supabase.co/storage/v1/object/public/androoid/KalPad.apk"
                                         target="_blank"
                                         download="KalPad.apk"
                                         size="xl"
