@@ -127,12 +127,14 @@ export default function PlanDetailPage() {
             setPlan(data);
             setCramSheet(data.generated_cram_sheets?.[0] || null);
 
-            // Auto-select "Today" only on first load
-            const todayIndex = data.plan_topics.findIndex(t => isToday(parseISO(t.date))) - 1;
-            if (todayIndex !== -1) {
-                setSelectedDayIndex(todayIndex);
-                setTimeout(() => scrollToDay(todayIndex), 500); 
+            // Auto-select "Today" or default to first day
+            let initialDayIndex = data.plan_topics.findIndex(t => isToday(parseISO(t.date)));
+            // If no "Today" is found (e.g., past plan), default to Day 1 (index 0)
+            if (initialDayIndex === -1) {
+                initialDayIndex = 0; 
             }
+            setSelectedDayIndex(initialDayIndex);
+            setTimeout(() => scrollToDay(initialDayIndex), 500);
 
             if (window.Android?.cachePlanForOffline) window.Android.cachePlanForOffline(JSON.stringify(data));
         } catch (err) { setError(err.message); } finally { setLoading(false); }
@@ -461,7 +463,8 @@ export default function PlanDetailPage() {
                             {/* --- LEFT: ACTIVE CARD --- */}
                             <Grid.Col span={{ base: 12, md: 8 }}>
                                 <AnimatePresence mode="wait">
-                                    {plan.plan_topics[selectedDayIndex] && (
+                                    {/* --- FIX: GUARD AGAINST UNDEFINED --- */}
+                                    {plan.plan_topics && plan.plan_topics[selectedDayIndex] ? (
                                         <motion.div
                                             key={selectedDayIndex}
                                             initial={{ opacity: 0, x: 20 }}
@@ -478,6 +481,8 @@ export default function PlanDetailPage() {
                                                 onConfirmBulkGenerate={handleConfirmBulkGenerate} 
                                             />
                                         </motion.div>
+                                    ) : (
+                                        <GlassCard><Text c="dimmed">No topics found for this day.</Text></GlassCard>
                                     )}
                                 </AnimatePresence>
                             </Grid.Col>
@@ -509,14 +514,19 @@ export default function PlanDetailPage() {
                                     <GlassCard p="lg">
                                         <Stack gap="xs">
                                             <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Details</Text>
-                                            <Group justify="space-between">
-                                                <Text size="sm" c="dimmed">Date</Text>
-                                                <Text size="sm" fw={500}>{format(parseISO(plan.plan_topics[selectedDayIndex].date), 'MMM do, yyyy')}</Text>
-                                            </Group>
-                                            <Group justify="space-between">
-                                                <Text size="sm" c="dimmed">Tasks</Text>
-                                                <Text size="sm" fw={500}>{plan.plan_topics[selectedDayIndex].sub_topics.length} items</Text>
-                                            </Group>
+                                            {/* --- FIX: GUARD AGAINST UNDEFINED --- */}
+                                            {plan.plan_topics && plan.plan_topics[selectedDayIndex] && (
+                                                <>
+                                                    <Group justify="space-between">
+                                                        <Text size="sm" c="dimmed">Date</Text>
+                                                        <Text size="sm" fw={500}>{format(parseISO(plan.plan_topics[selectedDayIndex].date), 'MMM do, yyyy')}</Text>
+                                                    </Group>
+                                                    <Group justify="space-between">
+                                                        <Text size="sm" c="dimmed">Tasks</Text>
+                                                        <Text size="sm" fw={500}>{plan.plan_topics[selectedDayIndex].sub_topics.length} items</Text>
+                                                    </Group>
+                                                </>
+                                            )}
                                         </Stack>
                                     </GlassCard>
                                 </Stack>
