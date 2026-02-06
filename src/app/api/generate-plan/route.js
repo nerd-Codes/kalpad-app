@@ -423,47 +423,47 @@ export async function POST(request) {
         
         let retrievedContext = "No documents were used for context.";
     // Only allow RAG if documents are requested AND the user is not a guest
-    if (useDocuments && !isGuest) {
-            streamUpdate('status', 'Processing documents with semantic search...');
+    // if (useDocuments && !isGuest) {
+    //         streamUpdate('status', 'Processing documents with semantic search...');
             
-            // --- DEFINITIVE FIX V4: Use the PredictionServiceClient for embeddings ---
-           const syllabusTopics = getTopicsFromSyllabus(syllabus);
-            let allMatches = [];
-            const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
+    //         // --- DEFINITIVE FIX V4: Use the PredictionServiceClient for embeddings ---
+    //        const syllabusTopics = getTopicsFromSyllabus(syllabus);
+    //         let allMatches = [];
+    //         const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
 
-            for (const [index, topic] of syllabusTopics.entries()) {
-              streamUpdate('status', `Analyzing syllabus topic ${index + 1}/${syllabusTopics.length}: "${topic}"`);
+    //         for (const [index, topic] of syllabusTopics.entries()) {
+    //           streamUpdate('status', `Analyzing syllabus topic ${index + 1}/${syllabusTopics.length}: "${topic}"`);
               
-              // Use the original, working embedContent method
-              const result = await embeddingModel.embedContent(topic);
+    //           // Use the original, working embedContent method
+    //           const result = await embeddingModel.embedContent(topic);
               
-              const { data: matches, error } = await supabase.rpc('match_documents', {
-                  // Parse the response from the old SDK's structure
-                  query_embedding: result.embedding.values,
-                  match_count: 2,
-                  target_user_id: session.user.id
-              });
+    //           const { data: matches, error } = await supabase.rpc('match_documents', {
+    //               // Parse the response from the old SDK's structure
+    //               query_embedding: result.embedding.values,
+    //               match_count: 2,
+    //               target_user_id: session.user.id
+    //           });
 
-              if (error) { 
-                console.error(`Error matching documents for topic "${topic}":`, error); 
-                continue; 
-              }
+    //           if (error) { 
+    //             console.error(`Error matching documents for topic "${topic}":`, error); 
+    //             continue; 
+    //           }
               
-              if (matches && matches.length > 0) { 
-                allMatches.push(`For topic "${topic}", notes say: """${matches.map(m => m.content).join('\n---\n')}"""`); 
-              }
-            }
-            if (allMatches.length > 0) { 
-              retrievedContext = allMatches.join('\n\n');
-              streamUpdate('status', 'Document analysis complete. Building strategy...');
-            } 
-            else { 
-              retrievedContext = "No relevant info found in documents for this syllabus."; 
-              streamUpdate('status', 'No relevant documents found. Building general strategy...');
-            }
-        } else {
-          streamUpdate('status', 'Building strategy...');
-        }
+    //           if (matches && matches.length > 0) { 
+    //             allMatches.push(`For topic "${topic}", notes say: """${matches.map(m => m.content).join('\n---\n')}"""`); 
+    //           }
+    //         }
+    //         if (allMatches.length > 0) { 
+    //           retrievedContext = allMatches.join('\n\n');
+    //           streamUpdate('status', 'Document analysis complete. Building strategy...');
+    //         } 
+    //         else { 
+    //           retrievedContext = "No relevant info found in documents for this syllabus."; 
+    //           streamUpdate('status', 'No relevant documents found. Building general strategy...');
+    //         }
+    //     } else {
+    //       streamUpdate('status', 'Building strategy...');
+    //     }
         
         // --- VERTEX AI MIGRATION: USE CENTRALIZED GENERATIVE MODEL ---
         const plannerModel = await getVertexAIModel('gemini-2.5-flash', { responseMimeType: "application/json" });
