@@ -24,7 +24,7 @@ export const metadata = {
     description: 'The brutally honest AI partner that turns academic chaos into a clear battle plan. Built by a student, for students.',
     images: [
       {
-        url: 'https://kalpad-app.vercel.app/og-image.jpeg', // Absolute URL
+        url: 'https://kalpad-app.vercel.app/og-image.png', // Absolute URL
         width: 1890,
         height: 1035,
         alt: 'KalPad - The greatest minds did not waste their cognitive budget on menial tasks.',
