@@ -42,7 +42,7 @@ const TYPE_COLORS = {
     default: 'gray'
 };
 
-export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan', isReadOnly = false, onConfirmBulkGenerate, isGuestMode = false }) {
+export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed, onNoteGenerated, viewMode = 'plan', isReadOnly = false, onConfirmBulkGenerate, isGuestMode = false, setPlan }) {
     const { setIsLoading } = useLoading();
     const { guestArtifact, updateGuestNote } = useGuest();
 
@@ -102,7 +102,8 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
 
     const handleGenerateNotes = async (subTopicText) => {
         if (isGuestMode) {
-             const currentNotes = guestArtifact?.generatedNotes || [];
+            // ... (Guest mode logic is unchanged)
+            const currentNotes = guestArtifact?.generatedNotes || [];
              if (currentNotes.length >= 1) {
                  notifications.show({ title: 'Guest Limit', message: 'Sign up to generate unlimited notes.', color: 'orange' });
                  return;
@@ -122,20 +123,43 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                 body: JSON.stringify({
                     plan_topic_id: isGuestMode ? 0 : dayTopic.id,
                     sub_topic_text: subTopicText,
-                    exam_name: isGuestMode ? plan.exam_name : dayTopic.exam_name, 
+                    exam_name: isGuestMode ? plan.exam_name : plan.exam_name, // Use plan.exam_name for consistency
                     day_topic: dayTopic.topic_name,
                 }),
             });
 
             if (!response.ok) throw new Error((await response.json()).error);
-            const data = await response.json();
+            const { note: newNote } = await response.json();
 
+            // --- REACTIVE UI LOGIC ---
             if (isGuestMode) {
-                 updateGuestNote(dayTopic.day, subTopicText, data.note.notes_markdown);
+                 updateGuestNote(dayTopic.day, subTopicText, newNote.notes_markdown);
                  notifications.show({ title: 'Sample Note Forged', message: 'Sign up to save.', color: 'teal' });
+            } else if (setPlan) {
+                // Perform local mutation instead of full refresh
+                setPlan(currentPlan => {
+                    const newPlanTopics = currentPlan.plan_topics.map(topic => {
+                        if (topic.id === dayTopic.id) {
+                            // Find the note if it already exists to update it, otherwise add it
+                            const existingNoteIndex = topic.new_notes.findIndex(n => n.sub_topic_text === subTopicText);
+                            let updatedNotes;
+                            if (existingNoteIndex > -1) {
+                                updatedNotes = [...topic.new_notes];
+                                updatedNotes[existingNoteIndex] = newNote;
+                            } else {
+                                updatedNotes = [...topic.new_notes, newNote];
+                            }
+                            return { ...topic, new_notes: updatedNotes };
+                        }
+                        return topic;
+                    });
+                    return { ...currentPlan, plan_topics: newPlanTopics };
+                });
+                notifications.show({ title: 'Note Synced', message: 'Your timeline has updated instantly.', color: 'teal' });
             } else {
+                // Fallback to old method if setPlan is not provided
                 if (onNoteGenerated) await onNoteGenerated();
-                notifications.show({ title: 'Note Synced', message: 'Added to your dossier.', color: 'teal' });
+                notifications.show({ title: 'Note Synced', message: 'Reloading data...', color: 'teal' });
             }
 
         } catch (err) {
@@ -189,7 +213,11 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
         setIsBulkGenerating(true); closeBulkNoteModal();
         let completedCount = 0;
         const notificationId = `bulk-notes-${dayTopic.id}`;
-        notifications.show({ id: notificationId, loading: true, title: `Forging Notes...`, message: 'Starting...', autoClose: false, withCloseButton: false });
+        
+        notifications.show({ id: notificationId, loading: true, title: `Forging Notes... (0/${bulkNoteSelection.length})`, message: 'Starting...', autoClose: false, withCloseButton: false });
+
+        // --- THE FIX: We collect the new notes first ---
+        let newlyGeneratedNotes = [];
 
         for (const subTopicText of bulkNoteSelection) {
             try {
@@ -198,16 +226,39 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ plan_topic_id: dayTopic.id, sub_topic_text: subTopicText, exam_name: plan.exam_name, day_topic: dayTopic.topic_name }),
                 });
+
                 if (response.ok) {
+                    const { note } = await response.json();
+                    newlyGeneratedNotes.push(note); // Collect the note object
                     completedCount++;
                     notifications.update({ id: notificationId, title: `Forging... (${completedCount}/${bulkNoteSelection.length})`, message: `Done: ${subTopicText}` });
                 }
-                if (onNoteGenerated) await onNoteGenerated();
+                
+                // We add a small delay to avoid overwhelming the API
                 await new Promise(resolve => setTimeout(resolve, 1500));
+
             } catch (err) { console.error(err); }
         }
-        notifications.update({ id: notificationId, loading: false, color: 'teal', title: 'Done', message: `Forged ${completedCount} notes.`, autoClose: 5000 });
-        setIsBulkGenerating(false); setBulkNoteSelection([]);
+
+        // --- The Fix: Perform ONE state update at the end ---
+        if (setPlan && newlyGeneratedNotes.length > 0) {
+            setPlan(currentPlan => {
+                const newPlanTopics = currentPlan.plan_topics.map(topic => {
+                    if (topic.id === dayTopic.id) {
+                        // Merge the newly generated notes with any existing ones
+                        const existingNotes = new Map(topic.new_notes.map(n => [n.sub_topic_text, n]));
+                        newlyGeneratedNotes.forEach(n => existingNotes.set(n.sub_topic_text, n));
+                        return { ...topic, new_notes: Array.from(existingNotes.values()) };
+                    }
+                    return topic;
+                });
+                return { ...currentPlan, plan_topics: newPlanTopics };
+            });
+        }
+
+        notifications.update({ id: notificationId, loading: false, color: 'teal', title: 'Bulk Forge Complete', message: `Forged ${completedCount} notes.`, autoClose: 5000 });
+        setIsBulkGenerating(false);
+        setBulkNoteSelection([]);
     };
 
     const daysLeft = differenceInCalendarDays(new Date(plan.exam_date), new Date());

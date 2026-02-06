@@ -128,7 +128,7 @@ export default function PlanDetailPage() {
             setCramSheet(data.generated_cram_sheets?.[0] || null);
 
             // Auto-select "Today" only on first load
-            const todayIndex = data.plan_topics.findIndex(t => isToday(parseISO(t.date)));
+            const todayIndex = data.plan_topics.findIndex(t => isToday(parseISO(t.date))) - 1;
             if (todayIndex !== -1) {
                 setSelectedDayIndex(todayIndex);
                 setTimeout(() => scrollToDay(todayIndex), 500); 
@@ -245,7 +245,58 @@ export default function PlanDetailPage() {
         finally { setIsForging(false); }
     };
 
-    const handleConfirmBulkGenerate = async ({ total, topics }) => { /* Preserved */ };
+    const handleConfirmBulkGenerate = async () => {
+        if (bulkNoteSelection.length === 0) return;
+        setIsBulkGenerating(true); closeBulkNoteModal();
+        let completedCount = 0;
+        const notificationId = `bulk-notes-${dayTopic.id}`;
+        
+        notifications.show({ id: notificationId, loading: true, title: `Forging Notes... (0/${bulkNoteSelection.length})`, message: 'Starting...', autoClose: false, withCloseButton: false });
+
+        // --- THE FIX: We collect the new notes first ---
+        let newlyGeneratedNotes = [];
+
+        for (const subTopicText of bulkNoteSelection) {
+            try {
+                const response = await fetch('/api/generate-notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plan_topic_id: dayTopic.id, sub_topic_text: subTopicText, exam_name: plan.exam_name, day_topic: dayTopic.topic_name }),
+                });
+
+                if (response.ok) {
+                    const { note } = await response.json();
+                    newlyGeneratedNotes.push(note); // Collect the note object
+                    completedCount++;
+                    notifications.update({ id: notificationId, title: `Forging... (${completedCount}/${bulkNoteSelection.length})`, message: `Done: ${subTopicText}` });
+                }
+                
+                // We add a small delay to avoid overwhelming the API
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+            } catch (err) { console.error(err); }
+        }
+
+        // --- The Fix: Perform ONE state update at the end ---
+        if (setPlan && newlyGeneratedNotes.length > 0) {
+            setPlan(currentPlan => {
+                const newPlanTopics = currentPlan.plan_topics.map(topic => {
+                    if (topic.id === dayTopic.id) {
+                        // Merge the newly generated notes with any existing ones
+                        const existingNotes = new Map(topic.new_notes.map(n => [n.sub_topic_text, n]));
+                        newlyGeneratedNotes.forEach(n => existingNotes.set(n.sub_topic_text, n));
+                        return { ...topic, new_notes: Array.from(existingNotes.values()) };
+                    }
+                    return topic;
+                });
+                return { ...currentPlan, plan_topics: newPlanTopics };
+            });
+        }
+
+        notifications.update({ id: notificationId, loading: false, color: 'teal', title: 'Bulk Forge Complete', message: `Forged ${completedCount} notes.`, autoClose: 5000 });
+        setIsBulkGenerating(false);
+        setBulkNoteSelection([]);
+    };
 
     // --- TIMELINE NAVIGATION HELPER (Dual Ref Support) ---
     const scrollToDay = (index) => {
@@ -259,7 +310,7 @@ export default function PlanDetailPage() {
 
         // Scroll Desktop Scrubber
         if (desktopScrubberRef.current) {
-            const scrollPos = (index * DESKTOP_DAY_WIDTH) - (desktopScrubberRef.current.clientWidth / 2) + (DESKTOP_DAY_WIDTH / 2);
+            const scrollPos = (index * DESKTOP_DAY_WIDTH)  + (DESKTOP_DAY_WIDTH / 2);
             desktopScrubberRef.current.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
         }
     };
@@ -367,7 +418,7 @@ export default function PlanDetailPage() {
             </Group>
         </Box>
         {/* Adjusted padding: reduced from 24px to 16px */}
-        <Box ref={desktopScrubberRef} style={{ display: 'flex', overflowX: 'auto', padding: '16px', gap: '10px', scrollBehavior: 'smooth' }}>
+        <Box ref={desktopScrubberRef} style={{ display: 'flex', overflowX: 'auto', padding: '16px', gap: '10px', scrollBehavior: 'smooth', scrollbarWidth: 'none' }}>
             {plan.plan_topics.map((topic, index) => {
                 const isSelected = index === selectedDayIndex;
                 const isCurrent = isToday(parseISO(topic.date));
@@ -422,7 +473,7 @@ export default function PlanDetailPage() {
                                                 plan={plan}
                                                 dayTopic={plan.plan_topics[selectedDayIndex]}
                                                 onUpdate={handleUpdateTopic}
-                                                onNoteGenerated={() => fetchPlanData(session)}
+                                                setPlan={setPlan} 
                                                 isInitiallyCollapsed={false}
                                                 onConfirmBulkGenerate={handleConfirmBulkGenerate} 
                                             />

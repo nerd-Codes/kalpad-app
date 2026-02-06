@@ -1,4 +1,4 @@
-// /src/app/api/forge-cram-sheet/route.js
+// src/app/api/forge-cram-sheet/route.js
 
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
@@ -33,7 +33,7 @@ export async function POST(request) {
             let cramSheetId = null;
 
             try {
-                // --- Step 1: Initial DB Setup & Status Update ---
+                // --- Step 1: Initial DB Setup ---
                 const { data: newSheet, error: insertError } = await supabase
                     .from('generated_cram_sheets')
                     .insert({ plan_id, user_id: session.user.id, status: 'in_progress' })
@@ -41,7 +41,6 @@ export async function POST(request) {
                     .single();
 
                 if (insertError) {
-                    // Handle potential conflict if a sheet already exists but is in a failed state
                     if (insertError.code === '23505') { // unique_violation
                          const { data: updatedSheet, error: updateError } = await supabase
                             .from('generated_cram_sheets')
@@ -61,118 +60,128 @@ export async function POST(request) {
                 
                 streamUpdate('status', { title: 'Fetching plan data...' });
 
-                // --- Step 2: Fetch all plan data ---
-                const { data: planData, error: planError } = await supabase
-                    .from('plan_topics')
-                    .select('day, topic_name, sub_topics, generated_notes(notes_markdown)')
-                    .eq('plan_id', plan_id)
-                    .order('day');
-
-                if (planError) throw new Error(`Failed to fetch plan topics: ${planError.message}`);
+                // --- Step 2: Fetch Plan Data (INCLUDING EXAM NAME) ---
+                const { data: masterPlanData, error: masterPlanError } = await supabase
+                    .from('study_plans')
+                    .select(`
+                        exam_name,
+                        plan_topics (
+                            day, topic_name, sub_topics,
+                            generated_notes ( notes_markdown )
+                        )
+                    `)
+                    .eq('id', plan_id)
+                    .single();
                 
-                // --- Step 3: The "Miner" Agent (Map Step) ---
+                if (masterPlanError) throw new Error(`Failed to fetch master plan: ${masterPlanError.message}`);
+                
+                const examName = masterPlanData.exam_name;
+                const planData = masterPlanData.plan_topics.sort((a, b) => a.day - b.day);
+
+                // --- Step 3: The "Miner" Agent (Throttled Map Step) ---
                 streamUpdate('status', { title: 'Mining key concepts from your plan... (0%)' });
-                const minerModel = await getVertexAIModel('gemini-2.5-flash', { responseMimeType: "application/json" });
+                const minerModel = await getVertexAIModel('gemini-2.5-pro', { responseMimeType: "application/json" });
                 
-                const minerPromises = planData.map(async (day) => {
-                    // Prioritize rich generated notes, fall back to topic titles
-                    const sourceText = day.generated_notes[0]?.notes_markdown || 
-                                       `Topic: ${day.topic_name}. Sub-topics: ${day.sub_topics.map(st => st.text).join(', ')}`;
+                const minerResults = [];
+                const MINER_BATCH_SIZE = 5; 
+                
+                for (let i = 0; i < planData.length; i += MINER_BATCH_SIZE) {
+                    const batch = planData.slice(i, i + MINER_BATCH_SIZE);
                     
-                    const minerPrompt = `
-                        You are a meticulous and exhaustive Academic Auditor AI. Your sole function is to deconstruct the provided academic material into a structured, exhaustive list of its most important components. You do not make strategic judgments; you extract and categorize with perfect fidelity.
+                    const batchPromises = batch.map(async (day) => {
+                        const sourceText = day.generated_notes[0]?.notes_markdown || `Topic: ${day.topic_name}. Sub-topics: ${day.sub_topics.map(st => st.text).join(', ')}`;
+                        
+                        // --- ENHANCED MINER PROMPT ---
+                        const minerPrompt = `
+                            You are a meticulous Academic Auditor AI.
+                            **CONTEXT:** The student is preparing for the **"${examName}"** exam.
+                            
+                            **TASK:** Extract every key formula, definition, and concept from the source text below.
+                            Your extraction MUST be relevant to the context of the exam. 
+                            - For competitive exams (JEE, GATE), prioritize numerical formulas and core theorems.
+                            - For theoretical exams (UPSC, Boards), prioritize definitions and conceptual flows.
+                            
+                            **SOURCE:**
+                            Topic: "${day.topic_name}"
+                            Text: """${sourceText.substring(0, 15000)}""" 
 
-                        **INPUTS:**
-
-                        1.  **Syllabus Checklist (The Ground Truth):**
-                            """
-                            - Topic Name: "${day.topic_name}"
-                            - Sub-Topics: ${day.sub_topics.map(t => t.text).join(', ')}
-                            """
-
-                        2.  **Source Notes (The Knowledge Base):**
-                            """
-                            ${sourceText || 'No source notes provided. Use your internal knowledge.'} 
-                            """
-
-                        **YOUR THREE-STEP TASK:**
-
-                        1.  **Exhaustive Extraction:** Read the **Source Notes**. If they are empty, use your own deep internal knowledge. Extract every single relevant formula, definition, and core concept that relates to the topics in the **Syllabus Checklist**.
-
-                        2.  **ZERO-DEFECT AUDIT ALGORITHM:**
-                            2.1.  **Create Checklist:** First, create a literal, internal checklist of every single topic, sub-topic, and named concept from the input.
-                            2.2.  **Exhaustive Extraction:** Perform your primary task of extracting all key information from the input or your internal knowledge.
-                            2.3.  **Final Audit Pass:** Before you output your final JSON, you MUST iterate through your internal checklist from Step 2.1 with pedantic, literal-minded precision. For each and every item, you must verify that the exact term or a very close semantic equivalent is present in your extracted key_definitions or key_concepts. Do not assume any topic is "implicitly covered." If there is a term on the checklist, the same must be in your output. Failure to include every single item from the checklist is a critical failure of your primary function.
-
-                        3.  **Final Formatting:** Ensure your final output is dense and high-yield. "Concise" means no filler words or introductory sentences, not missing information.
-
-                        **CRITICAL JSON SCHEMA (Your ONLY output must be this object):**
-                        {
-                        "key_formulas": [
-                            "Every relevant formula, in valid LaTeX."
-                        ],
-                        "key_definitions": [
-                            "A single, clear sentence defining every key term from the checklist and source notes."
-                        ],
-                        "key_concepts": [
-                            "A concise bullet point explaining every core concept, principle, or theorem from the checklist and source notes."
-                        ]
-                        }
+                            **OUTPUT JSON (STRICT):**
+                            {
+                                "key_formulas": ["LaTeX strings"],
+                                "key_definitions": ["Concise sentences"],
+                                "key_concepts": ["Bullet points"]
+                            }
                         `;
-                    
-                    const result = await minerModel.generateContent({
-                        contents: [{ role: 'user', parts: [{ text: minerPrompt }] }]
+                        
+                        try {
+                            const result = await minerModel.generateContent({
+                                contents: [{ role: 'user', parts: [{ text: minerPrompt }] }]
+                            });
+                            return {
+                                day: day.day,
+                                topic_name: day.topic_name,
+                                ...JSON.parse(result.response.candidates[0].content.parts[0].text)
+                            };
+                        } catch (e) {
+                            console.warn(`Miner failed for day ${day.day}`, e);
+                            return null;
+                        }
                     });
 
-                    return {
-                        day: day.day,
-                        topic_name: day.topic_name,
-                        ...JSON.parse(result.response.candidates[0].content.parts[0].text)
-                    };
-                });
-
-                // Execute in parallel and update progress
-                const minerResults = [];
-                for (const promise of minerPromises) {
-                    minerResults.push(await promise);
-                    const progress = Math.round((minerResults.length / planData.length) * 100);
+                    const batchResults = await Promise.all(batchPromises);
+                    minerResults.push(...batchResults.filter(r => r !== null));
+                    
+                    const progress = Math.round(((i + batch.length) / planData.length) * 100);
                     streamUpdate('status', { title: `Mining key concepts from your plan... (${progress}%)` });
                 }
 
                 // --- Step 4: The "Synthesizer" Agent (Iterative Reduce Step) ---
                 streamUpdate('status', { title: 'Synthesizing knowledge into a Cram Sheet...' });
-                const synthesizerModel = await getVertexAIModel('gemini-2.5-flash');
+                const synthesizerModel = await getVertexAIModel('gemini-2.5-pro');
 
-                let finalCramSheet = `\n\n`; // Initial title
-                
-                // Process in chunks to avoid context limits
+                let finalCramSheet = ``;
                 const chunkSize = 5; 
+                
                 for (let i = 0; i < minerResults.length; i += chunkSize) {
                     const chunk = minerResults.slice(i, i + chunkSize);
                     
+                    // --- HIGH-FIDELITY SYNTHESIZER PROMPT ---
                     const synthesizerPrompt = `
-                        You are an expert academic author and a master information architect. Your task is to transform the following raw, day-by-day data dump into a single, cohesive, brilliantly structured "Cram Sheet" for a student's last-minute revision.
+                        **ROLE:** You are a Senior Academic Strategist and Master Information Architect. Your task is to transform raw data into a "Level 10" Cram Sheet—the kind used by toppers for high-stakes exams.
 
-                        **Existing Cram Sheet (for context only, do not repeat its content):**
-                        ---
-                        ${finalCramSheet.slice(-2000)}
-                        ---
+                        **MISSION:** Create a high-density, exam-ready document for: "${examName}". 
 
-                        **New Raw Data to Synthesize and Append:**
+                        **CONTEXT:**
+                        - **Current Progress:** 
+                        ---
+                        ${finalCramSheet.slice(-2500)}
+                        ---
+                        - **New Batch Data to Integrate:**
                         ---
                         ${JSON.stringify(chunk, null, 2)}
                         ---
 
-                        **CRITICAL INSTRUCTIONS (YOUR MANDATORY THOUGHT PROCESS):**
+                        **CRITICAL INSTRUCTIONS (EXECUTE WITH PEDANTIC PRECISION):**
 
-                        1.  **Architect, Don't Just List:** Your first and most important job is to find the "story" in the data. Do NOT just list the days sequentially. You MUST intelligently group related topics under larger, more meaningful headings (e.g., a single "## 1D Schrödinger Solutions" section that synthesizes data from multiple days).
+                        1.  **DETECT SUBJECT DNA (DYNAMIC FORMATTING):**
+                            - **Quantitative Topics (Physics/Math/Eng):** Use a "Formula-First" layout. State the formula clearly, define variables in a list, and follow with "Quick Intuition" bullet points.
+                            - **Qualitative Topics (Bio/Arts/Social):** Use a "Hierarchical" layout. Use Bold terms followed by clear definitions and "Cause-and-Effect" arrows (A -> B).
 
-                        2.  **Synthesize, Don't Repeat:** Read the entire data dump first. If you see a recurring concept or formula, introduce and define it once in the most logical place. Your goal is to create a dense, non-redundant document.
+                        2.  **THE "STORY" CLUSTER ENGINE:**
+                            - DO NOT list days (e.g., "Day 4: ..."). 
+                            - CLUSTER the data by **Academic Significance**. If three days of data all relate to "Nuclear Physics," group them under one '## Nuclear Physics' heading.
+                            - ARCHITECT the flow from Foundational Principles to Advanced Edge Cases.
 
-                        3.  **Be Ruthlessly Concise:** Every word on this sheet must be high-yield. Use clear headings ('##', '###'), bullet points for definitions and concepts, and LaTeX for all formulas. Do not add conversational text, introductions, or conclusions. Jump straight to the critical information.
+                        3.  **SYNTHESIZE & DEDUP:**
+                            - If a formula appears in multiple entries, identify the "Master Version" and list it once.
+                            - Use "Pro-Tips" or "Common Traps" in blockquotes (\`>\`) to warn the student about common exam errors related to these specific topics.
 
+                        4.  **BE RUTHLESSLY CONCISE:**
+                            - No fluff. No "This section covers...". 
+                            - Every word must be a potential mark in the exam.
+                            - Bold the first instance of every technical term.
 
-                         **LATEX STYLE GUIDE (THESE ARE UNBREAKABLE LAWS FOR KATEX COMPATIBILITY):**
+                        **LATEX STYLE GUIDE (THESE ARE UNBREAKABLE LAWS FOR KATEX COMPATIBILITY):**
                             
                             1.  **DELIMITERS:** You MUST use \`$ ... $\` for inline math and \`$$ ... $$\` for display math. You are FORBIDDEN from using \`\\[ ... \\]\` or \`\\( ... \\)\`.
                             
@@ -189,8 +198,8 @@ export async function POST(request) {
                                 -   Ensure all brackets, braces, and parentheses are correctly matched and closed.
                                 -   NEVER nest a display math block ($$) inside another display math block.
 
-                        **Your ONLY output should be a single, complete, beautifully formatted Markdown document.**
-                        `;
+                        **OUTPUT:** Return ONLY the Markdown text. Begin immediately with the first relevant heading.
+                    `;
 
                     const result = await synthesizerModel.generateContent({
                         contents: [{ role: 'user', parts: [{ text: synthesizerPrompt }] }]
@@ -214,7 +223,6 @@ export async function POST(request) {
 
             } catch (error) {
                 console.error("Critical Error in Forge stream:", error);
-                // Attempt to update the DB record to 'error' state
                 if (cramSheetId) {
                     await supabase.from('generated_cram_sheets').update({ status: 'error' }).eq('id', cramSheetId);
                 }

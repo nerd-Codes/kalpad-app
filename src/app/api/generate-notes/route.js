@@ -9,6 +9,20 @@ import { getVertexAIModel } from '@/lib/vertexai';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
 
+function cleanJSON(text) {
+    try {
+        let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(clean);
+    } catch (e) {
+        try {
+            const start = text.indexOf('{');
+            const end = text.lastIndexOf('}');
+            if (start !== -1 && end !== -1) return JSON.parse(text.substring(start, end + 1));
+        } catch (e2) { throw new Error("AI returned malformed JSON."); }
+        throw e;
+    }
+}
+
 export async function POST(request) {
   try {
     let supabase;
@@ -41,7 +55,7 @@ export async function POST(request) {
     // --- CONTEXT RETRIEVAL (RAG & HISTORY) ---
     const { data: topicData, error: topicError } = await supabase
       .from('plan_topics')
-      .select('relevant_page_images, plan_id, day') // Fetch plan_id and day for history lookup
+      .select('relevant_page_images, plan_id, day, study_plans ( exam_persona )') // Fetch persona from parent
       .eq('id', plan_topic_id)
       .single();
       
@@ -70,62 +84,69 @@ export async function POST(request) {
         }
     } catch (e) { console.warn("Context fetch warning:", e); }
 
-    const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
-    const embeddingResult = await embeddingModel.embedContent(sub_topic_text);
-    const { data: matches } = await supabase.rpc('match_documents', {
-        query_embedding: embeddingResult.embedding.values,
-        match_threshold: 0.73,
-        match_count: 5,
-        target_user_id: session.user.id
-    });
-    const retrievedTextContext = matches?.map(m => m.content).join('\n---\n') || "No specific text context found.";
+    // const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
+    // const embeddingResult = await embeddingModel.embedContent(sub_topic_text);
+    // const { data: matches } = await supabase.rpc('match_documents', {
+    //     query_embedding: embeddingResult.embedding.values,
+    //     match_threshold: 0.73,
+    //     match_count: 5,
+    //     target_user_id: session.user.id
+    // });
+    // const retrievedTextContext = matches?.map(m => m.content).join('\n---\n') || "No specific text context found.";
 
-    const imageParts = [];
-    if (topicData.relevant_page_images && topicData.relevant_page_images.length > 0) {
-        for (const imageUrl of topicData.relevant_page_images) {
-            const path = imageUrl.substring(imageUrl.indexOf('/study-materials/') + '/study-materials/'.length);
-            const { data: imageBlob, error: downloadError } = await supabase.storage.from('study-materials').download(path);
-            if (downloadError) { console.error(`Skipping image due to download error:`, downloadError.message); continue; }
-            const buffer = await imageBlob.arrayBuffer();
-            imageParts.push({ inlineData: { data: Buffer.from(buffer).toString("base64"), mimeType: 'image/jpeg' } });
-        }
-    }
+    // const imageParts = [];
+    // if (topicData.relevant_page_images && topicData.relevant_page_images.length > 0) {
+    //     for (const imageUrl of topicData.relevant_page_images) {
+    //         const path = imageUrl.substring(imageUrl.indexOf('/study-materials/') + '/study-materials/'.length);
+    //         const { data: imageBlob, error: downloadError } = await supabase.storage.from('study-materials').download(path);
+    //         if (downloadError) { console.error(`Skipping image due to download error:`, downloadError.message); continue; }
+    //         const buffer = await imageBlob.arrayBuffer();
+    //         imageParts.push({ inlineData: { data: Buffer.from(buffer).toString("base64"), mimeType: 'image/jpeg' } });
+    //     }
+    // }
 
     // --- STEP 0 (NEW): The Exam Persona Analyst ---
+    let examPersona = topicData.study_plans.exam_persona;
 
-// Use a separate, lightweight model for this fast, preparatory step.
-const personaModel = await getVertexAIModel('gemini-2.5-flash', { responseMimeType: "application/json" });
+    if (!examPersona) {
+            console.log(`[Persona Cache] MISS for Plan ID ${topicData.plan_id}. Generating...`);
+            const personaModel = await getVertexAIModel('gemini-2.5-flash', { responseMimeType: "application/json" });
+            const personaPrompt = `
+                You are an expert academic analyst. Based on the following exam name, generate a concise "persona document" that will guide another AI in writing study notes.
 
-const personaPrompt = `
-    You are an expert academic analyst. Based on the following exam name, generate a concise "persona document" that will guide another AI in writing study notes.
+                **Exam Name:** "${exam_name}"
 
-    **Exam Name:** "${exam_name}"
+                **Your Task:** Return a single, valid JSON object with the following fields:
+                - "audience_level": A short description of the target audience (e.g., "Undergraduate, 2nd Year," "Post-graduate, highly competitive," "High School, foundational").
+                - "key_focus_areas": An array of concepts or skill types that are CRITICAL for this exam level (e.g., ["Numerical problem-solving", "Deep theoretical proofs", "Practical applications", "Memorization of key formulas"]).
+                - "writing_style": A directive for the writing tone (e.g., "Highly technical and precise, use formal language," "Conceptual and intuitive, use analogies").
+                
+                **Example for "GATE Electronics":**
+                {
+                  "audience_level": "Post-graduate engineering, highly competitive and technical.",
+                  "key_focus_areas": ["Rapid problem-solving", "In-depth understanding of core theorems", "Application of formulas to complex circuits", "Numerical accuracy"],
+                  "writing_style": "Assume strong foundational knowledge. Be dense, technical, and focus on examinable points. Use formal, textbook-level language."
+                }
 
-    **Your Task:** Return a single, valid JSON object with the following fields:
-    - "audience_level": A short description of the target audience (e.g., "Undergraduate, 2nd Year," "Post-graduate, highly competitive," "High School, foundational").
-    - "key_focus_areas": An array of concepts or skill types that are CRITICAL for this exam level (e.g., ["Numerical problem-solving", "Deep theoretical proofs", "Practical applications", "Memorization of key formulas"]).
-    - "writing_style": A directive for the writing tone (e.g., "Highly technical and precise, use formal language," "Conceptual and intuitive, use analogies").
-    
-    **Example for "GATE Electronics":**
-    {
-      "audience_level": "Post-graduate engineering, highly competitive and technical.",
-      "key_focus_areas": ["Rapid problem-solving", "In-depth understanding of core theorems", "Application of formulas to complex circuits", "Numerical accuracy"],
-      "writing_style": "Assume strong foundational knowledge. Be dense, technical, and focus on examinable points. Use formal, textbook-level language."
-    }
+                **Example for "CBSE Class 12 Physics":**
+                {
+                  "audience_level": "High school senior, focus on core concepts and board exam patterns.",
+                  "key_focus_areas": ["Clear definition of terms", "Step-by-step derivation of key formulas", "Solving standard textbook problems", "Understanding of key experiments"],
+                  "writing_style": "Clear, simple language. Use relatable analogies. Assume no prior knowledge beyond the previous class level."
+                }
+            `;
 
-    **Example for "CBSE Class 12 Physics":**
-    {
-      "audience_level": "High school senior, focus on core concepts and board exam patterns.",
-      "key_focus_areas": ["Clear definition of terms", "Step-by-step derivation of key formulas", "Solving standard textbook problems", "Understanding of key experiments"],
-      "writing_style": "Clear, simple language. Use relatable analogies. Assume no prior knowledge beyond the previous class level."
-    }
-`;
+            const personaResult = await personaModel.generateContent({ contents: [{ role: 'user', parts: [{ text: personaPrompt }] }] });
+            examPersona = cleanJSON(personaResult.response.candidates[0].content.parts[0].text);
 
-const personaResult = await personaModel.generateContent({
-    contents: [{ role: 'user', parts: [{ text: personaPrompt }] }]
-});
-
-const examPersona = JSON.parse(personaResult.response.candidates[0].content.parts[0].text);
+            // Save back to DB for future use
+            await supabase
+                .from('study_plans')
+                .update({ exam_persona: examPersona })
+                .eq('id', topicData.plan_id);
+        } else {
+            console.log(`[Persona Cache] HIT for Plan ID ${topicData.plan_id}.`);
+        }
     
     const model = await getVertexAIModel('gemini-2.5-flash');
 
@@ -166,7 +187,7 @@ const examPersona = JSON.parse(personaResult.response.candidates[0].content.part
       Output ONLY a structured Markdown outline (using ### for sections). This outline will be given to another AI to write the full chapter, so its clarity and logical flow are paramount.
       `;
     const outlineResult = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: outlinePrompt }, ...imageParts] }]
+        contents: [{ role: 'user', parts: [{ text: outlinePrompt }] }]
     });
     const chapterOutline = outlineResult.response.candidates[0].content.parts[0].text;
 
@@ -252,7 +273,7 @@ const examPersona = JSON.parse(personaResult.response.candidates[0].content.part
       `;
 
     const authorResult = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: authorPrompt }, ...imageParts] }]
+        contents: [{ role: 'user', parts: [{ text: authorPrompt }] }]
     });
     const notesText = authorResult.response.candidates[0].content.parts[0].text;
 
