@@ -1,275 +1,267 @@
 // src/components/landing/personality/Hero.jsx
 "use client";
 
-import { Container, Title, Text, Box, Group, Stack, Button, Badge, ThemeIcon, SimpleGrid } from '@mantine/core';
-import { IconArrowRight, IconBrandAndroid, IconCheck, IconClock, IconBrain, IconFlame, IconRefresh, IconShare3, IconListCheck, IconEye, IconLayoutDashboard, IconPlus, IconFileText } from '@tabler/icons-react';
-import { motion } from 'framer-motion';
+import { useRef, useState } from 'react';
+import { Container, Title, Text, Box, Group, Badge } from '@mantine/core';
+import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { IconArrowRight, IconFileText, IconBattery1, IconClock, IconBrain, IconDownload } from '@tabler/icons-react';
 import Link from 'next/link';
-import { Interactive } from '@/components/Interactive';
-import { GlassCard } from '@/components/GlassCard';
-import { ShimmerButton } from '../ShimmerButton';
 
-// --- SUB-COMPONENT: FAKE APP SCREEN (The "Screenshot") ---
-function AppScreenMockup() {
+// --- UTILITY: DYNAMIC FILM GRAIN ---
+function NoiseOverlay() {
     return (
-        <Box style={{ height: '100%', width: '100%', backgroundColor: '#050505', position: 'relative', overflow: 'hidden', fontFamily: 'var(--font-inter)' }}>
-            
-            {/* 1. Header Section */}
-            <Box pt={60} px={24} pb="sm">
-                <Text size="10px" c="dimmed" tt="uppercase" fw={700} style={{ letterSpacing: '0.15em' }}>Active Mission</Text>
-                <Title order={3} c="white" mt={4} style={{ fontFamily: 'var(--font-lexend)', letterSpacing: '-0.02em', fontSize: '1.75rem' }}>
-                    JEE Mains Sprint
-                </Title>
-                
-                {/* Action Ribbon */}
-                <SimpleGrid cols={2} spacing={8} mt={20}>
-                    <Button size="xs" radius="lg" variant="light" color="teal" leftSection={<IconBrain size={14}/>} style={{ height: '36px', fontSize: '11px', justifyContent: 'flex-start' }}>Start Quiz</Button>
-                    <Button size="xs" radius="lg" variant="filled" color="dark" c="orange" leftSection={<IconFlame size={14}/>} style={{ height: '36px', fontSize: '11px', backgroundColor: 'rgba(255, 149, 0, 0.15)', justifyContent: 'flex-start' }}>Cram Sheet</Button>
-                    <Button size="xs" radius="lg" variant="filled" color="dark" c="violet" leftSection={<IconRefresh size={14}/>} style={{ height: '36px', fontSize: '11px', backgroundColor: 'rgba(191, 90, 242, 0.15)', justifyContent: 'flex-start' }}>Refine Plan</Button>
-                    <Button size="xs" radius="lg" variant="filled" color="dark" c="gray" leftSection={<IconShare3 size={14}/>} style={{ height: '36px', fontSize: '11px', backgroundColor: 'rgba(255, 255, 255, 0.1)', justifyContent: 'flex-start' }}>Share Plan</Button>
-                </SimpleGrid>
-            </Box>
-
-            {/* 2. Timeline Strip */}
-            <Box pl={24} mb={24} style={{ display: 'flex', gap: '10px', overflow: 'hidden' }}>
-                {[11, 12, 13, 14, 15].map((day, i) => {
-                    const isActive = day === 14; // Simulating Day 4/14 as active
-                    return (
-                        <Box key={day} style={{ 
-                            minWidth: '60px', height: '64px', borderRadius: '14px', 
-                            backgroundColor: isActive ? 'rgba(191, 90, 242, 0.15)' : 'rgba(255,255,255,0.03)',
-                            border: isActive ? '1px solid #BF5AF2' : '1px solid rgba(255,255,255,0.05)',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
-                        }}>
-                            <Text size="9px" c="dimmed" fw={700} tt="uppercase">DAY</Text>
-                            <Text size="lg" c={isActive ? 'white' : 'dimmed'} fw={700} lh={1}>{day}</Text>
-                            {isActive && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#34C759', marginTop: 4 }} />}
-                        </Box>
-                    );
-                })}
-            </Box>
-
-            {/* 3. The Active Card (Electrostatics) */}
-            <Box px={24}>
-                <GlassCard p={0} style={{ borderLeft: '4px solid #FF3B30', backgroundColor: 'rgba(20, 20, 25, 0.8)', overflow: 'hidden' }}>
-                    <Stack gap={0} p={20}>
-                        <Group gap="xs" mb="sm">
-                            <Badge color="dark" variant="filled" size="sm" c="dimmed" radius="sm">DAY 14</Badge>
-                            <Badge color="red" variant="filled" size="sm" radius="sm">HARD</Badge>
-                        </Group>
-                        
-                        <Title order={4} c="white" style={{ fontFamily: 'var(--font-lexend)', fontSize: '1.4rem', lineHeight: 1.2 }}>
-                            Electrostatics & Fields
-                        </Title>
-                        
-                        <Button 
-                            variant="light" color="violet" size="xs" radius="md" mt="lg" w="fit-content"
-                            leftSection={<IconListCheck size={14}/>}
-                        >
-                            Bulk Notes
-                        </Button>
-                    </Stack>
-                    
-                    {/* The Task Item (Inside the card) */}
-                    <Box p={20} pt={0}>
-                        <Box p="md" style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <Group justify="space-between" align="start" wrap="nowrap">
-                                <Group gap="md" align="start" wrap="nowrap">
-                                    <div style={{ 
-                                        width: 20, height: 10, borderRadius: '50%', 
-                                        border: '2px solid rgba(255,255,255,0.3)', marginTop: 2 
-                                    }} />
-                                    <Box>
-                                        <Text size="sm" c="white" fw={500} lh={1.4}>
-                                            Derive Electric Field due to a Dipole
-                                        </Text>
-                                        <Group gap={6} mt={6}>
-                                            <Badge size="xs" color="gray" variant="outline" style={{ fontSize: '9px', height: '18px' }}>DERIVATION</Badge>
-                                            <Badge size="xs" color="teal" variant="filled" style={{ fontSize: '9px', height: '18px' }}>NOTE READY</Badge>
-                                        </Group>
-                                    </Box>
-                                </Group>
-                                <ThemeIcon variant="light" color="teal" radius="xl" size="md">
-                                    <IconEye size={14} />
-                                </ThemeIcon>
-                            </Group>
-                        </Box>
-                    </Box>
-                </GlassCard>
-            </Box>
-
-            {/* Bottom Fade (To simulate scroll) */}
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '120px', background: 'linear-gradient(to top, #050505 20%, transparent)', zIndex: 20 }} />
-            
-            {/* Bottom Nav Mockup */}
-            <div style={{ position: 'absolute', bottom: 20, left: 0, right: 0, zIndex: 30, padding: '0 30px' }}>
-                <Group justify="space-between" style={{ opacity: 0.5 }}>
-                     <Stack gap={2} align="center"><IconLayoutDashboard size={20} /><Text size="8px" fw={600}>Home</Text></Stack>
-                     <Stack gap={2} align="center"><IconPlus size={20} /><Text size="8px" fw={600}>Create</Text></Stack>
-                     <Stack gap={2} align="center"><IconFileText size={20} /><Text size="8px" fw={600}>Plans</Text></Stack>
-                     <Stack gap={2} align="center"><div style={{width: 20, height: 20, borderRadius: '50%', background: '#BF5AF2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color:'black', fontWeight:'bold'}}>SR</div><Text size="8px" fw={600}>Profile</Text></Stack>
-                </Group>
-            </div>
-        </Box>
+        <div style={{
+            position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none',
+            opacity: 0.4, mixBlendMode: 'overlay',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+        }} />
     );
 }
 
+// --- UTILITY: MAGNETIC BUTTON WRAPPER ---
+function MagneticButton({ children, href, primary = true }) {
+    const ref = useRef(null);
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+
+    const handleMouse = (e) => {
+        const { clientX, clientY } = e;
+        const { height, width, left, top } = ref.current.getBoundingClientRect();
+        const middleX = clientX - (left + width / 2);
+        const middleY = clientY - (top + height / 2);
+        setPosition({ x: middleX * 0.2, y: middleY * 0.2 });
+    };
+
+    const reset = () => setPosition({ x: 0, y: 0 });
+
+    return (
+        <motion.div
+            ref={ref}
+            onMouseMove={handleMouse}
+            onMouseLeave={reset}
+            animate={{ x: position.x, y: position.y }}
+            transition={{ type: "spring", stiffness: 150, damping: 15, mass: 0.1 }}
+            style={{ position: 'relative', zIndex: 100 }}
+        >
+            <Link href={href} style={{ textDecoration: 'none' }}>
+                <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    style={{
+                        background: primary ? 'linear-gradient(135deg, rgba(191, 90, 242, 1) 0%, rgba(94, 92, 230, 1) 100%)' : 'rgba(255,255,255,0.05)',
+                        padding: '16px 32px',
+                        borderRadius: '999px',
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        boxShadow: primary ? '0 15px 30px -10px rgba(191, 90, 242, 0.5), inset 0 2px 0 rgba(255,255,255,0.2)' : 'none',
+                        border: primary ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.2)',
+                        cursor: 'pointer',
+                        backdropFilter: 'blur(10px)'
+                    }}
+                >
+                    {children}
+                </motion.div>
+            </Link>
+        </motion.div>
+    );
+}
+
+// --- UTILITY: FLOATING CHAOS ELEMENTS ---
+function FloatingThreat({ icon: Icon, text, x, y, delay, duration, rotate, blur = false }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: y + 50 }}
+            animate={{ 
+                // Cycle opacity and physical position
+                opacity: [0, 1, 0], 
+                y: [y, y - 40, y],
+                rotate: [rotate, rotate + 10, rotate - 5, rotate],
+                // THE FIX: Cycle the blur filter from blurry -> sharp -> blurry
+                filter: blur ? ['blur(8px)', 'blur(0px)', 'blur(8px)'] : ['blur(0px)', 'blur(0px)', 'blur(0px)']
+            }}
+            transition={{ duration: duration, repeat: Infinity, delay: delay, ease: "easeInOut" }}
+            style={{
+                position: 'absolute', top: `${y}%`, left: `${x}%`,
+                zIndex: 100, // THE FIX: Brought to the absolute top layer
+                pointerEvents: 'none',
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '10px 16px', borderRadius: '12px',
+                background: 'rgba(20, 20, 25, 0.6)', border: '1px solid rgba(255,255,255,0.1)',
+                boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)',
+            }}
+            className="hidden md:flex"
+        >
+            <Icon size={16} color="#FF3B30" />
+            <Text size="xs" fw={600} c="white" style={{ fontFamily: 'monospace' }}>{text}</Text>
+        </motion.div>
+    );
+}
+
+// --- UTILITY: THE SCREENSHOT SLICER ---
+function ScreenshotSlicer() {
+    return (
+        <motion.div
+            initial={{ opacity: 0, rotateX: 40, y: 200, scale: 0.9 }}
+            animate={{ opacity: 1, rotateX: 12, y: 0, scale: 1 }}
+            transition={{ duration: 1.5, ease: "circOut", delay: 0.5 }}
+            style={{
+                width: '100%', maxWidth: '1100px', margin: '0 auto',
+                borderRadius: '24px 24px 0 0',
+                border: '1px solid rgba(191, 90, 242, 0.4)', 
+                borderBottom: 'none',
+                boxShadow: '0 -40px 100px -20px rgba(191, 90, 242, 0.25), 0 0 0 1px rgba(255,255,255,0.05) inset',
+                overflow: 'hidden', position: 'relative', zIndex: 40,
+                transformPerspective: 1200, transformStyle: 'preserve-3d',
+                backgroundColor: '#111113' // Fallback behind image
+            }}
+        >
+            {/* 
+                THE FIX: Actual Image Tag 
+                Ensure you place your dashboard screenshot in the public folder as 'dashboard-screenshot.png' (or update the src).
+            */}
+            <img 
+                src="/dashboard-screenshot.png" 
+                alt="KalPad OS Dashboard"
+                style={{ 
+                    width: '100%', 
+                    height: 'auto', 
+                    display: 'block', 
+                    objectFit: 'cover', 
+                    objectPosition: 'top' 
+                }}
+                onError={(e) => {
+                    // Fallback visual if image isn't found yet
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div style="padding: 100px; text-align: center; color: #888; font-family: monospace;">[ Replace with /public/dashboard-screenshot.png ]</div>';
+                }}
+            />
+
+            {/* Glossy overlay to enhance the 3D screen effect */}
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 40%)', pointerEvents: 'none' }} />
+            
+            {/* Scanner line animation */}
+           
+        </motion.div>
+    );
+}
+
+
 export function Hero() {
+    // Volumetric Spotlight Tracking
+    const mouseX = useMotionValue(0);
+    const mouseY = useMotionValue(0);
+    const springX = useSpring(mouseX, { stiffness: 50, damping: 20 });
+    const springY = useSpring(mouseY, { stiffness: 50, damping: 20 });
+    const bgPositionX = useTransform(springX, v => `${v}px`);
+    const bgPositionY = useTransform(springY, v => `${v}px`);
+
+    const handleMouseMove = (e) => {
+        const { clientX, clientY } = e;
+        const { innerWidth, innerHeight } = window;
+        mouseX.set(clientX - innerWidth / 2);
+        mouseY.set(clientY - innerHeight / 2);
+    };
+
     return (
         <Box
+            onMouseMove={handleMouseMove}
             style={{
                 position: 'relative',
                 minHeight: '100vh',
                 display: 'flex',
-                alignItems: 'center',
+                flexDirection: 'column',
+                justifyContent: 'space-between', 
                 overflow: 'hidden',
-                paddingTop: '100px', // Header offset
-                paddingBottom: '60px',
-                paddingLeft: '20px',
-                paddingRight: '20px',
-                background: 'transparent', // FIX: Transparent to let Global Void show
+                backgroundColor: '#05050500', 
             }}
         >
-            {/* --- BACKGROUND AMBIENCE (The Local Glow) --- */}
-            <div style={{
-                position: 'absolute', top: '20%', right: '-10%',
-                width: '60vw', height: '60vw',
-                background: 'radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, transparent 60%)',
-                filter: 'blur(100px)', zIndex: 0
-            }} />
+            
 
-            <Container size="xl" style={{ position: 'relative', zIndex: 10 }}>
-                {/* FIX: Use SimpleGrid for reliable responsive layout */}
-                <SimpleGrid cols={{ base: 1, lg: 2 }} spacing={80} verticalSpacing={60}>
+            {/* --- THE VOLUMETRIC SPOTLIGHT --- */}
+            <motion.div
+                style={{
+                    position: 'absolute', top: '50%', left: '50%',
+                    width: '120vw', height: '120vw',
+                    x: bgPositionX, y: bgPositionY,
+                    translateX: '-50%', translateY: '-50%',
+                    background: 'radial-gradient(circle, rgba(191, 90, 242, 0.08) 0%, rgba(52, 199, 89, 0.02) 40%, transparent 60%)',
+                    filter: 'blur(80px)', zIndex: 0, pointerEvents: 'none'
+                }}
+            />
+
+            {/* --- THE CHAOS LAYER (Floating Threats - Now Z-Index 100) --- */}
+            <FloatingThreat icon={IconFileText} text="Syllabus_v4_FINAL.pdf" x={12} y={25} delay={0} duration={8} rotate={-12} blur />
+            <FloatingThreat icon={IconClock} text="72:00:00 Remaining" x={75} y={15} delay={2} duration={9} rotate={8} blur />
+            <FloatingThreat icon={IconBattery1} text="Focus < 10%" x={15} y={55} delay={4} duration={7} rotate={-5} blur />
+            <FloatingThreat icon={IconBrain} text="Cognitive Overload" x={82} y={50} delay={1} duration={8} rotate={15} blur />
+
+            {/* --- MAIN TYPOGRAPHY & CTA (Center Stage) --- */}
+            <Container size="xl" style={{ position: 'relative', zIndex: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '22vh', flex: 1 }}>
+                
+                <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: "easeOut" }} style={{ textAlign: 'center', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     
-                    {/* --- LEFT COLUMN: THE PITCH --- */}
-                    <Stack gap="xl" justify="center">
-                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-                            <Group gap="xs" mb="xs" visibleFrom='sm'>
-                                <ThemeIcon size="sm" radius="xl" color="white" variant="white"><IconCheck size={10} color="black"/></ThemeIcon>
-                                <Text size="sm" fw={700} c="white" tt="uppercase" style={{ letterSpacing: '0.1em' }}>
-                                    AI academic mentor {'('}not just a study tool{')'}
-                                </Text>
-                            </Group>
+                    <Group justify="center" mb="lg">
+                        {/* THE FIX: Shorter, punchier badge */}
+                        <Badge variant="outline" size="sm" style={{ borderColor: 'rgba(255,255,255,0.15)', color: '#86868B', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', letterSpacing: '0.15em', padding: '14px 20px' }}>
+                            THE ACADEMIC CHEAT CODE
+                        </Badge>
+                    </Group>
 
-                            <Title 
-                                order={1} 
-                                style={{ 
-                                    fontFamily: 'var(--font-lexend)', 
-                                    fontSize: 'clamp(3rem, 5vw, 5rem)', 
-                                    fontWeight: 800, 
-                                    lineHeight: 1,
-                                    letterSpacing: '-0.04em',
-                                    color: 'white'
-                                }}
-                            >
-                                <span className="apple-text-gradient">
-                                    FIGHT THE<br/>SYLLABUS
-                                </span>
-                            </Title>
-                        </motion.div>
+                    {/* THE FIX: Overlapping Editorial Typography */}
+                    <Title 
+                        style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'center',
+                            fontSize: 'clamp(3.5rem, 10vw, 8.5rem)', 
+                            fontWeight: 900, 
+                            lineHeight: 0.85, // Extremely tight line height
+                            letterSpacing: '-0.04em',
+                            color: '#F5F5F7',
+                            textTransform: 'uppercase',
+                            fontFamily: 'var(--font-lexend)'
+                        }}
+                    >
+                        <span style={{ zIndex: 1 }}>Survive the</span>
+                        <span style={{ 
+                            fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif', 
+                            fontStyle: 'italic', 
+                            fontWeight: 400, 
+                            textTransform: 'lowercase',
+                            color: '#BF5AF2',
+                            marginTop: '-0.25em', // THE FIX: Physical overlap
+                            zIndex: 2,           // Pulls "chaos" in front of "Survive"
+                            textShadow: '0 10px 30px rgba(191, 90, 242, 0.4)'
+                        }}>
+                            chaos.
+                        </span>
+                    </Title>
 
-                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }}>
-                            <Text size="xl" c="gray.4" lh={1.6} maw={600}>
-                                It's a trap designed to make you panic. I got tired of losing, so I built our weapon. KalPad generates a ruthless, adaptive study plan that turns 
-                                <span style={{ color: '#fff', fontWeight: 600 }}> "Kal Padhunga"</span> into 
-                                <span style={{ color: '#34C759', fontWeight: 600 }}> "Done."</span>
-                            </Text>
-                        </motion.div>
+                    <Text size="xl" c="gray.4" mt="xl" mb={40} maw={550} mx="auto" style={{ fontFamily: 'var(--font-inter)', lineHeight: 1.6 }}>
+                        You are out of time and out of focus. KalPad is an AI OS that ingests your mess and outputs a ruthless, tactical timeline.
+                    </Text>
 
-                        {/* Buttons */}
-                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.4 }}>
-                            <Group gap="md" mt="sm">
-                                {/* FIX: Replaced with ShimmerButton */}
-                                <Interactive>
-                                    <ShimmerButton
-                                        component={Link}
-                                        href="/guest-plan"
-                                        size="xl"
-                                        radius="xl"
-                                        style={{ height: '60px', padding: '0 40px', fontSize: '1.1rem' }}
-                                    >
-                                        Try it Now <IconArrowRight size={20} style={{ marginLeft: 8 }}/>
-                                    </ShimmerButton>
-                                </Interactive>
+                    {/* THE FIX: Split CTAs */}
+                    <Group justify="center" gap="md">
+                        <MagneticButton href="/guest-plan" primary={true}>
+                            <Text size="md" fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>Guest Mode</Text>
+                            <IconArrowRight size={18} color="white" />
+                        </MagneticButton>
 
-                                <Interactive>
-                                    <Button
-                                        component="a"
-                                        href="https://fwibambhxyjklrcnqdse.supabase.co/storage/v1/object/public/androoid/KalPad.apk"
-                                        target="_blank"
-                                        download="KalPad.apk"
-                                        size="xl"
-                                        radius="xl"
-                                        variant="default"
-                                        leftSection={<IconBrandAndroid size={22} color="#3DDC84"/>}
-                                        style={{ 
-                                            height: '60px',
-                                            fontSize: '1.1rem',
-                                            backgroundColor: 'rgba(255,255,255,0.05)',
-                                            border: '1px solid rgba(255,255,255,0.1)',
-                                            color: 'white',
-                                        }}
-                                    >
-                                        Download App
-                                    </Button>
-                                </Interactive>
-                            </Group>
-                            
-                            <Text size="sm" c="dimmed" mt="md" fs="italic">
-                                *No Sign Up required to try
-                            </Text>
-                        </motion.div>
-                    </Stack>
-
-                    {/* --- RIGHT COLUMN: THE PROOF (PHONE MOCKUP) --- */}
-                    <Box style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        {/* Background Decor */}
-                        <svg width="600" height="600" viewBox="0 0 600 600" fill="none" style={{ position: 'absolute', zIndex: 0, opacity: 0.3, transform: 'scale(1.2)' }}>
-                            <path d="M50 300 C 150 500, 450 100, 550 300" stroke="url(#grad1)" strokeWidth="40" strokeLinecap="round" fill="none" />
-                            <defs>
-                                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" style={{ stopColor: '#7C3AED', stopOpacity: 0 }} />
-                                    <stop offset="50%" style={{ stopColor: '#BF5AF2', stopOpacity: 1 }} />
-                                    <stop offset="100%" style={{ stopColor: '#34C759', stopOpacity: 0 }} />
-                                </linearGradient>
-                            </defs>
-                        </svg>
-
-                        {/* The Phone Chassis */}
-                        <motion.div 
-                            initial={{ y: 50, opacity: 0, rotate: -5 }}
-                            animate={{ y: 0, opacity: 1, rotate: 0 }}
-                            transition={{ duration: 1, ease: "circOut", delay: 0.2 }}
-                            style={{
-                                width: '320px',
-                                height: '650px',
-                                borderRadius: '50px',
-                                border: '8px solid #2d2d2d',
-                                backgroundColor: '#000',
-                                boxShadow: `
-                                    0 0 0 2px #444, /* Outer Bezel */
-                                    0 20px 50px -10px rgba(0,0,0,0.8), /* Drop Shadow */
-                                    inset 0 0 20px rgba(255,255,255,0.1) /* Inner Gloss */
-                                `,
-                                position: 'relative',
-                                zIndex: 10,
-                                overflow: 'hidden'
-                            }}
-                        >
-                            {/* Dynamic Island */}
-                            <div style={{
-                                position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)',
-                                width: '100px', height: '28px', backgroundColor: '#000', borderRadius: '20px', zIndex: 50
-                            }} />
-
-                            {/* Screen Content */}
-                            <AppScreenMockup />
-                        </motion.div>
-                    </Box>
-
-                </SimpleGrid>
+                        <MagneticButton href="https://fwibambhxyjklrcnqdse.supabase.co/storage/v1/object/public/androoid/KalPad.apk" primary={false}>
+                            <IconDownload size={18} color="white" />
+                            <Text size="md" fw={600} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>Get App</Text>
+                        </MagneticButton>
+                    </Group>
+                </motion.div>
             </Container>
+
+            {/* --- THE REVEAL (Actual Screenshot slicing in) --- */}
+            <Box style={{ width: '100%', position: 'relative', zIndex: 40, marginTop: '40px' }}>
+                <ScreenshotSlicer />
+                
+                {/* Bottom Fade to mask the sharp edge and blend into the next section */}
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '200px', background: 'linear-gradient(to top, #000, transparent)', zIndex: 50, pointerEvents: 'none' }} />
+            </Box>
+
         </Box>
     );
 }

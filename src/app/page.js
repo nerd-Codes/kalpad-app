@@ -13,7 +13,14 @@ import supabase from '@/lib/supabaseClient';
 
 // --- SECTIONS ---
 import { Hero } from "@/components/landing/personality/Hero";
+import { TheRealityCheck } from '@/components/landing/personality/TheRealityCheck';
+import { TheMethodology } from '@/components/landing/personality/TheMethodology';
+import { TheBlueprint } from '@/components/landing/personality/TheBlueprint';
+import { TheEngineRoom } from '@/components/landing/personality/TheEngineRoom';
+import { TheGodMode } from '@/components/landing/personality/TheGodMode';
+
 import { Manifesto } from "@/components/landing/personality/Manifesto";
+
 import { Arsenal } from "@/components/landing/personality/Arsenal"; 
 import { Playground } from "@/components/landing/personality/Playground"; 
 import { Devlog } from "@/components/landing/personality/Devlog"; 
@@ -26,6 +33,7 @@ import { TheToolkit } from '@/components/landing/personality/TheToolkit';
 import { GuestCTA } from '@/components/landing/personality/GuestCTA';
 import { TheShift } from '@/components/landing/personality/TheShift';
 import { ThePledge } from '@/components/landing/personality/ThePledge';
+
 
 // --- GLOBAL BACKGROUND: THE INFINITE VOID (FIXED) ---
 function InfiniteVoid() {
@@ -109,24 +117,16 @@ export default function LandingPage() {
             <main style={{ position: 'relative', zIndex: 1 }}>
                  {/* 1. THE HOOK */}
                 <Hero />
-                <Arsenal />
-                <TheBrain />
-                <TheToolkit />
-                <TheShift />
+                <TheRealityCheck />
+                <TheMethodology />
+                < TheBlueprint />
+                <TheEngineRoom />
+                <TheGodMode />
                 <ThePledge />
-                <GuestCTA />
-                <Playground />
-                <Devlog />
-                <Community />
-                <Manifesto />
-                <RealQuestion />
             </main>
             
             <Footer />
             
-            <AnimatePresence>
-                {showGoldPass && <GoldPass onClaim={handleClaimPass} />}
-            </AnimatePresence>
             <CookieConsent />
         </>
     );

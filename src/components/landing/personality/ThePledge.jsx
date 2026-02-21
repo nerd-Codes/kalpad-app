@@ -1,126 +1,175 @@
+// src/components/landing/personality/ThePledge.jsx
 "use client";
 
-import { Container, Title, Text, SimpleGrid, Stack, Box, Group, Badge, ThemeIcon, List } from '@mantine/core';
+import { Container, Title, Text, Box, Group, Stack, Badge, Button, ThemeIcon, SimpleGrid, Divider } from '@mantine/core';
 import { motion } from 'framer-motion';
-import { IconCurrencyDollarOff, IconLockOpen, IconCheck, IconTrophy, IconInfinity, IconBrain } from '@tabler/icons-react';
-import { GlassCard } from '../../GlassCard'; 
+import { IconCheck, IconShieldCheck, IconBolt, IconArrowRight, IconInfinity, IconHeartHandshake, IconServer } from '@tabler/icons-react';
+import Link from 'next/link';
+import { GlassCard } from '@/components/GlassCard';
+import { Interactive } from '@/components/Interactive';
 
-// --- VISUAL CONSTANTS ---
-const NEON_GREEN = '#34C759';
-const ACCENT_GOLD = '#FFD700';
+// --- EDITORIAL FONT STYLE ---
+const serifItalic = {
+    fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
+    fontStyle: 'italic',
+    fontWeight: 400,
+    color: '#34C759', 
+    textTransform: 'lowercase'
+};
+
+// --- DATA: THE FREE ARSENAL ---
+const FREE_ARSENAL = [
+    { label: "Constitutional Chain-of-Thought AI", value: "ACTIVE" },
+    { label: "Syllabus Triage Engine", value: "ACTIVE" },
+    { label: "Multimodal RAG (Note Gen)", value: "DAILY CREDITS" },
+    { label: "Active Recall Engine", value: "DAILY CREDITS" },
+    { label: "YouTube Lecture Scout", value: "STANDARD ACCESS" },
+    { label: "Mobile App Access", value: "UNRESTRICTED" },
+];
 
 export function ThePledge() {
     return (
-        <Box py={{ base: 100, md: 160 }} style={{ position: 'relative', zIndex: 10 }}>
-            <Container size="lg">
+        <Box py={{ base: 100, md: 160 }} style={{ position: 'relative', zIndex: 10, backgroundColor: '#05050500', borderTop: '1px solid rgba(255,255,255,0.02)' }}>
+            <Container size="xl">
                 
-                <Stack align="center" ta="center" gap="md" mb={80}>
+                {/* --- HEADER --- */}
+                <Stack align="center" ta="center" gap="lg" mb={80}>
                     <Badge 
-                        variant="outline" color="green" size="lg" radius="sm"
-                        style={{ borderColor: 'rgba(52, 199, 89, 0.4)', color: NEON_GREEN, letterSpacing: '0.1em' }}
+                        variant="outline" color="green" size="md" radius="xl"
+                        style={{ borderColor: 'rgba(52, 199, 89, 0.4)', color: '#34C759', letterSpacing: '0.1em', backgroundColor: 'rgba(52, 199, 89, 0.05)' }}
+                        leftSection={<IconHeartHandshake size={14}/>}
                     >
-                        DEMOCRATIZING SUCCESS
+                        THE PLEDGE
                     </Badge>
                     <Title 
                         order={2} 
                         style={{ 
                             fontFamily: 'var(--font-lexend)', 
-                            fontSize: 'clamp(2.5rem, 5vw, 4rem)', 
+                            fontSize: 'clamp(2.5rem, 5vw, 4.5rem)', 
                             letterSpacing: '-0.03em',
                             lineHeight: 1.1,
-                            color: 'white'
+                            color: 'white',
+                            maxWidth: '900px'
                         }}
                     >
-                        Your bank account doesn't <br/> take the exam. <span className="apple-text-gradient">You do.</span>
+                        Your bank account doesn't <br/> take the exam. <span style={serifItalic}>You do.</span>
                     </Title>
                 </Stack>
 
-                <GlassCard 
-                    p={{ base: 'xl', md: 60 }}
-                    style={{ 
-                        background: 'linear-gradient(180deg, rgba(20,20,25,0.8) 0%, rgba(52, 199, 89, 0.05) 100%)',
-                        border: '1px solid rgba(52, 199, 89, 0.2)',
-                        boxShadow: '0 0 80px -20px rgba(52, 199, 89, 0.1)'
-                    }}
-                >
-                    <SimpleGrid cols={{ base: 1, md: 2 }} spacing={60} verticalSpacing={40}>
-                        
-                        {/* LEFT: THE PHILOSOPHY */}
-                        <Stack justify="center" gap="xl">
-                            <Box>
-                                <Text size="xl" fw={600} c="white" mb="sm">
-                                    We don't gatekeep grades.
-                                </Text>
-                                <Text size="lg" c="dimmed" lh={1.6}>
-                                    Most tools lock the "good stuff" behind a credit card. We don't. 
-                                    The Free Tier isn't a trial. It is a complete weapon.
-                                </Text>
-                            </Box>
+                {/* --- THE MANIFESTO CARD --- */}
+                <Box maw={900} mx="auto" mb={100}>
+                    <GlassCard 
+                        p={{ base: 'xl', md: 60 }}
+                        style={{ 
+                            background: 'linear-gradient(180deg, rgba(20,20,25,0.8) 0%, rgba(52, 199, 89, 0.03) 100%)',
+                            border: '1px solid rgba(52, 199, 89, 0.2)',
+                            boxShadow: '0 0 100px -20px rgba(52, 199, 89, 0.1)',
+                            position: 'relative', overflow: 'hidden'
+                        }}
+                    >
+                        {/* Background Texture */}
+                        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(#34C759 1px, transparent 1px)', backgroundSize: '30px 30px', opacity: 0.05, pointerEvents: 'none' }} />
 
-                            <Box p="lg" style={{ borderLeft: `3px solid ${NEON_GREEN}`, background: 'rgba(255,255,255,0.03)' }}>
-                                <Text size="md" c="white" style={{ fontFamily: 'var(--font-lexend)' }}>
-                                    "If you have the discipline to finish one mission before starting the next, you will never pay us a cent. And you will still ace the exam."
-                                </Text>
-                            </Box>
-
-                            <Group gap="xs" style={{ opacity: 0.8 }}>
-                                <IconCurrencyDollarOff size={20} color={NEON_GREEN} />
-                                <Text size="sm" c="green.4" fw={700} tt="uppercase">No Credit Card Required</Text>
-                            </Group>
-                        </Stack>
-
-                        {/* RIGHT: THE SPECS (Comparison) */}
-                        <Stack gap="md">
-                            <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>
-                                FREE TIER CAPABILITIES
+                        <Stack gap="xl">
+                            {/* The Core Message */}
+                            <Text size="xl" c="white" lh={1.6} fw={400} ta="center" style={{ fontFamily: 'var(--font-lexend)' }}>
+                                We don't gatekeep grades. The Free Tier isn't a "trial." <br/>
+                                <span style={{ color: '#34C759' }}>It is a complete academic weapon.</span>
                             </Text>
 
-                            {/* Spec 1 */}
-                            <Box p="md" style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <Group justify="space-between">
-                                    <Group gap="sm">
-                                        <ThemeIcon color="green" variant="light" radius="xl"><IconCheck size={14}/></ThemeIcon>
-                                        <Text size="sm" fw={600} c="white">The Strategist Plan</Text>
+                            <Divider color="rgba(255,255,255,0.1)" label="SYSTEM CAPABILITIES ASSIGNED TO YOU" labelPosition="center" />
+
+                            {/* The Spec Sheet */}
+                            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
+                                {FREE_ARSENAL.map((item, i) => (
+                                    <Group key={i} justify="space-between" style={{ padding: '12px 0', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}>
+                                        <Group gap="sm">
+                                            <IconCheck size={16} color="#34C759" />
+                                            <Text size="sm" c="gray.4">{item.label}</Text>
+                                        </Group>
+                                        <Badge size="sm" variant="filled" color="dark" style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' }}>{item.value}</Badge>
                                     </Group>
-                                    <Badge color="gray" variant="outline">1 Active Slot</Badge>
+                                ))}
+                            </SimpleGrid>
+
+                            {/* The "Why We Charge" Honest Footnote */}
+                            <Box mt="lg" p="md" style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <Group align="flex-start" wrap="nowrap">
+                                    <ThemeIcon variant="light" color="gray" size="sm" radius="xl" mt={2}><IconServer size={12}/></ThemeIcon>
+                                    <Stack gap={4}>
+                                        <Text size="xs" fw={700} c="dimmed" tt="uppercase">Transparency Note</Text>
+                                        <Text size="sm" c="gray.5" lh={1.5}>
+                                            We only charge for "Unlimited" plans because GPU compute costs us money. 
+                                            But if you have the discipline to finish one mission before starting the next, 
+                                            <span style={{ color: 'white', fontWeight: 600 }}> the free daily credits are mathematically sufficient to ace any syllabus.</span>
+                                        </Text>
+                                    </Stack>
                                 </Group>
                             </Box>
 
-                            {/* Spec 2 */}
-                            <Box p="md" style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <Group justify="space-between">
-                                    <Group gap="sm">
-                                        <ThemeIcon color="green" variant="light" radius="xl"><IconBrain size={14}/></ThemeIcon>
-                                        <Text size="sm" fw={600} c="white">Full Intelligence</Text>
-                                    </Group>
-                                    <Badge color="green" variant="light">UNLOCKED</Badge>
-                                </Group>
-                                <Text size="xs" c="dimmed" mt="xs" ml={38}>
-                                    Includes AI Notes, Golden Questions, and Hidden Prerequisite Analysis.
-                                </Text>
-                            </Box>
-
-                            {/* Spec 3 */}
-                            <Box p="md" style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <Group justify="space-between">
-                                    <Group gap="sm">
-                                        <ThemeIcon color="green" variant="light" radius="xl"><IconTrophy size={14}/></ThemeIcon>
-                                        <Text size="sm" fw={600} c="white">Exam Success</Text>
-                                    </Group>
-                                    <Badge color="green" variant="light">100% POSSIBLE</Badge>
-                                </Group>
-                            </Box>
-
-                            {/* The "Cost" */}
-                            <Group justify="space-between" px="xs">
-                                <Text size="sm" c="dimmed">Real Cost</Text>
-                                <Text size="lg" fw={800} c="brandGreen" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Discipline</Text>
+                            {/* The Cost */}
+                            <Group justify="center" gap="xl" mt="sm">
+                                <Stack gap={0} align="center">
+                                    <Text size="xs" c="dimmed" tt="uppercase" fw={700} style={{ letterSpacing: '0.1em' }}>Financial Cost</Text>
+                                    <Text size="2.5rem" fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)', lineHeight: 1 }}>₹0</Text>
+                                </Stack>
+                                <div style={{ width: '1px', height: '40px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
+                                <Stack gap={0} align="center">
+                                    <Text size="xs" c="dimmed" tt="uppercase" fw={700} style={{ letterSpacing: '0.1em' }}>Real Cost</Text>
+                                    <Text size="2.5rem" fw={700} c="green.4" style={{ fontFamily: 'var(--font-lexend)', lineHeight: 1 }}>Focus</Text>
+                                </Stack>
                             </Group>
 
                         </Stack>
+                    </GlassCard>
+                </Box>
 
-                    </SimpleGrid>
-                </GlassCard>
+                {/* --- FINAL EXIT: THE ZERO FRICTION LAUNCH --- */}
+                <Box style={{ position: 'relative', padding: '60px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <Stack align="center" gap="xl">
+                        <Title 
+                            order={2} 
+                            style={{ 
+                                fontFamily: 'var(--font-lexend)', 
+                                fontSize: 'clamp(2rem, 4vw, 3.5rem)', 
+                                textAlign: 'center', 
+                                color: 'white'
+                            }}
+                        >
+                            Don't trust us. <span style={{ color: '#22d3ee' }}>Test us.</span>
+                        </Title>
+                        
+                        <Interactive>
+                            <Link href="/guest-plan" style={{ textDecoration: 'none' }}>
+                                <motion.div
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    style={{
+                                        background: 'linear-gradient(135deg, #0891b2 0%, #22d3ee 100%)',
+                                        padding: '24px 60px',
+                                        borderRadius: '999px',
+                                        display: 'flex', alignItems: 'center', gap: '16px',
+                                        boxShadow: '0 20px 60px -10px rgba(34, 211, 238, 0.4)',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <IconBolt size={32} color="white" fill="white" />
+                                    <Box>
+                                        <Text size="xl" fw={800} c="white" style={{ fontFamily: 'var(--font-lexend)', lineHeight: 1 }}>
+                                            INSTANT GUEST MODE
+                                        </Text>
+                                        <Text size="xs" c="rgba(255,255,255,0.8)" fw={600} mt={4} tt="uppercase" style={{ letterSpacing: '0.1em' }}>
+                                            No Login • No Credit Card • 10 Seconds
+                                        </Text>
+                                    </Box>
+                                    <IconArrowRight size={32} color="white" />
+                                </motion.div>
+                            </Link>
+                        </Interactive>
+
+                    </Stack>
+                </Box>
+
             </Container>
         </Box>
     );
