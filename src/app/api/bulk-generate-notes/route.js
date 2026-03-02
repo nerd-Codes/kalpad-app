@@ -1,7 +1,6 @@
 // /src/app/api/bulk-generate-notes/route.js
 
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { isBearerRequest, logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 // This function constructs the absolute URL for our API calls,
 // which is necessary when a serverless function calls itself.
@@ -11,11 +10,14 @@ function getAbsoluteUrl(path) {
 }
 
 export async function POST(request) {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
+    let authMode = 'none';
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const user = auth.user;
 
-    if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    if (!user) {
+        logRouteResult('/api/bulk-generate-notes', authMode, 401);
+        return unauthorizedResponse();
     }
 
     const { topics } = await request.json();
@@ -25,7 +27,7 @@ export async function POST(request) {
 
     // --- DEFINITIVE ARCHITECTURE: Server-side loop calling our own API ---
     (async () => {
-        console.log(`[Bulk Gen] Starting job for ${topics.length} topics for user ${session.user.id}`);
+        console.log(`[Bulk Gen] Starting job for ${topics.length} topics for user ${user.id}`);
         
         for (const topic of topics) {
             try {
@@ -34,13 +36,21 @@ export async function POST(request) {
                 
                 // Make a fetch request to our own API.
                 // We securely forward the user's authentication cookie.
+                const internalHeaders = {
+                    'Content-Type': 'application/json'
+                };
+                if (isBearerRequest(request)) {
+                    internalHeaders.Authorization = request.headers.get('Authorization');
+                } else {
+                    const cookieHeader = request.headers.get('cookie');
+                    if (cookieHeader) {
+                        internalHeaders.Cookie = cookieHeader;
+                    }
+                }
+
                 const response = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        // Forward the user's cookie to the next API route
-                        'Cookie': request.headers.get('cookie'),
-                    },
+                    headers: internalHeaders,
                     body: JSON.stringify(topic),
                 });
 
@@ -59,10 +69,11 @@ export async function POST(request) {
                 console.error(`[Bulk Gen] CRITICAL ERROR during fetch for "${topic.sub_topic_text}":`, error.message);
             }
         }
-        console.log(`[Bulk Gen] Finished job for user ${session.user.id}`);
+        console.log(`[Bulk Gen] Finished job for user ${user.id}`);
     })();
 
     // Immediately confirm to the client that the job has been accepted.
+    logRouteResult('/api/bulk-generate-notes', authMode, 202);
     return new Response(JSON.stringify({ message: 'Bulk note generation request accepted.' }), {
         status: 202,
     });

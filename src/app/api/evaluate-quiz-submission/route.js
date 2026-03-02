@@ -1,18 +1,20 @@
 // src/app/api/evaluate-quiz-submission/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getVertexAIModel } from '@/lib/vertexai';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  let authMode = 'none';
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+      logRouteResult('/api/evaluate-quiz-submission', authMode, 401);
+      return unauthorizedResponse();
     }
 
     const { plan_topic_id, quiz_mode, attempts } = await request.json();
@@ -80,7 +82,7 @@ export async function POST(request) {
     const { data: sessionData, error: sessionError } = await supabase
       .from('quiz_sessions')
       .insert({
-        user_id: session.user.id,
+        user_id: user.id,
         plan_topic_id,
         score,
         ai_feedback_summary: aiFeedbackSummary,
@@ -104,6 +106,7 @@ export async function POST(request) {
     if (attemptsError) throw new Error(`DB Error (attempts): ${attemptsError.message}`);
 
     // 4. Return the full results object to the frontend
+    logRouteResult('/api/evaluate-quiz-submission', authMode, 200);
     return new Response(JSON.stringify({
         score,
         feedback_summary: aiFeedbackSummary,
@@ -112,6 +115,7 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Full error in evaluate-quiz-submission API:', error);
+    logRouteResult('/api/evaluate-quiz-submission', authMode, 500);
     return new Response(JSON.stringify({ error: error.message || 'An internal error occurred.' }), { status: 500 });
   }
 }

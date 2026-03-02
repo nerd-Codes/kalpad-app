@@ -1,16 +1,17 @@
 // src/app/api/save-regenerated-plan/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  let authMode = 'none';
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+      logRouteResult('/api/save-regenerated-plan', authMode, 401);
+      return unauthorizedResponse();
     }
 
     const { 
@@ -40,10 +41,12 @@ export async function POST(request) {
         throw new Error(`Database transaction failed: ${rpcError.message}`);
     }
 
+    logRouteResult('/api/save-regenerated-plan', authMode, 200);
     return new Response(JSON.stringify({ message: 'Plan regenerated and saved successfully', new_plan_id: newPlanId }), { status: 200 });
 
   } catch (error) {
     console.error('Full error in save-regenerated-plan API:', error);
+    logRouteResult('/api/save-regenerated-plan', authMode, 500);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

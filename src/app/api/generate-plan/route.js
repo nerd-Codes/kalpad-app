@@ -1,9 +1,8 @@
 // src/app/api/generate-plan/route.js
 
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { getVertexAIModel, getVertexAIEmbeddingModel } from '@/lib/vertexai';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -357,29 +356,15 @@ function getModeSpecificPlanning(mode) {
 }
 
 export async function POST(request) {
+  const auth = await resolveRouteAuth(request, { allowGuest: true });
+  const supabase = auth.supabase;
+  const session = auth.user ? { user: auth.user } : null;
+  const isGuest = auth.isGuest;
+  const authMode = auth.authMode;
 
-  const supabase = createRouteHandlerClient({ cookies });
-  let session;
-  const authHeader = request.headers.get('Authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-      const jwt = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabase.auth.getUser(jwt);
-      if (user) { session = { user }; }
-  }
-  if (!session) {
-      const { data } = await supabase.auth.getSession();
-      session = data.session;
-  }
-
-  const isGuestRequest = request.headers.get('x-is-guest') === 'true';
-  let isGuest = false;
-
-  if (!session) {
-      if (isGuestRequest) {
-          isGuest = true;
-      } else {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-      }
+  if (!session && !isGuest) {
+    logRouteResult('/api/generate-plan', authMode, 401);
+    return unauthorizedResponse();
   }
 
   const { examName, syllabus, examDate, useDocuments, studyHoursPerDay, planMode = 'default' } = await request.json();
@@ -390,8 +375,9 @@ export async function POST(request) {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   if (isGuest && diffDays > 8) { // 8 to allow for timezone buffer
+       logRouteResult('/api/generate-plan', authMode, 403);
        return new Response(JSON.stringify({ error: 'Guest plans are limited to 1 week. Please sign up for longer plans.' }), { status: 403 });
-  }
+   }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -795,5 +781,6 @@ export async function POST(request) {
     }
   });
 
+  logRouteResult('/api/generate-plan', authMode, 200);
   return new Response(stream, { headers: { 'Content-Type': 'application/json' } });
 }

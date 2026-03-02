@@ -1,16 +1,17 @@
 // src/app/api/archive-plans/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  let authMode = 'none';
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+      logRouteResult('/api/archive-plans', authMode, 401);
+      return unauthorizedResponse();
     }
 
     const { planIds } = await request.json();
@@ -24,17 +25,19 @@ export async function POST(request) {
       .from('study_plans')
       .update({ is_active: false })
       .in('id', planIds)
-      .eq('user_id', session.user.id); // Ensure users can only update their own plans.
+      .eq('user_id', user.id); // Ensure users can only update their own plans.
 
     if (error) {
       console.error('Supabase error during plan archival:', error);
       throw new Error(`Database error: ${error.message}`);
     }
 
+    logRouteResult('/api/archive-plans', authMode, 200);
     return new Response(JSON.stringify({ message: `${planIds.length} plan(s) archived successfully.` }), { status: 200 });
 
   } catch (error) {
     console.error('Full error in archive-plans API:', error);
+    logRouteResult('/api/archive-plans', authMode, 500);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

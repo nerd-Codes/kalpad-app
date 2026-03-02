@@ -1,18 +1,20 @@
 // src/app/api/generate-quiz/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getVertexAIModel } from '@/lib/vertexai';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  let authMode = 'none';
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+      logRouteResult('/api/generate-quiz', authMode, 401);
+      return unauthorizedResponse();
     }
 
     // --- DEFINITIVE UPGRADE: ACCEPT NEW PARAMETERS ---
@@ -76,10 +78,12 @@ export async function POST(request) {
 
     const quizData = JSON.parse(result.response.candidates[0].content.parts[0].text);
 
+    logRouteResult('/api/generate-quiz', authMode, 200);
     return new Response(JSON.stringify(quizData), { status: 200 });
 
   } catch (error) {
     console.error('Full error in generate-quiz API:', error);
+    logRouteResult('/api/generate-quiz', authMode, 500);
     return new Response(JSON.stringify({ error: error.message || 'An internal error occurred.' }), { status: 500 });
   }
 }

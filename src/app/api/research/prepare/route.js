@@ -1,17 +1,22 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import axios from 'axios';
 import { inngest } from "@/lib/inngest";
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export async function POST(req) {
-    const supabase = createRouteHandlerClient({ cookies });
     const { paper_id } = await req.json();
+    let authMode = 'none';
+    let supabase = null;
 
     try {
-        // 1. Get user session for auth
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const auth = await resolveRouteAuth(req);
+        authMode = auth.authMode;
+        const { supabase: authedSupabase, user } = auth;
+        supabase = authedSupabase;
+        if (!user) {
+            logRouteResult('/api/research/prepare', authMode, 401);
+            return unauthorizedResponse();
+        }
 
         // 2. Fetch paper metadata
         const { data: paper, error: fetchError } = await supabase
@@ -35,7 +40,7 @@ export async function POST(req) {
             });
 
             // Upload to Supabase
-            const filePath = `${session.user.id}/fetched_papers/${paper_id}.pdf`;
+            const filePath = `${user.id}/fetched_papers/${paper_id}.pdf`;
             const { error: uploadError } = await supabase.storage
                 .from('study-materials')
                 .upload(filePath, response.data, { contentType: 'application/pdf', upsert: true });
@@ -52,18 +57,22 @@ export async function POST(req) {
         // 5. Send lightweight event to Inngest
         await inngest.send({
             name: "research/analysis.requested",
-            data: { paper_id, user_id: session.user.id }
+            data: { paper_id, user_id: user.id }
         });
 
+        logRouteResult('/api/research/prepare', authMode, 200);
         return NextResponse.json({ success: true, message: "Analysis queued." });
 
     } catch (error) {
         console.error("Prepare API Error:", error.message);
         // If download fails, update status so UI can react
-        await supabase.from('research_papers')
-            .update({ status: 'upload_needed', analyst_output: { error: `Download failed: ${error.message}` } })
-            .eq('id', paper_id);
+        if (supabase) {
+            await supabase.from('research_papers')
+                .update({ status: 'upload_needed', analyst_output: { error: `Download failed: ${error.message}` } })
+                .eq('id', paper_id);
+        }
             
+        logRouteResult('/api/research/prepare', authMode, 500);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

@@ -1,18 +1,19 @@
 // src/app/api/sync-guest-data/route.js
 
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+    let authMode = 'none';
     try {
-        const supabase = createRouteHandlerClient({ cookies });
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const auth = await resolveRouteAuth(request);
+        authMode = auth.authMode;
+        const { supabase, user } = auth;
+        if (!user) {
+            logRouteResult('/api/sync-guest-data', authMode, 401);
+            return unauthorizedResponse();
         }
 
         const body = await request.json();
@@ -29,7 +30,7 @@ export async function POST(request) {
         const { data: newPlan, error: planError } = await supabase
             .from('study_plans')
             .insert({
-                user_id: session.user.id,
+                user_id: user.id,
                 exam_name: examName,
                 exam_date: examDate,
                 syllabus: syllabus,
@@ -73,7 +74,7 @@ export async function POST(request) {
 
                 if (parentTopic) {
                     notesPayload.push({
-                        user_id: session.user.id,
+                        user_id: user.id,
                         plan_topic_id: parentTopic.id,
                         sub_topic_text: note.sub_topic_text,
                         notes_markdown: note.notes_markdown,
@@ -91,10 +92,12 @@ export async function POST(request) {
             }
         }
 
+        logRouteResult('/api/sync-guest-data', authMode, 200);
         return NextResponse.json({ success: true, planId: newPlan.id });
 
     } catch (error) {
         console.error("Sync Guest Data Error:", error);
+        logRouteResult('/api/sync-guest-data', authMode, 500);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

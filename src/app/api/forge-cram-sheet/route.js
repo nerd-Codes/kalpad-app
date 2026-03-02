@@ -1,16 +1,17 @@
 // src/app/api/forge-cram-sheet/route.js
 
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { getVertexAIModel } from '@/lib/vertexai';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    const authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+        logRouteResult('/api/forge-cram-sheet', authMode, 401);
+        return unauthorizedResponse();
     }
 
     const { plan_id } = await request.json();
@@ -36,7 +37,7 @@ export async function POST(request) {
                 // --- Step 1: Initial DB Setup ---
                 const { data: newSheet, error: insertError } = await supabase
                     .from('generated_cram_sheets')
-                    .insert({ plan_id, user_id: session.user.id, status: 'in_progress' })
+                    .insert({ plan_id, user_id: user.id, status: 'in_progress' })
                     .select('id')
                     .single();
 
@@ -46,7 +47,7 @@ export async function POST(request) {
                             .from('generated_cram_sheets')
                             .update({ status: 'in_progress', markdown_content: null })
                             .eq('plan_id', plan_id)
-                            .eq('user_id', session.user.id)
+                            .eq('user_id', user.id)
                             .select('id')
                             .single();
                         if (updateError) throw new Error(`DB conflict and update failed: ${updateError.message}`);
@@ -232,6 +233,7 @@ export async function POST(request) {
         }
     });
 
+    logRouteResult('/api/forge-cram-sheet', authMode, 200);
     return new Response(stream, {
         headers: {
             'Content-Type': 'text/event-stream',

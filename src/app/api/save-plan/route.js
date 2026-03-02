@@ -1,36 +1,19 @@
 // src/api/save-plan/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 // Note: We no longer need the Gemini AI client in this file.
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  let authMode = 'none';
   try {
-          const supabase = createRouteHandlerClient({ cookies });
-      let session;
-
-      // First, try to get user from the mobile app's JWT in the Authorization header
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-          const jwt = authHeader.replace('Bearer ', '');
-          const { data: { user } } = await supabase.auth.getUser(jwt);
-          // If the JWT is valid, we create a session object
-          if (user) {
-              session = { user }; 
-          }
-      }
-
-      // If there was no valid mobile session, fall back to the web app's cookie method
-      if (!session) {
-          const { data } = await supabase.auth.getSession();
-          session = data.session;
-      }
-
-      // If we still don't have a session after checking both methods, deny access
-      if (!session) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-      }
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+      logRouteResult('/api/save-plan', authMode, 401);
+      return unauthorizedResponse();
+    }
 
     const { exam_name, exam_date, plan_topics, generation_context, syllabus, page_image_urls } = await request.json();
     if (!exam_name || !exam_date || !plan_topics || !syllabus) {
@@ -39,7 +22,7 @@ export async function POST(request) {
 
     // 1. Save the main plan details
     const { data: planData, error: planError } = await supabase.from('study_plans').insert({
-        user_id: session.user.id,
+        user_id: user.id,
         exam_name, exam_date, generation_context, syllabus,
     }).select().single();
     if (planError) throw new Error(`DB error (study_plans): ${planError.message}`);
@@ -78,9 +61,11 @@ export async function POST(request) {
     const { error: topicsError } = await supabase.from('plan_topics').insert(topicsToInsert);
     if (topicsError) throw new Error(`DB error (plan_topics): ${topicsError.message}`);
 
+    logRouteResult('/api/save-plan', authMode, 200);
     return new Response(JSON.stringify({ message: 'Plan saved successfully' }), { status: 200 });
   } catch (error) {
     console.error('Full error in save-plan API:', error);
+    logRouteResult('/api/save-plan', authMode, 500);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

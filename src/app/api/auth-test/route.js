@@ -1,39 +1,21 @@
 // src/app/api/auth-test/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
-async function getUserByJwt(supabase, authHeader) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return null;
-    }
-    const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user } } = await supabase.auth.getUser(jwt);
-    return user;
-}
-
 export async function GET(request) {
+  let authMode = 'none';
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    let user;
-
-    // First, try to get user from the mobile app's JWT
-    const authHeader = request.headers.get('Authorization');
-    user = await getUserByJwt(supabase, authHeader);
-
-    // If no JWT user, fall back to the web app's cookie session
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const { user } = auth;
     if (!user) {
-        const { data: { session } } = await supabase.auth.getSession();
-        user = session?.user;
-    }
-
-    // If still no user, deny access
-    if (!user) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      logRouteResult('/api/auth-test', authMode, 401);
+      return unauthorizedResponse();
     }
 
     // If authentication is successful, return a success message
+    logRouteResult('/api/auth-test', authMode, 200);
     return new Response(JSON.stringify({ 
         message: 'Authentication successful!',
         userId: user.id,
@@ -42,6 +24,7 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('Full error in auth-test API:', error);
+    logRouteResult('/api/auth-test', authMode, 500);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

@@ -1,7 +1,6 @@
 // src/app/api/share-plan/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 // Use the Service Role Key for elevated privileges, ONLY on the server.
 const supabaseAdmin = createClient(
@@ -12,12 +11,14 @@ const supabaseAdmin = createClient(
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  let authMode = 'none';
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+      logRouteResult('/api/share-plan', authMode, 401);
+      return unauthorizedResponse();
     }
 
     const { plan_id } = await request.json();
@@ -46,7 +47,7 @@ export async function POST(request) {
       .from('study_plans')
       .select('*, plan_topics(*)')
       .eq('id', plan_id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single();
 
     if (privatePlanError || !privatePlan) {
@@ -58,7 +59,7 @@ export async function POST(request) {
       .from('public_plans')
       .insert({
         source_plan_id: privatePlan.id,
-        user_id: session.user.id,
+        user_id: user.id,
         exam_name: privatePlan.exam_name,
         exam_date: privatePlan.exam_date,
         generation_context: privatePlan.generation_context
@@ -87,10 +88,12 @@ export async function POST(request) {
     if (topicsError) throw topicsError;
 
     // 5. Return the new public ID.
+    logRouteResult('/api/share-plan', authMode, 201);
     return new Response(JSON.stringify({ public_id: newPublicPlan.public_id }), { status: 201 });
 
   } catch (error) {
     console.error('Full error in share-plan API:', error);
+    logRouteResult('/api/share-plan', authMode, 500);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

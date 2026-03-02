@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 // The Librarian's Search Engine
 export async function POST(req) {
+    let authMode = 'none';
     try {
+        const auth = await resolveRouteAuth(req);
+        authMode = auth.authMode;
+        if (!auth.user) {
+            logRouteResult('/api/research/search', authMode, 401);
+            return unauthorizedResponse();
+        }
+
         // 1. Accept new params: sort and limit
         const { query, offset = 0, limit = 10, sort = 'relevance' } = await req.json();
 
@@ -23,6 +32,7 @@ export async function POST(req) {
 
         const response = await axios.get(url, { headers });
 
+        logRouteResult('/api/research/search', authMode, 200);
         return NextResponse.json({ 
             data: response.data.data || [], 
             total: response.data.total 
@@ -30,6 +40,7 @@ export async function POST(req) {
 
     } catch (error) {
         console.error("Librarian Search Error:", error.response?.data || error.message);
+        logRouteResult('/api/research/search', authMode, 500);
         return NextResponse.json({ error: "Failed to fetch research papers." }, { status: 500 });
     }
 }

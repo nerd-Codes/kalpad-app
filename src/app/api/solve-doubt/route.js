@@ -2,11 +2,20 @@
 
 // --- MODIFICATION: Import our robust Vertex AI utility ---
 import { getVertexAIModel } from '@/lib/vertexai';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 // --- MODIFICATION: The 'groq' dependency is no longer needed ---
 
 export async function POST(req) {
+  let authMode = 'none';
   try {
+    const auth = await resolveRouteAuth(req);
+    authMode = auth.authMode;
+    if (!auth.user) {
+      logRouteResult('/api/solve-doubt', authMode, 401);
+      return unauthorizedResponse();
+    }
+
     const body = await req.json();
     const payload = body.data || body;
 
@@ -75,6 +84,7 @@ export async function POST(req) {
     const aiResponseText = response.response.candidates[0]?.content?.parts[0]?.text || 'Sorry, I could not generate a response.';
 
     // Return the full response in a single JSON object (unchanged).
+    logRouteResult('/api/solve-doubt', authMode, 200);
     return new Response(JSON.stringify({ response: aiResponseText }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -84,6 +94,7 @@ export async function POST(req) {
     console.error('Error in /api/solve-doubt:', error);
     // The Vertex AI SDK often nests the core error message, so we check for it.
     const errorMessage = error.response?.candidates?.[0]?.finishReason || error.message || 'An unknown error occurred.';
+    logRouteResult('/api/solve-doubt', authMode, 500);
     return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
   }
 }

@@ -1,10 +1,9 @@
 // src/app/api/payment/initiate-payu/route.js
 
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,16 +16,16 @@ const PLANS = {
 };
 
 export async function POST(request) {
+    let authMode = 'none';
     try {
-        // 1. Authenticate User
-        const supabase = createRouteHandlerClient({ cookies });
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const auth = await resolveRouteAuth(request);
+        authMode = auth.authMode;
+        if (!auth.user) {
+            logRouteResult('/api/payment/initiate-payu', authMode, 401);
+            return unauthorizedResponse();
         }
 
-        const user = session.user;
+        const user = auth.user;
         const { planId } = await request.json();
         
         // 2. Validate Plan
@@ -85,6 +84,7 @@ export async function POST(request) {
 
         // 5. Return Form Data
         // The frontend will create a hidden form with these values and submit it.
+        logRouteResult('/api/payment/initiate-payu', authMode, 200);
         return NextResponse.json({
             action: 'https://secure.payu.in/_payment', // Use https://test.payu.in/_payment for testing
             params: {
@@ -105,6 +105,7 @@ export async function POST(request) {
 
     } catch (error) {
         console.error("PayU Initiation Failed:", error);
+        logRouteResult('/api/payment/initiate-payu', authMode, 500);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

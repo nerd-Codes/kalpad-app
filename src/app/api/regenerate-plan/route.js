@@ -1,8 +1,7 @@
 // src/api/regenerate-plan/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { getVertexAIModel } from '@/lib/vertexai';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
@@ -66,10 +65,12 @@ function analyzeUserPerformance(planTopics, userDeclaredHours) {
 }
 
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    const authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+      logRouteResult('/api/regenerate-plan', authMode, 401);
+      return unauthorizedResponse();
     }
 
     const { plan_id, user_feedback, user_declared_hours } = await request.json();
@@ -78,7 +79,7 @@ function analyzeUserPerformance(planTopics, userDeclaredHours) {
     const { data: existingPlan, error: fetchError } = await supabase
       .from('study_plans')
       .select(`*, plan_topics(*, quiz_sessions(score, created_at))`)
-      .eq('id', plan_id).eq('user_id', session.user.id).single();
+      .eq('id', plan_id).eq('user_id', user.id).single();
     if (fetchError) throw new Error(`Failed to fetch plan: ${fetchError.message}`);
 
     const today = new Date();
@@ -381,6 +382,7 @@ function analyzeUserPerformance(planTopics, userDeclaredHours) {
             }
         });
 
+        logRouteResult('/api/regenerate-plan', authMode, 200);
         return new Response(stream, { headers: { 'Content-Type': 'application/json' } });
 
   } catch (error) {

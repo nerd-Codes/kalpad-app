@@ -1,7 +1,6 @@
 // src/app/api/export-note-pdf/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { PDFDocument } from 'pdf-lib';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,11 +45,13 @@ function chunkMarkdown(markdown, chunkSize) {
 }
 
 export async function POST(request) {
+  let authMode = 'none';
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    if (!auth.user) {
+      logRouteResult('/api/export-note-pdf', authMode, 401);
+      return unauthorizedResponse();
     }
 
     const { markdown, topicName, subTopicName, css } = await request.json();
@@ -112,6 +113,7 @@ export async function POST(request) {
 
     const mergedPdfBytes = await mergedPdf.save();
 
+    logRouteResult('/api/export-note-pdf', authMode, 200);
     return new Response(mergedPdfBytes, {
       headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="note.pdf"' },
       status: 200,
@@ -119,6 +121,7 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Full error in export-note-pdf API:', error);
+    logRouteResult('/api/export-note-pdf', authMode, 500);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

@@ -1,42 +1,25 @@
 // src/api/ingest-document/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  let authMode = 'none';
   try {
-          const supabase = createRouteHandlerClient({ cookies });
-      let session;
-
-      // First, try to get user from the mobile app's JWT in the Authorization header
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-          const jwt = authHeader.replace('Bearer ', '');
-          const { data: { user } } = await supabase.auth.getUser(jwt);
-          // If the JWT is valid, we create a session object
-          if (user) {
-              session = { user }; 
-          }
-      }
-
-      // If there was no valid mobile session, fall back to the web app's cookie method
-      if (!session) {
-          const { data } = await supabase.auth.getSession();
-          session = data.session;
-      }
-
-      // If we still don't have a session after checking both methods, deny access
-      if (!session) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-      }
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+      logRouteResult('/api/ingest-document', authMode, 401);
+      return unauthorizedResponse();
+    }
 
     const { text_chunks, page_image_urls, file_name } = await request.json();
     
     // Safety first: delete any old version of this document to prevent duplicates.
-    await supabase.from('documents').delete().eq('user_id', session.user.id).eq('file_name', file_name);
+    await supabase.from('documents').delete().eq('user_id', user.id).eq('file_name', file_name);
 
     const documentsToInsert = [];
     let failedChunks = 0;
@@ -74,7 +57,7 @@ export async function POST(request) {
     // First, the image entries
     page_image_urls.forEach((url, index) => {
         finalDocumentsToInsert.push({
-            user_id: session.user.id, file_name,
+            user_id: user.id, file_name,
             content_type: 'image_page',
             page_number: index + 1,
             image_url: url,
@@ -86,7 +69,7 @@ export async function POST(request) {
     const chunksPerPage = Math.ceil(documentsToInsert.length / page_image_urls.length);
     documentsToInsert.forEach((doc, i) => {
         finalDocumentsToInsert.push({
-            user_id: session.user.id, file_name,
+            user_id: user.id, file_name,
             content_type: 'text_chunk',
             page_number: Math.floor(i / chunksPerPage) + 1,
             content: doc.content,
@@ -104,9 +87,11 @@ export async function POST(request) {
     const successMessage = `Successfully ingested content for '${file_name}'. ${documentsToInsert.length} text chunks were indexed.`;
     const finalMessage = failedChunks > 0 ? `${successMessage} ${failedChunks} text chunks failed to process.` : successMessage;
 
+    logRouteResult('/api/ingest-document', authMode, 200);
     return new Response(JSON.stringify({ message: finalMessage }), { status: 200 });
   } catch (error) {
     console.error('Full error in ingest-document API:', error);
+    logRouteResult('/api/ingest-document', authMode, 500);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

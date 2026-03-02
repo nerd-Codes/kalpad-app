@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export async function POST(request) {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return NextResponse.json({}, { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    const authMode = auth.authMode;
+    if (!auth.user) {
+        logRouteResult('/api/payment/dismiss-notification', authMode, 401);
+        return unauthorizedResponse();
+    }
 
     const { txnid } = await request.json();
 
@@ -20,7 +22,8 @@ export async function POST(request) {
         .from('payment_transactions')
         .update({ user_notified: true })
         .eq('txnid', txnid)
-        .eq('user_id', session.user.id); // Security check
+        .eq('user_id', auth.user.id); // Security check
 
+    logRouteResult('/api/payment/dismiss-notification', authMode, 200);
     return NextResponse.json({ success: true });
 }

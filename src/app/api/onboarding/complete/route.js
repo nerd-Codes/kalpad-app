@@ -1,27 +1,20 @@
 // /src/app/api/onboarding/complete/route.js
 
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
-    // 1. Initialize the client designed specifically for Route Handlers.
-    const supabase = createRouteHandlerClient({ cookies });
+    let authMode = 'none';
 
     try {
-        // 2. Fetch the user session directly and robustly.
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!session) {
-            // If no session, the user is not logged in.
-            return new Response(JSON.stringify({ error: 'Unauthorized: No active session.' }), {
-                status: 401,
-                headers: { 'Content-Type': 'application/json' },
-            });
+        const auth = await resolveRouteAuth(request);
+        authMode = auth.authMode;
+        const { supabase, user } = auth;
+        if (!user) {
+            logRouteResult('/api/onboarding/complete', authMode, 401);
+            return unauthorizedResponse();
         }
-        
-        const user = session.user;
 
         // 3. Perform the update operation.
         const { data, error: updateError } = await supabase
@@ -42,6 +35,7 @@ export async function POST(request) {
         // it will be treated as an error and caught above. So we no longer need the `!data` check here.
         
         // 4. Respond with a success message.
+        logRouteResult('/api/onboarding/complete', authMode, 200);
         return new Response(JSON.stringify({ message: 'Onboarding status updated successfully.', updatedData: data }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -49,6 +43,7 @@ export async function POST(request) {
 
     } catch (error) {
         console.error("Critical Error in /api/onboarding/complete:", error.message);
+        logRouteResult('/api/onboarding/complete', authMode, 500);
         return new Response(JSON.stringify({ error: 'Failed to update onboarding status.', details: error.message }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },

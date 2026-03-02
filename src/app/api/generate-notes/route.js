@@ -1,10 +1,8 @@
 // src/app/api/generate-notes/route.js
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { inngest } from '@/lib/inngest';
 import { getVertexAIModel } from '@/lib/vertexai'; 
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const dynamic = 'force-dynamic';
@@ -24,29 +22,14 @@ function cleanJSON(text) {
 }
 
 export async function POST(request) {
+  let authMode = 'none';
   try {
-    let supabase;
-    let session;
-
-    // --- AUTHENTICATION ---
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        const jwt = authHeader.replace('Bearer ', '');
-        supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-            { global: { headers: { Authorization: `Bearer ${jwt}` } } }
-        );
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) { session = { user }; }
-    } else {
-        supabase = createRouteHandlerClient({ cookies });
-        const { data } = await supabase.auth.getSession();
-        session = data.session;
-    }
-
-    if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+        logRouteResult('/api/generate-notes', authMode, 401);
+        return unauthorizedResponse();
     }
 
     const { plan_topic_id, sub_topic_text, exam_name, day_topic } = await request.json();
@@ -286,7 +269,7 @@ export async function POST(request) {
     const { data: savedNote, error: saveError } = await supabase
       .from('generated_notes')
       .upsert({
-        user_id: session.user.id,
+        user_id: user.id,
         plan_topic_id: plan_topic_id,
         sub_topic_text: sub_topic_text,
         notes_markdown: notesText,
@@ -303,15 +286,17 @@ export async function POST(request) {
         name: 'notes/illustration.requested',
         data: {
           note_id: savedNote.id,
-          user_id: session.user.id
+          user_id: user.id
         }
       });
     }
 
+    logRouteResult('/api/generate-notes', authMode, 200);
     return new Response(JSON.stringify({ note: savedNote }), { status: 200 });
 
   } catch (error) {
     console.error('Full error in generate-notes API:', error);
+    logRouteResult('/api/generate-notes', authMode, 500);
     return new Response(JSON.stringify({ error: error.message || 'An internal error occurred.' }), { status: 500 });
   }
 }

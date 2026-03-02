@@ -1,18 +1,19 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { generateEmbeddings } from '@/lib/vertexEmbedding'; 
 import { getVertexAIModel } from '@/lib/vertexai'; 
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  let authMode = 'none';
   try {
     // 1. Auth & Session Verification
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    const auth = await resolveRouteAuth(request);
+    authMode = auth.authMode;
+    const { supabase, user } = auth;
+    if (!user) {
+      logRouteResult('/api/research/chat', authMode, 401);
+      return unauthorizedResponse();
     }
 
     const { query, projectId } = await request.json();
@@ -72,6 +73,7 @@ export async function POST(request) {
     const result = await model.generateContent(prompt);
     const responseText = result.response.candidates[0].content.parts[0].text;
 
+    logRouteResult('/api/research/chat', authMode, 200);
     return new Response(JSON.stringify({ response: responseText }), { 
         status: 200,
         headers: { 'Content-Type': 'application/json' }
@@ -79,6 +81,7 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Project Curie Chat Failure:', error);
+    logRouteResult('/api/research/chat', authMode, 500);
     return new Response(JSON.stringify({ 
         error: error.message || 'The Consultant encountered a cognitive error.',
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined

@@ -1,20 +1,22 @@
 // /src/app/api/start-lecture-curation/route.js
 
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { inngest } from '@/lib/inngest';
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-    }
+    let authMode = 'none';
 
     try {
+        const auth = await resolveRouteAuth(request);
+        authMode = auth.authMode;
+        const { supabase, user } = auth;
+        if (!user) {
+            logRouteResult('/api/start-lecture-curation', authMode, 401);
+            return unauthorizedResponse();
+        }
+
         // 1. Receive the FULL, rich payload from the client.
         const payload = await request.json();
         const { plan_id, topics_to_curate, all_todays_topics, timezone } = payload;
@@ -49,6 +51,7 @@ export async function POST(request) {
         });
         
         // 4. Respond to the client with the job ID so it can start polling.
+        logRouteResult('/api/start-lecture-curation', authMode, 202);
         return new Response(JSON.stringify({ job_id: jobData.id }), {
             status: 202, // 202 Accepted
             headers: { 'Content-Type': 'application/json' },
@@ -56,6 +59,7 @@ export async function POST(request) {
 
     } catch (error) {
         console.error("Error starting lecture curation job:", error);
+        logRouteResult('/api/start-lecture-curation', authMode, 500);
         return new Response(JSON.stringify({ error: 'Failed to start curation job.', details: error.message }), {
             status: 500,
         });

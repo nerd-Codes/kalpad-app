@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { inngest } from "@/lib/inngest";
+import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
 export async function POST(req) {
+    let authMode = 'none';
     try {
         const { paper_id, project_id } = await req.json();
 
-        // 1. Verify Auth (Security)
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        );
-        // Note: In a real app, we'd pass the auth header to verify the user via supabase.auth.getUser()
-        // For MVP speed, we'll trust the client but in production, ALWAYS verify the session here.
+        const auth = await resolveRouteAuth(req);
+        authMode = auth.authMode;
+        const user = auth.user;
+        if (!user) {
+            logRouteResult('/api/research/analyze', authMode, 401);
+            return unauthorizedResponse();
+        }
 
         if (!paper_id || !project_id) {
             return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
@@ -24,14 +25,16 @@ export async function POST(req) {
             data: {
                 paper_id,
                 project_id,
-                // We can pass user_id if we extract it from session
+                user_id: user.id
             },
         });
 
+        logRouteResult('/api/research/analyze', authMode, 200);
         return NextResponse.json({ success: true, message: "Analysis queued" });
 
     } catch (error) {
         console.error("Trigger Error:", error);
+        logRouteResult('/api/research/analyze', authMode, 500);
         return NextResponse.json({ error: "Failed to start analysis" }, { status: 500 });
     }
 }
