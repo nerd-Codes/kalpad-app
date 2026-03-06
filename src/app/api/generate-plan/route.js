@@ -583,7 +583,7 @@ export async function POST(request) {
                 **  MODE-SPECIFIC PLANNING DIRECTIVE (UNBREAKABLE):**
                 ${plannerDirectives}
 
-                  **ADDITIONAL CRITICAL ANALYSIS:**
+                  **ADDITIONAL CRITICAL ANALYSIS(ONLY FOR BALANCED MODE):**
                     1. Look for **HIDDEN DEPENDENCIES** (e.g., "Cannot do Fluid Dynamics without Calculus").
                     2. Look for **TRAP TOPICS** (Topics that look short but take forever).
 
@@ -616,7 +616,7 @@ export async function POST(request) {
               **  MODE-SPECIFIC PLANNING DIRECTIVE (UNBREAKABLE):**
                 ${plannerDirectives}
 
-              **ADDITIONAL CRITICAL ANALYSIS:**
+              **ADDITIONAL CRITICAL ANALYSIS(ONLY FOR BALANCED MODE):**
               1. Look for **HIDDEN DEPENDENCIES** (e.g., "Cannot do Fluid Dynamics without Calculus").
               2. Look for **TRAP TOPICS** (Topics that look short but take forever).
 
