@@ -53,7 +53,21 @@ export async function POST(request) {
           - **'Problem Solving'**: Focus on application-based questions that require calculation or scenario analysis.
       3.  For each question, provide exactly 4 options. One must be correct.
       4.  Ensure the options are plausible and challenging.
-      5.  Your entire output MUST be a valid JSON object that adheres strictly to the following schema.
+      5.  Question text and options may use clean Markdown and LaTeX where helpful.
+      6.  Your entire output MUST be a valid JSON object that adheres strictly to the following schema.
+
+      **LATEX STYLE GUIDE (UNBREAKABLE FOR KATEX COMPATIBILITY):**
+      1.  Use only \`$...$\` for inline math and \`$$...$$\` for display math.
+      2.  Do NOT use \`\\(...\\)\` or \`\\[...\\]\`.
+      3.  Allowed environments only: \`{matrix}\`, \`{pmatrix}\`, \`{bmatrix}\`, \`{Vmatrix}\`, \`{vmatrix}\`, \`{align}\`, \`{aligned}\`, \`{cases}\`.
+      4.  Do NOT use unsupported environments like \`{equation}\`, \`{eqnarray}\`, or \`{gather}\`.
+      5.  Use common vanilla LaTeX commands only.
+      6.  Inside math, escape special chars: \`\\%\`, \`\\_\`, and \`\\&\` (except \`\\&\` inside \`align/aligned\` columns).
+      7.  Ensure brackets/braces/parentheses are balanced and never nest \`$$...$$\` inside \`$$...$$\`.
+
+      **JSON ESCAPING RULE (MANDATORY):**
+      Because output is JSON, every LaTeX backslash must be double-escaped in string values.
+      Example: \`"question_text": "Compute $\\\\frac{d}{dx}x^2$"\`
 
       **JSON Schema:**
       {

@@ -52,7 +52,21 @@ export async function POST(request) {
             **CRITICAL INSTRUCTIONS:**
             1.  For each incorrect question, provide a concise, helpful explanation of **why** the user's answer was wrong and **why** the correct answer is right.
             2.  After providing explanations, write a brief, encouraging overall feedback summary (2-3 sentences). Identify the key concepts or topics the student should revisit based on their errors.
-            3.  Your entire output MUST be a valid JSON object that adheres strictly to the following schema.
+            3.  Explanations may use clean Markdown and LaTeX where helpful.
+            4.  Your entire output MUST be a valid JSON object that adheres strictly to the following schema.
+
+            **LATEX STYLE GUIDE (UNBREAKABLE FOR KATEX COMPATIBILITY):**
+            1.  Use only \`$...$\` for inline math and \`$$...$$\` for display math.
+            2.  Do NOT use \`\\(...\\)\` or \`\\[...\\]\`.
+            3.  Allowed environments only: \`{matrix}\`, \`{pmatrix}\`, \`{bmatrix}\`, \`{Vmatrix}\`, \`{vmatrix}\`, \`{align}\`, \`{aligned}\`, \`{cases}\`.
+            4.  Do NOT use unsupported environments like \`{equation}\`, \`{eqnarray}\`, or \`{gather}\`.
+            5.  Use common vanilla LaTeX commands only.
+            6.  Inside math, escape special chars: \`\\%\`, \`\\_\`, and \`\\&\` (except \`\\&\` inside \`align/aligned\` columns).
+            7.  Ensure brackets/braces/parentheses are balanced and never nest \`$$...$$\` inside \`$$...$$\`.
+
+            **JSON ESCAPING RULE (MANDATORY):**
+            Because output is JSON, every LaTeX backslash must be double-escaped in string values.
+            Example: \`"explanation": "Use $\\\\frac{1}{2}$, not $\\\\frac{2}{1}$."\`
 
             **JSON Schema:**
             {
