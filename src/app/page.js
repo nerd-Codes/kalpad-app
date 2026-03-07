@@ -1,15 +1,9 @@
 // src/app/page.js
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Navbar } from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
-import { AnimatePresence, motion } from 'framer-motion';
-
-
-import { PageLoader } from '@/components/PageLoader';
-import supabase from '@/lib/supabaseClient';
+import { motion } from 'framer-motion';
 
 // --- SECTIONS ---
 import { Hero } from "@/components/landing/personality/Hero";
@@ -72,41 +66,6 @@ function InfiniteVoid() {
 }
 
 export default function LandingPage() {
-    const [isLoading, setIsLoading] = useState(true);
-    const [isApp, setIsApp] = useState(false);
-    const [showGoldPass, setShowGoldPass] = useState(false);
-    const router = useRouter();
-
-    useEffect(() => {
-        const initialize = async () => {
-            const userAgent = navigator.userAgent;
-            if (userAgent.includes('KalPad-Android-App')) {
-                setIsApp(true);
-                const { data: { session } } = await supabase.auth.getSession();
-                router.replace(session ? '/dashboard' : '/sign-up');
-            } else {
-                setIsApp(false);
-                setTimeout(() => setIsLoading(false), 2000); 
-            }
-        };
-        initialize();
-    }, [router]);
-
-    useEffect(() => {
-        if (!isLoading && !isApp) {
-            const timer = setTimeout(() => setShowGoldPass(true), 8000); 
-            return () => clearTimeout(timer);
-        }
-    }, [isLoading, isApp]);
-
-    const handleClaimPass = () => {
-        const communitySection = document.getElementById('community-section');
-        if (communitySection) communitySection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setShowGoldPass(false);
-    };
-
-    if (isLoading || isApp) return <PageLoader isLoading={true} />;
-
     return (
         <>
             <InfiniteVoid />
