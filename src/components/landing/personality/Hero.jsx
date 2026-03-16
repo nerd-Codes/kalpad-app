@@ -246,7 +246,7 @@ export function Hero() {
                             <IconArrowRight size={18} color="white" />
                         </MagneticButton>
 
-                        <MagneticButton href="https://github.com/nerd-Codes/kalpad-app/releases/download/Android/KalPad-1-0-0.apk" primary={false}>
+                        <MagneticButton href="https://github.com/nerd-Codes/project-periselene/releases/download/Android/KalPad-1-0-0.apk" primary={false}>
                             <IconDownload size={18} color="white" />
                             <Text size="md" fw={600} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>Get App</Text>
                         </MagneticButton>

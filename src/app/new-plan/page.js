@@ -1200,9 +1200,6 @@ export default function NewPlanPage() {
                         >
                             <Loader size="lg" color="violet" type="dots" />
                             <Box>
-                                <Text size="xs" fw={700} c="violet.3" tt="uppercase" mb={10} style={{ letterSpacing: '0.12em' }}>
-                                    Did you know?
-                                </Text>
                                 {/* FIX 4: Bigger, bolder, more legible fact text */}
                                 <AnimatePresence mode="wait">
                                     <motion.div
