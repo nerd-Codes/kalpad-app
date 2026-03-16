@@ -806,9 +806,6 @@ export default function GuestPlanPage() {
                         }}>
                             <Loader size="lg" color="violet" type="dots" />
                             <Box>
-                                <Text size="xs" fw={700} c="violet.3" tt="uppercase" mb={10} style={{ letterSpacing: '0.12em' }}>
-                                    Did you know?
-                                </Text>
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key={currentFact}
