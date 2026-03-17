@@ -53,6 +53,64 @@ th { background: #f0f0f0; }
 .katex { font-family: 'Lexend Deca', 'Inter', serif; font-size: 1em; }
 @page { size: A4; margin: 0.3in; }`;
 
+// --- LATEX PREPROCESSING ---
+// remarkMath only treats $$...$$ as DISPLAY (block) math when blank lines exist
+// before and after the block. The LLM frequently omits them, so the parser
+// falls back to inline mode and renders equations in a garbled, run-on line.
+//
+// This normaliser runs on the raw markdown string BEFORE ReactMarkdown sees it.
+// It works line-by-line so it never accidentally mutates inline $...$ expressions.
+function preprocessMathBlocks(markdown) {
+    if (!markdown) return markdown;
+
+    const lines = markdown.split('\n');
+    const out   = [];
+    let inBlock = false;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line    = lines[i];
+        const trimmed = line.trim();
+
+        const isDelimiter = trimmed === '$$';
+
+        // Single-line display math: $$formula$$ all on one line.
+        // Split into open / content / close so remarkMath sees a proper block.
+        const singleLine = (
+            !isDelimiter &&
+            trimmed.startsWith('$$') &&
+            trimmed.endsWith('$$') &&
+            trimmed.length > 4
+        );
+
+        if (singleLine) {
+            if (out.length > 0 && out[out.length - 1].trim() !== '') out.push('');
+            out.push('$$');
+            out.push(trimmed.slice(2, -2).trim());
+            out.push('$$');
+            if (i + 1 < lines.length && lines[i + 1].trim() !== '') out.push('');
+            continue;
+        }
+
+        if (isDelimiter) {
+            if (!inBlock) {
+                // Opening $$: ensure a blank line before
+                if (out.length > 0 && out[out.length - 1].trim() !== '') out.push('');
+            }
+            out.push(line);
+            if (inBlock) {
+                // Closing $$: ensure a blank line after
+                if (i + 1 < lines.length && lines[i + 1].trim() !== '') out.push('');
+            }
+            inBlock = !inBlock;
+            continue;
+        }
+
+        out.push(line);
+    }
+
+    return out.join('\n');
+}
+
 // --- MODAL STYLES ---
 const glassPopupStyles = {
     content: { 
@@ -172,6 +230,49 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
             const isSvg = props.src.endsWith('.svg');
             const finalStyle = isSvg ? { maxWidth: '100%', maxHeight: '1500px', borderRadius: '8px', background: 'black', padding: '0.5rem' } : { maxWidth: '100%', maxHeight: '1500px', borderRadius: '8px' };
             return <span style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}><img {...props} style={finalStyle} /></span>;
+        },
+        // FIX: <div class="katex-display"> nested inside <p> is invalid HTML.
+        // Browsers auto-close the <p> mid-render, breaking layout.
+        // Render as <div> whenever children contain a display-math block.
+        p: ({ node, children, ...props }) => {
+            const hasMathBlock = (nodes) => {
+                if (!nodes) return false;
+                const arr = Array.isArray(nodes) ? nodes : [nodes];
+                return arr.some(child => {
+                    if (!child || typeof child !== 'object') return false;
+                    const cls = child.props?.className ?? '';
+                    if (cls.includes('katex-display')) return true;
+                    if (child.props?.children) return hasMathBlock(child.props.children);
+                    return false;
+                });
+            };
+            const childArr = Array.isArray(children) ? children : [children];
+            if (hasMathBlock(childArr)) {
+                return <div style={{ margin: '0.5em 0' }}>{children}</div>;
+            }
+            return <p {...props}>{children}</p>;
+        },
+        // FIX: Force katex-display spans to block-level so they never collapse
+        // into surrounding inline text flow.
+        span: ({ node, children, className, ...props }) => {
+            if (className?.includes('katex-display')) {
+                return (
+                    <div
+                        className={className}
+                        style={{
+                            display: 'block',
+                            margin: '1.4em auto',
+                            textAlign: 'center',
+                            overflowX: 'auto',
+                            maxWidth: '100%',
+                        }}
+                        {...props}
+                    >
+                        {children}
+                    </div>
+                );
+            }
+            return <span className={className} {...props}>{children}</span>;
         },
          mark: ({ node, ...props }) => {
             // Convert children to string safely
@@ -330,10 +431,10 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
                                 <Box className={markdownStyles.markdown} style={{ fontSize: '1.125rem' }}>
                                     <ReactMarkdown
                                         remarkPlugins={[remarkGfm, remarkMath]}
-                                        rehypePlugins={[rehypeRaw, rehypeKatex]}
+                                        rehypePlugins={[rehypeKatex, rehypeRaw]}
                                         components={customRenderers}
                                     >
-                                        {localMarkdown}
+                                        {preprocessMathBlocks(localMarkdown)}
                                     </ReactMarkdown>
                                 </Box>
                             ) : (
@@ -422,8 +523,8 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
                     {error && <Alert color="red" title="Error">{error}</Alert>}
                     {aiResponse && (
                         <Box className={markdownStyles.markdown} mah="60vh" style={{ overflowY: 'auto' }}>
-                             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, rehypeKatex]} components={customRenderers}>
-                                {aiResponse}
+                             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]} components={customRenderers}>
+                                {preprocessMathBlocks(aiResponse)}
                             </ReactMarkdown>
                         </Box>
                     )}

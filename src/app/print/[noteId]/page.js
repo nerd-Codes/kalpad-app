@@ -16,6 +16,44 @@ import { IconPrinter, IconAlertTriangle } from '@tabler/icons-react';
 
 import './print.css';
 
+// --- LATEX PREPROCESSING (same fix as FullscreenNoteViewer) ---
+// remarkMath only treats $$...$$ as display math when blank lines surround it.
+// The LLM often omits them, collapsing equations into garbled inline text.
+function preprocessMathBlocks(markdown) {
+    if (!markdown) return markdown;
+    const lines = markdown.split('\n');
+    const out   = [];
+    let inBlock = false;
+    for (let i = 0; i < lines.length; i++) {
+        const line    = lines[i];
+        const trimmed = line.trim();
+        const isDelimiter = trimmed === '$$';
+        const singleLine  = (
+            !isDelimiter &&
+            trimmed.startsWith('$$') &&
+            trimmed.endsWith('$$') &&
+            trimmed.length > 4
+        );
+        if (singleLine) {
+            if (out.length > 0 && out[out.length - 1].trim() !== '') out.push('');
+            out.push('$$');
+            out.push(trimmed.slice(2, -2).trim());
+            out.push('$$');
+            if (i + 1 < lines.length && lines[i + 1].trim() !== '') out.push('');
+            continue;
+        }
+        if (isDelimiter) {
+            if (!inBlock && out.length > 0 && out[out.length - 1].trim() !== '') out.push('');
+            out.push(line);
+            if (inBlock && i + 1 < lines.length && lines[i + 1].trim() !== '') out.push('');
+            inBlock = !inBlock;
+            continue;
+        }
+        out.push(line);
+    }
+    return out.join('\n');
+}
+
 export default function PrintNotePage() {
     const params = useParams();
     const { noteId } = params;
@@ -69,6 +107,47 @@ export default function PrintNotePage() {
     if (!note) return <Box p="xl"><Alert color="yellow">Note not found.</Alert></Box>;
 
     const customRenderers = {
+        // FIX: <div class="katex-display"> inside <p> is invalid HTML.
+        // Browsers auto-close the <p>, breaking layout. Degrade to <div> when needed.
+        p: ({ node, children, ...props }) => {
+            const hasMathBlock = (nodes) => {
+                if (!nodes) return false;
+                const arr = Array.isArray(nodes) ? nodes : [nodes];
+                return arr.some(child => {
+                    if (!child || typeof child !== 'object') return false;
+                    const cls = child.props?.className ?? '';
+                    if (cls.includes('katex-display')) return true;
+                    if (child.props?.children) return hasMathBlock(child.props.children);
+                    return false;
+                });
+            };
+            const childArr = Array.isArray(children) ? children : [children];
+            if (hasMathBlock(childArr)) {
+                return <div style={{ margin: '0.5em 0' }}>{children}</div>;
+            }
+            return <p {...props}>{children}</p>;
+        },
+        // FIX: Force katex-display spans to block-level with proper print margins.
+        span: ({ node, children, className, ...props }) => {
+            if (className?.includes('katex-display')) {
+                return (
+                    <div
+                        className={className}
+                        style={{
+                            display: 'block',
+                            margin: '1.4em auto',
+                            textAlign: 'center',
+                            overflowX: 'auto',
+                            maxWidth: '100%',
+                        }}
+                        {...props}
+                    >
+                        {children}
+                    </div>
+                );
+            }
+            return <span className={className} {...props}>{children}</span>;
+        },
         img: ({ node, ...props }) => {
             const isSvg = props.src && props.src.endsWith('.svg');
             const finalStyle = {
@@ -119,15 +198,15 @@ export default function PrintNotePage() {
             {/* The Paper Sheet */}
             <div className="paper-sheet">
                 <div className="printable-content">
-                    <Title order={1} className="print-title">{note.plan_topics.topic_name}</Title>
-                    <Title order={2} className="print-subtitle">{note.sub_topic_text}</Title>
+                    <Title order={2} className="print-title">{note.plan_topics.topic_name}</Title>
+                    <Title order={1} className="print-subtitle">{note.sub_topic_text}</Title>
                     
                     <ReactMarkdown 
                         remarkPlugins={[remarkGfm, remarkMath]}
-                        rehypePlugins={[rehypeRaw, rehypeKatex]}
+                        rehypePlugins={[rehypeKatex, rehypeRaw]}
                         components={customRenderers}
                     >
-                        {contentToRender}
+                        {preprocessMathBlocks(contentToRender)}
                     </ReactMarkdown>
                 </div>
             </div>
