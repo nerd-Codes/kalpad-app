@@ -1,7 +1,7 @@
 // src/components/landing/personality/Hero.jsx
 "use client";
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Container, Title, Text, Box, Group, Badge } from '@mantine/core';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { IconArrowRight, IconFileText, IconBattery1, IconClock, IconBrain, IconDownload } from '@tabler/icons-react';
@@ -145,6 +145,39 @@ function ScreenshotSlicer() {
 
 
 export function Hero() {
+    const defaultApkUrl = 'https://github.com/nerd-Codes/project-periselene/releases/download/Android/KalPad-1-0-1.apk';
+    const [latestApkUrl, setLatestApkUrl] = useState(defaultApkUrl);
+
+    useEffect(() => {
+        const abortController = new AbortController();
+
+        const fetchLatestApkUrl = async () => {
+            try {
+                const response = await fetch('/api/mobile/android/latest', {
+                    method: 'GET',
+                    cache: 'no-store',
+                    signal: abortController.signal
+                });
+
+                if (!response.ok) return;
+
+                const payload = await response.json();
+                const apkUrl = typeof payload?.apkUrl === 'string' ? payload.apkUrl.trim() : '';
+                if (apkUrl) setLatestApkUrl(apkUrl);
+            } catch (error) {
+                if (error?.name !== 'AbortError') {
+                    console.error('Failed to fetch latest Android release URL:', error);
+                }
+            }
+        };
+
+        fetchLatestApkUrl();
+
+        return () => {
+            abortController.abort();
+        };
+    }, []);
+
     // Volumetric Spotlight Tracking
     const mouseX = useMotionValue(0);
     const mouseY = useMotionValue(0);
@@ -246,7 +279,7 @@ export function Hero() {
                             <IconArrowRight size={18} color="white" />
                         </MagneticButton>
 
-                        <MagneticButton href="https://github.com/nerd-Codes/project-periselene/releases/download/Android/KalPad-1-0-0.apk" primary={false}>
+                        <MagneticButton href={latestApkUrl} primary={false}>
                             <IconDownload size={18} color="white" />
                             <Text size="md" fw={600} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>Get App</Text>
                         </MagneticButton>
