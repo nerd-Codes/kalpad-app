@@ -81,19 +81,30 @@ const TIER_CONFIG = {
     'pro_test': { label: 'Debug', color: '#F06595', icon: IconCheck, ring: '#F06595', badgeColor: 'pink', isSpecial: false }
 };
 
+const RESEARCH_BETA_EMAILS = new Set(['khushigarg1718@gmail.com']);
+
+function canAccessResearch(user) {
+    const normalizedEmail = user?.email?.trim().toLowerCase();
+    return Boolean(normalizedEmail && RESEARCH_BETA_EMAILS.has(normalizedEmail));
+}
+
 // --- 1. THE FLOATING SIDEBAR (DESKTOP) ---
 function FloatingSidebar({ user, tier, onNavigate, onSignOut }) {
     const pathname = usePathname();
     const config = TIER_CONFIG[tier] || TIER_CONFIG['free'];
     const TierIcon = config.icon;
+    const showResearchLink = canAccessResearch(user);
     
     // Only show Upgrade if Free
     const navLinks = [
         { icon: IconLayoutDashboard, label: 'Dashboard', href: '/dashboard' },
         { icon: IconFileText, label: 'All Plans', href: '/plans' },
         { icon: IconPlus, label: 'New Plan', href: '/new-plan', id: 'new-plan-button' },
-        // { icon: IconFlask, label: 'Research', href: '/research' }, 
     ];
+
+    if (showResearchLink) {
+        navLinks.push({ icon: IconFlask, label: 'Research', href: '/research' });
+    }
 
     if (tier === 'free') {
         navLinks.push({ icon: IconDiamond, label: 'Upgrade', action: 'upgrade', id: 'upgrade-button', color: '#BF5AF2' });
@@ -241,14 +252,18 @@ function FloatingSidebar({ user, tier, onNavigate, onSignOut }) {
 function MobileNavbar({ user, tier, onNavigate, onSignOut, isLiteMode }) {
     const pathname = usePathname();
     const config = TIER_CONFIG[tier] || TIER_CONFIG['free'];
+    const showResearchLink = canAccessResearch(user);
     
     // Upgrade button is REMOVED from grid
     const navLinks = [
         { icon: IconLayoutDashboard, label: 'Home', href: '/dashboard' },
         { icon: IconPlus, label: 'Create', href: '/new-plan', id: 'new-plan-button' },
         { icon: IconFileText, label: 'Plans', href: '/plans' },
-        // { icon: IconFlask, label: 'Research', href: '/research' }, 
     ];
+
+    if (showResearchLink) {
+        navLinks.push({ icon: IconFlask, label: 'Research', href: '/research' });
+    }
 
     const backgroundStyle = isLiteMode ? {
         background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 60%, rgba(0,0,0,1) 100%)',
@@ -273,7 +288,7 @@ function MobileNavbar({ user, tier, onNavigate, onSignOut, isLiteMode }) {
                 zIndex: 1000
             }}
         >
-            <SimpleGrid cols={4} spacing={0}>
+            <SimpleGrid cols={navLinks.length + 1} spacing={0}>
                 {navLinks.map((link) => {
                     const isActive = pathname === link.href;
                     return (
