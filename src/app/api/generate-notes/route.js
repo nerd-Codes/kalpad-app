@@ -430,7 +430,7 @@ RULE 14 — ILLUSTRATIONS:
   Insert a kalpad-illustration block for each entry in the brief's illustration_directives array.
   Place each block immediately after the paragraph explaining the concept it illustrates.
   
-  For flowcharts / diagrams:
+  For flowcharts:
   \`\`\`kalpad-illustration
   {
     "engine": "mermaid",
@@ -438,7 +438,7 @@ RULE 14 — ILLUSTRATIONS:
   }
   \`\`\`
   
-  For plots / graphs:
+  For plots / graphs / diagrams:
   \`\`\`kalpad-illustration
   {
     "engine": "matplotlib",
