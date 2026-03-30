@@ -1,7 +1,7 @@
 // src/components/TimelineEntry.jsx
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Paper, Title, Text, Group, Badge, Checkbox, Button, Box, Alert, Stack, ActionIcon, Tooltip } from '@mantine/core';
 import { differenceInCalendarDays } from 'date-fns';
 import { IconPencilPlus, IconBrain, IconPlayerPlay, IconMessageCircle, IconEye } from '@tabler/icons-react';
@@ -45,6 +45,11 @@ export function TimelineEntry({ taskGroup, onUpdate, onNoteGenerated }) {
 
     const { plan, dailyTopic } = taskGroup;
     const { exam_name: examName, exam_date: examDate, id: examId } = plan;
+    const [localNotes, setLocalNotes] = useState(dailyTopic.new_notes || []);
+
+    useEffect(() => {
+        setLocalNotes(dailyTopic.new_notes || []);
+    }, [dailyTopic.new_notes]);
     
     const daysLeft = differenceInCalendarDays(new Date(examDate), new Date());
     let color = 'brandGreen';
@@ -58,6 +63,17 @@ export function TimelineEntry({ taskGroup, onUpdate, onNoteGenerated }) {
             index === subTopicIndex ? { ...sub, completed: isChecked } : sub
         );
         onUpdate(dailyTopic.id, { sub_topics: newSubTopics });
+    };
+
+    const patchNoteLocally = (noteId, patch) => {
+        if (!noteId) return;
+
+        setLocalNotes(currentNotes => currentNotes.map(note => (
+            note.id === noteId ? { ...note, ...patch } : note
+        )));
+        setNoteToView(currentNote => (
+            currentNote?.id === noteId ? { ...currentNote, ...patch } : currentNote
+        ));
     };
 
     const handleGenerateNotes = async (subTopicText) => {
@@ -110,7 +126,7 @@ export function TimelineEntry({ taskGroup, onUpdate, onNoteGenerated }) {
                     
                     <Stack gap="sm" mt="xs">
                         {dailyTopic.sub_topics?.map((subTopic, index) => {
-                            const v2_note = dailyTopic.new_notes?.find(n => n.sub_topic_text === subTopic.text);
+                            const v2_note = localNotes.find(n => n.sub_topic_text === subTopic.text);
                             const v1_note = (index === 0 && dailyTopic.generated_notes) ? { notes_markdown: dailyTopic.generated_notes, sub_topic_text: subTopic.text } : null;
                             const existingNote = v2_note || v1_note;
 
@@ -167,7 +183,12 @@ export function TimelineEntry({ taskGroup, onUpdate, onNoteGenerated }) {
 
             <QuizModal opened={quizModalOpened} onClose={() => setQuizModalOpened(false)} planTopicId={dailyTopic.id} />
             <SummaryModal opened={summaryModalOpened} onClose={() => setSummaryModalOpened(false)} planTopicId={dailyTopic.id} />
-            <FullscreenNoteViewer noteData={noteToView} onClose={() => setNoteToView(null)} onUpdate={onUpdate} />
+            <FullscreenNoteViewer
+                noteData={noteToView}
+                onClose={() => setNoteToView(null)}
+                onUpdate={onUpdate}
+                onNoteUpdate={patchNoteLocally}
+            />
         </>
     );
 }

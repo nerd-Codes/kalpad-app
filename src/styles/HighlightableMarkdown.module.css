@@ -1,0 +1,37 @@
+.root {
+  position: relative;
+  isolation: isolate;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+}
+
+.rect {
+  position: absolute;
+  border-radius: 0.2rem;
+  background: rgba(250, 204, 21, 0.24);
+  border-bottom: 2px solid rgba(245, 158, 11, 0.95);
+  
+  
+}
+
+.rect[data-atomic='true'] {
+  border-radius: 0.45rem;
+  padding-bottom: 10;
+}
+
+@media print {
+  .rect {
+    background: rgba(255, 224, 102, 0.42);
+    border-bottom-color: rgba(168, 117, 0, 0.95);
+  }
+}

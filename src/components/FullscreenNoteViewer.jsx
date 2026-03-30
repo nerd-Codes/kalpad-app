@@ -1,10 +1,10 @@
 // src/components/FullscreenNoteViewer.jsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-    Modal, ScrollArea, Group, Title, Text, Stack, Badge, Button, 
-    ActionIcon, Box, Loader, Tooltip, Alert, Paper, ThemeIcon, Transition 
+    Modal, ScrollArea, Group, Title, Text, Stack, Button, 
+    ActionIcon, Box, Loader, Tooltip, Alert, Paper, ThemeIcon
 } from '@mantine/core';
 import { 
     IconCircleCheck, IconMessageQuestion, IconMessageCircle, IconBook, 
@@ -12,16 +12,19 @@ import {
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { Popover } from '@mantine/core';
-import { useTextSelection } from '../hooks/useTextSelection';
 import { notifications } from '@mantine/notifications';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 import supabase from '@/lib/supabaseClient'; 
 
 // --- KALPAD OS IMPORTS ---
 import { GlassCard } from '@/components/GlassCard';
 import { Interactive } from '@/components/Interactive';
+import { HighlightableMarkdown } from '@/components/HighlightableMarkdown';
 import { FollowUpModal } from './FollowUpModal';
+import { useNoteTextSelection } from '@/hooks/useNoteTextSelection';
+import { buildCanonicalStream, mergeHighlightIntoSet } from '@/lib/noteHighlights';
+import { preprocessMathBlocks } from '@/lib/noteMarkdown';
 
 // --- MARKDOWN ENGINE ---
 import ReactMarkdown from 'react-markdown';
@@ -33,6 +36,8 @@ import 'katex/dist/katex.min.css';
 import markdownStyles from '../styles/MarkdownStyles.module.css';
 
 // --- CONSTANTS ---
+const EMPTY_HIGHLIGHTS = Object.freeze([]);
+
 const PDF_CSS = `@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lexend+Deca:wght@900&display=swap');
 body { font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; color: #222; margin: 2rem; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Lexend Deca', sans-serif; font-weight: 600; margin: 1.5rem 0 0.75rem 0; color: #111; }
@@ -53,64 +58,6 @@ th { background: #f0f0f0; }
 .katex { font-family: 'Lexend Deca', 'Inter', serif; font-size: 1em; }
 @page { size: A4; margin: 0.3in; }`;
 
-// --- LATEX PREPROCESSING ---
-// remarkMath only treats $$...$$ as DISPLAY (block) math when blank lines exist
-// before and after the block. The LLM frequently omits them, so the parser
-// falls back to inline mode and renders equations in a garbled, run-on line.
-//
-// This normaliser runs on the raw markdown string BEFORE ReactMarkdown sees it.
-// It works line-by-line so it never accidentally mutates inline $...$ expressions.
-function preprocessMathBlocks(markdown) {
-    if (!markdown) return markdown;
-
-    const lines = markdown.split('\n');
-    const out   = [];
-    let inBlock = false;
-
-    for (let i = 0; i < lines.length; i++) {
-        const line    = lines[i];
-        const trimmed = line.trim();
-
-        const isDelimiter = trimmed === '$$';
-
-        // Single-line display math: $$formula$$ all on one line.
-        // Split into open / content / close so remarkMath sees a proper block.
-        const singleLine = (
-            !isDelimiter &&
-            trimmed.startsWith('$$') &&
-            trimmed.endsWith('$$') &&
-            trimmed.length > 4
-        );
-
-        if (singleLine) {
-            if (out.length > 0 && out[out.length - 1].trim() !== '') out.push('');
-            out.push('$$');
-            out.push(trimmed.slice(2, -2).trim());
-            out.push('$$');
-            if (i + 1 < lines.length && lines[i + 1].trim() !== '') out.push('');
-            continue;
-        }
-
-        if (isDelimiter) {
-            if (!inBlock) {
-                // Opening $$: ensure a blank line before
-                if (out.length > 0 && out[out.length - 1].trim() !== '') out.push('');
-            }
-            out.push(line);
-            if (inBlock) {
-                // Closing $$: ensure a blank line after
-                if (i + 1 < lines.length && lines[i + 1].trim() !== '') out.push('');
-            }
-            inBlock = !inBlock;
-            continue;
-        }
-
-        out.push(line);
-    }
-
-    return out.join('\n');
-}
-
 // --- MODAL STYLES ---
 const glassPopupStyles = {
     content: { 
@@ -124,13 +71,20 @@ const glassPopupStyles = {
     close: { color: 'gray', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' } }
 };
 
-export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet = false }) {
+export function FullscreenNoteViewer({ noteData, onClose, onUpdate, onNoteUpdate, isCramSheet = false }) {
     // --- 1. DATA EXTRACTION (MOVED UP) ---
     // We must destructure this first so we can use `notes_markdown` in useState
-    const { notes_markdown = "No content available.", sub_topic = {}, day_topic = {}, exam_name = "Study Plan" } = noteData || {};
+    const {
+        notes_markdown = "No content available.",
+        highlights = EMPTY_HIGHLIGHTS,
+        sub_topic = {},
+        day_topic = {},
+        exam_name = "Study Plan",
+    } = noteData || {};
 
     const [renderContent, setRenderContent] = useState(false);
-    const { selection, clearSelection } = useTextSelection();
+    const noteContentRef = useRef(null);
+    const { selection, clearSelection } = useNoteTextSelection(noteContentRef, !!noteData);
     
     // Modals
     const [followUpModalOpened, { open: openFollowUpModal, close: closeFollowUpModal }] = useDisclosure(false);
@@ -145,11 +99,16 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
     // --- LOCAL STATE FOR INSTANT UPDATES ---
     // Now valid because notes_markdown is defined above
     const [localMarkdown, setLocalMarkdown] = useState(notes_markdown);
+    const [localHighlights, setLocalHighlights] = useState(Array.isArray(highlights) ? highlights : []);
 
     // Sync local state when the prop changes (e.g., opening a different note)
     useEffect(() => {
         setLocalMarkdown(notes_markdown);
     }, [notes_markdown]);
+
+    useEffect(() => {
+        setLocalHighlights(Array.isArray(highlights) ? highlights : []);
+    }, [highlights]);
 
     // --- EFFECTS ---
     useEffect(() => {
@@ -162,6 +121,9 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
     }, [noteData]);
 
     if (!noteData) return null;
+
+    const canPersistStructuredHighlights = Boolean(noteData.id) && !isCramSheet;
+    const hasSelection = Boolean(selection.text.trim());
     
     // --- HANDLERS ---
     const handleDoubtRequest = async (action, textOverride = null) => {
@@ -231,49 +193,6 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
             const finalStyle = isSvg ? { maxWidth: '100%', maxHeight: '1500px', borderRadius: '8px', background: 'black', padding: '0.5rem' } : { maxWidth: '100%', maxHeight: '1500px', borderRadius: '8px' };
             return <span style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}><img {...props} style={finalStyle} /></span>;
         },
-        // FIX: <div class="katex-display"> nested inside <p> is invalid HTML.
-        // Browsers auto-close the <p> mid-render, breaking layout.
-        // Render as <div> whenever children contain a display-math block.
-        p: ({ node, children, ...props }) => {
-            const hasMathBlock = (nodes) => {
-                if (!nodes) return false;
-                const arr = Array.isArray(nodes) ? nodes : [nodes];
-                return arr.some(child => {
-                    if (!child || typeof child !== 'object') return false;
-                    const cls = child.props?.className ?? '';
-                    if (cls.includes('katex-display')) return true;
-                    if (child.props?.children) return hasMathBlock(child.props.children);
-                    return false;
-                });
-            };
-            const childArr = Array.isArray(children) ? children : [children];
-            if (hasMathBlock(childArr)) {
-                return <div style={{ margin: '0.5em 0' }}>{children}</div>;
-            }
-            return <p {...props}>{children}</p>;
-        },
-        // FIX: Force katex-display spans to block-level so they never collapse
-        // into surrounding inline text flow.
-        span: ({ node, children, className, ...props }) => {
-            if (className?.includes('katex-display')) {
-                return (
-                    <div
-                        className={className}
-                        style={{
-                            display: 'block',
-                            margin: '1.4em auto',
-                            textAlign: 'center',
-                            overflowX: 'auto',
-                            maxWidth: '100%',
-                        }}
-                        {...props}
-                    >
-                        {children}
-                    </div>
-                );
-            }
-            return <span className={className} {...props}>{children}</span>;
-        },
          mark: ({ node, ...props }) => {
             // Convert children to string safely
             const textContent = Array.isArray(props.children) 
@@ -283,6 +202,12 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
             return (
                 <Tooltip label="Click to Ask AI" withArrow zIndex={3100}>
                     <mark 
+                        style={{
+                            background: 'rgba(250, 204, 21, 0.24)',
+                            borderBottom: '4px solid rgba(245, 158, 11, 0.95)',
+                            borderRadius: '0.2rem',
+                            padding: '0 0.08em',
+                        }}
                         onClick={(e) => {
                             e.stopPropagation();
                             // Pass textContent as the second argument (textOverride)
@@ -298,31 +223,33 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
 
     // --- HIGHLIGHT HANDLER ---
     const handleHighlightSelection = async () => {
-        if (!selection.text) return;
+        if (!canPersistStructuredHighlights || !selection.anchor) return;
+        if (!noteContentRef.current) return;
 
-        // 1. Wrap in HTML using the CURRENT local state
-        const newMarkdown = localMarkdown.replace(
-            selection.text, 
-            `<mark>${selection.text}</mark>`
-        );
+        const previousHighlights = localHighlights;
+        const stream = buildCanonicalStream(noteContentRef.current);
+        const mergedHighlights = mergeHighlightIntoSet(localHighlights, selection.anchor, stream.text, 'yellow');
 
-        // 2. Optimistic UI Update (Instant)
-        setLocalMarkdown(newMarkdown);
-        clearSelection(); // Clear the browser selection immediately
+        setLocalHighlights(mergedHighlights);
+        clearSelection();
         
-        // 3. Persist to Database (Background)
         try {
-            if (noteData.id) {
-                await supabase
-                    .from('generated_notes')
-                    .update({ notes_markdown: newMarkdown })
-                    .eq('id', noteData.id);
-                
-                // Optional: Update parent if needed, but local state handles the view
-                if (onUpdate) onUpdate(day_topic.id, { generated_notes: newMarkdown });
-            }
+            const { error: saveError } = await supabase
+                .from('generated_notes')
+                .update({ highlights: mergedHighlights })
+                .eq('id', noteData.id);
+
+            if (saveError) throw saveError;
+
+            onNoteUpdate?.(noteData.id, { highlights: mergedHighlights });
         } catch (e) {
             console.error("Highlight save failed", e);
+            setLocalHighlights(previousHighlights);
+            notifications.show({
+                title: 'Highlight Save Failed',
+                message: 'We could not save that highlight. Please try again.',
+                color: 'red',
+            });
         }
     };
 
@@ -344,7 +271,7 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
                 }}
             >
                 {/* --- CONTEXT LENS (POPOVER) --- */}
-                <Popover opened={selection.text.length > 5} position="top" withArrow shadow="xl" zIndex={3002}>
+                <Popover opened={hasSelection} position="top" withArrow shadow="xl" zIndex={3002}>
                     <Popover.Target>
                         <div style={{ position: 'absolute', top: `${selection.position.y}px`, left: `${selection.position.x}px`, pointerEvents: 'none' }} />
                     </Popover.Target>
@@ -356,15 +283,17 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
                         borderRadius: '99px'
                     }}>
                         <Group gap="xs">
-                            <Tooltip label="Highlight & Save" withArrow zIndex={3100}>
-                                <ActionIcon 
-                                    variant="transparent" 
-                                    color="yellow" 
-                                    onClick={handleHighlightSelection}
-                                >
-                                    <IconHighlight size={18} />
-                                </ActionIcon>
-                            </Tooltip>
+                            {canPersistStructuredHighlights && (
+                                <Tooltip label="Highlight & Save" withArrow zIndex={3100}>
+                                    <ActionIcon
+                                        variant="transparent"
+                                        color="yellow"
+                                        onClick={handleHighlightSelection}
+                                    >
+                                        <IconHighlight size={18} />
+                                    </ActionIcon>
+                                </Tooltip>
+                            )}
                             <Tooltip label="Explain" withArrow zIndex={3100}><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('explain')} ><IconBook size={18} /></ActionIcon></Tooltip>
                             <Tooltip label="Analogy" withArrow zIndex={3100}><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('analogy')} zIndex={3100}><IconBulb size={18} /></ActionIcon></Tooltip>
                             <Tooltip label="Importance" withArrow zIndex={3100}><ActionIcon variant="transparent" color="gray" onClick={() => handleDoubtRequest('importance')} zIndex={3100}><IconMessageCircle size={18} /></ActionIcon></Tooltip>
@@ -428,15 +357,14 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
 
                             {/* --- CONTENT SURFACE --- */}
                             {renderContent ? (
-                                <Box className={markdownStyles.markdown} style={{ fontSize: '1.125rem' }}>
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                        rehypePlugins={[rehypeKatex, rehypeRaw]}
-                                        components={customRenderers}
-                                    >
-                                        {preprocessMathBlocks(localMarkdown)}
-                                    </ReactMarkdown>
-                                </Box>
+                                <HighlightableMarkdown
+                                    markdown={localMarkdown}
+                                    highlights={localHighlights}
+                                    className={markdownStyles.markdown}
+                                    style={{ fontSize: '1.125rem' }}
+                                    components={customRenderers}
+                                    contentRef={noteContentRef}
+                                />
                             ) : (
                                 <Group justify="center" p="xl"><Loader color="gray" type="dots" /></Group>
                             )}
@@ -523,7 +451,7 @@ export function FullscreenNoteViewer({ noteData, onClose, onUpdate, isCramSheet 
                     {error && <Alert color="red" title="Error">{error}</Alert>}
                     {aiResponse && (
                         <Box className={markdownStyles.markdown} mah="60vh" style={{ overflowY: 'auto' }}>
-                             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]} components={customRenderers}>
+                             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, rehypeKatex]} components={customRenderers}>
                                 {preprocessMathBlocks(aiResponse)}
                             </ReactMarkdown>
                         </Box>

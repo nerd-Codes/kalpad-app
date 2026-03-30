@@ -1,100 +1,190 @@
 // /src/app/api/solve-doubt/route.js
 
-// --- MODIFICATION: Import our robust Vertex AI utility ---
 import { getVertexAIModel } from '@/lib/vertexai';
 import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
 
-// --- MODIFICATION: The 'groq' dependency is no longer needed ---
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTION CONFIG
+// Each action has its own directive, temperature, and token limit.
+// Adding a new action = one new entry here. Nothing else to touch.
+// ─────────────────────────────────────────────────────────────────────────────
+const ACTION_CONFIG = {
+    explain: {
+        directive: (examName) =>
+            `Explain the highlighted text clearly and precisely at the level expected for "${examName}". ` +
+            `Break it down step by step. If there is a common misconception about this, call it out explicitly. ` +
+            `End with one sentence that crystallises the core idea.`,
+        temperature:     0.35,
+        maxOutputTokens: 500,
+        needsFullNote:   false,
+    },
+    analogy: {
+        directive: (examName) =>
+            `Give one vivid, concrete real-world analogy for the highlighted concept. ` +
+            `Calibrate the analogy to a student preparing for "${examName}" — not too basic, not too abstract. ` +
+            `After the analogy, add one sentence on where the analogy breaks down so the student doesn't over-extend it.`,
+        temperature:     0.7,
+        maxOutputTokens: 400,
+        needsFullNote:   false,
+    },
+    importance: {
+        directive: (examName) =>
+            `Explain exactly why this concept matters for "${examName}". ` +
+            `Be specific: What question types does it appear in? What breaks downstream if this concept isn't understood? ` +
+            `Do not give generic "this is foundational" answers. Give the actual exam-level reason.`,
+        temperature:     0.35,
+        maxOutputTokens: 400,
+        needsFullNote:   false,
+    },
+    custom: {
+        directive: () =>
+            `Answer the user's question directly and concisely. ` +
+            `Use the full note content as your primary source of truth. ` +
+            `If the answer requires a derivation or worked example, include it.`,
+        temperature:     0.5,
+        maxOutputTokens: 1500,
+        needsFullNote:   true,
+    },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYSTEM PROMPT
+// Tight structural rules — no fluff persona description.
+// The KaTeX rule and tone instructions are the only things that produce
+// measurable output differences.
+// ─────────────────────────────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `You are KalPad, an AI tutor. You give sharp, direct, exam-calibrated answers.
+
+TONE: Conversational and direct. Use "you" and "I". Skip pleasantries. Get to the point fast.
+      Be the knowledgeable friend, not the cautious professor.
+
+FORMATTING:
+- Respond in clean Markdown.
+- Use bullet points for lists, bold for key terms on first use.
+- Keep responses tight — every sentence must earn its place.
+
+MATH (CRITICAL):
+- Inline math: $...$ — always, no exceptions.
+- Display math: $$...$$ — on its own line, with a blank line before and after.
+- FORBIDDEN: \\( \\) and \\[ \\] — KaTeX does not support them.
+- Escape inside math blocks: \\% \\_ \\& (\\& is fine inside {align}).
+- Never nest $$ inside $$.`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROMPT BUILDERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildQuickActionPrompt(action, highlightedText, context, directive) {
+    // context.examName is used by the directive — but we also add it here
+    // so the model knows who it's talking to without needing the full note.
+    return `I am studying for my **${context.examName}** exam.
+Current chapter: "${context.dayTopic}"
+Sub-topic I'm on: "${context.subTopic}"
+
+I've highlighted this from my notes:
+> "${highlightedText}"
+
+Your task: ${directive}`;
+}
+
+function buildCustomPrompt(question, fullNoteContent, context) {
+    // Full note is justified here — the user is asking a freeform question
+    // that may require understanding the whole note, not just a selection.
+    return `I am studying for my **${context.examName}** exam.
+Current chapter: "${context.dayTopic}"
+Sub-topic: "${context.subTopic}"
+
+Full note content (your primary source of truth):
+---
+${fullNoteContent}
+---
+
+My question: "${question}"`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HANDLER
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req) {
-  let authMode = 'none';
-  try {
-    const auth = await resolveRouteAuth(req);
-    authMode = auth.authMode;
-    if (!auth.user) {
-      logRouteResult('/api/solve-doubt', authMode, 401);
-      return unauthorizedResponse();
-    }
+    let authMode = 'none';
+    try {
+        const auth = await resolveRouteAuth(req);
+        authMode   = auth.authMode;
 
-    const body = await req.json();
-    const payload = body.data || body;
-
-    const { 
-        fullNoteContent,
-        highlightedText,
-        question,
-        action,
-        context 
-    } = payload;
-    
-    // --- Input Validation is unchanged ---
-    if (!action || !context) {
-        return new Response(JSON.stringify({ error: 'Missing required fields: action and context' }), { status: 400 });
-    }
-    if ((action === 'explain' || action === 'analogy' || action === 'importance') && !highlightedText) {
-        return new Response(JSON.stringify({ error: 'highlightedText is required for this action' }), { status: 400 });
-    }
-    if (action === 'custom' && !question) {
-        return new Response(JSON.stringify({ error: 'question is required for the custom action' }), { status: 400 });
-    }
-
-    // --- Dynamic Prompt Construction (Unchanged) ---
-    let systemPrompt = `You are KalPad, an AI Tutor. Your persona is that of a brutally honest, slightly unhinged genius friend or big brother. You are not a formal, stuffy professor. Your goal is to make learning feel like a conversation with a brilliant friend who genuinely wants the user to succeed.
-    - **Tone:** Use a conversational, slightly informal tone. Use "you" and "I". Be direct, witty, and encouraging.
-    - **Clarity:** Break down complex topics into simple, digestible pieces. Use analogies and real-world examples.
-    - **Formatting:** Your entire response MUST be in clean, well-structured Markdown.
-    - **Conciseness:** Get to the point. Don't waste time with pleasantries.
-    - **Engagement:** Ask rhetorical questions, use humor, and be relatable. Make the user feel like they're chatting with a knowledgeable friend.
-    - **CRITICAL INSTRUCTION:** USe KaTex compatible syntax for all mathematical expressions. Always wrap inline math in single dollar signs ($...$) and display math in double dollar signs ($$...$$). Never use backticks or any other formatting for math.
-    `;
-
-    let userPrompt;
-    if (action === 'custom') {
-        systemPrompt += `\nYour primary source of truth is the full note content provided by the user. Answer the user's question based on this context.`;
-        userPrompt = `I am studying for my "${context.examName}" exam. My current topic is "${context.dayTopic}", and I'm looking at notes for the sub-topic "${context.subTopic}".\n\nHere is the full content of my notes for context:\n---\n${fullNoteContent}\n---\n\nMy Question: "${question}"\n\nPlease answer my question concisely.`;
-    } else {
-        systemPrompt += `\nYour task is to respond to a specific request about a piece of highlighted text from a larger note. The user has the full note, so you do not need to repeat context.`;
-        userPrompt = `I am studying for my "${context.examName}" exam, focusing on the sub-topic "${context.subTopic}". I have highlighted the following text from my notes:\n\nHighlighted Text: "${highlightedText}"\n\nMy Request: "${action === 'explain' ? "Explain this to me like I'm 10." : action === 'analogy' ? "Give me a real-world analogy for this." : "Explain why this concept is important."}"\n\nPlease provide a direct and concise response.`;
-    }
-     
-    // --- DEFINITIVE MIGRATION: Switch from Groq to Vertex AI ---
-    
-    // 1. Get the Vertex AI model. 'gemini-1.5-flash-001' is an excellent choice for speed and a large context window.
-    const model = await getVertexAIModel('gemini-2.5-flash-lite');
-
-    // 2. Construct the request payload in the format Vertex AI expects.
-    const requestPayload = {
-        systemInstruction: {
-            parts: [{ text: systemPrompt }]
-        },
-        contents: [{ 
-            role: 'user', 
-            parts: [{ text: userPrompt }] 
-        }],
-        generationConfig: {
-            maxOutputTokens: 2048, // Generous limit for detailed answers
-            temperature: 0.7,      // A balanced temperature for creative but factual responses
+        if (!auth.user) {
+            logRouteResult('/api/solve-doubt', authMode, 401);
+            return unauthorizedResponse();
         }
-    };
-    
-    // 3. Call the generateContent method.
-    const response = await model.generateContent(requestPayload);
 
-    // 4. Parse the response from the Vertex AI SDK's structure.
-    const aiResponseText = response.response.candidates[0]?.content?.parts[0]?.text || 'Sorry, I could not generate a response.';
+        const body    = await req.json();
+        const payload = body.data || body;
 
-    // Return the full response in a single JSON object (unchanged).
-    logRouteResult('/api/solve-doubt', authMode, 200);
-    return new Response(JSON.stringify({ response: aiResponseText }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-    });
+        const { fullNoteContent, highlightedText, question, action, context } = payload;
 
-  } catch (error) {
-    console.error('Error in /api/solve-doubt:', error);
-    // The Vertex AI SDK often nests the core error message, so we check for it.
-    const errorMessage = error.response?.candidates?.[0]?.finishReason || error.message || 'An unknown error occurred.';
-    logRouteResult('/api/solve-doubt', authMode, 500);
-    return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
-  }
+        // Input validation
+        if (!action || !context) {
+            return new Response(
+                JSON.stringify({ error: 'Missing required fields: action and context' }),
+                { status: 400 }
+            );
+        }
+
+        const config = ACTION_CONFIG[action];
+        if (!config) {
+            return new Response(
+                JSON.stringify({ error: `Unknown action: "${action}"` }),
+                { status: 400 }
+            );
+        }
+
+        if (action !== 'custom' && !highlightedText) {
+            return new Response(
+                JSON.stringify({ error: 'highlightedText is required for this action' }),
+                { status: 400 }
+            );
+        }
+        if (action === 'custom' && !question) {
+            return new Response(
+                JSON.stringify({ error: 'question is required for the custom action' }),
+                { status: 400 }
+            );
+        }
+
+        // Build prompt — quick actions never receive the full note
+        const directive  = config.directive(context.examName);
+        const userPrompt = action === 'custom'
+            ? buildCustomPrompt(question, fullNoteContent, context)
+            : buildQuickActionPrompt(action, highlightedText, context, directive);
+
+        const model = await getVertexAIModel('gemini-2.5-flash-lite');
+
+        const response = await model.generateContent({
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents:          [{ role: 'user', parts: [{ text: userPrompt }] }],
+            generationConfig:  {
+                temperature:     config.temperature,
+                maxOutputTokens: config.maxOutputTokens,
+            },
+        });
+
+        const aiResponseText =
+            response.response.candidates[0]?.content?.parts[0]?.text ||
+            'Sorry, I could not generate a response.';
+
+        logRouteResult('/api/solve-doubt', authMode, 200);
+        return new Response(
+            JSON.stringify({ response: aiResponseText }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+
+    } catch (error) {
+        console.error('Error in /api/solve-doubt:', error);
+        const errorMessage =
+            error.response?.candidates?.[0]?.finishReason ||
+            error.message ||
+            'An unknown error occurred.';
+        logRouteResult('/api/solve-doubt', authMode, 500);
+        return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
+    }
 }

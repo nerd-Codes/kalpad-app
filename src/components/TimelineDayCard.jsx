@@ -81,10 +81,15 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
     const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
     // --- LOCAL STATE MANAGEMENT ---
     const [internalSubTopics, setInternalSubTopics] = useState(dayTopic.sub_topics || []);
+    const [localNotes, setLocalNotes] = useState(dayTopic.new_notes || []);
 
     useEffect(() => {
         setInternalSubTopics(dayTopic.sub_topics || []);
     }, [dayTopic.sub_topics]);
+
+    useEffect(() => {
+        setLocalNotes(dayTopic.new_notes || []);
+    }, [dayTopic.new_notes]);
 
     const allTopicsCompleted = dayTopic.sub_topics?.every(sub => sub.completed) && dayTopic.sub_topics?.length > 0;
     
@@ -98,6 +103,33 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
         );
         setInternalSubTopics(newSubTopics);
         onUpdate(dayTopic.id, { sub_topics: newSubTopics });
+    };
+
+    const patchNoteLocally = (noteId, patch) => {
+        if (!noteId) return;
+
+        setLocalNotes(currentNotes => currentNotes.map(note => (
+            note.id === noteId ? { ...note, ...patch } : note
+        )));
+        setNoteToView(currentNote => (
+            currentNote?.id === noteId ? { ...currentNote, ...patch } : currentNote
+        ));
+
+        if (!setPlan) return;
+
+        setPlan(currentPlan => {
+            const nextPlanTopics = currentPlan.plan_topics.map(topic => {
+                if (topic.id !== dayTopic.id) return topic;
+                return {
+                    ...topic,
+                    new_notes: (topic.new_notes || []).map(note => (
+                        note.id === noteId ? { ...note, ...patch } : note
+                    )),
+                };
+            });
+
+            return { ...currentPlan, plan_topics: nextPlanTopics };
+        });
     };
 
     const handleGenerateNotes = async (subTopicText) => {
@@ -135,7 +167,19 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
             if (isGuestMode) {
                  updateGuestNote(dayTopic.day, subTopicText, newNote.notes_markdown);
                  notifications.show({ title: 'Sample Note Forged', message: 'Sign up to save.', color: 'teal' });
-            } else if (setPlan) {
+            } else {
+                setLocalNotes(currentNotes => {
+                    const existingNoteIndex = currentNotes.findIndex(n => n.sub_topic_text === subTopicText);
+                    if (existingNoteIndex > -1) {
+                        const updatedNotes = [...currentNotes];
+                        updatedNotes[existingNoteIndex] = newNote;
+                        return updatedNotes;
+                    }
+                    return [...currentNotes, newNote];
+                });
+            }
+
+            if (!isGuestMode && setPlan) {
                 // Perform local mutation instead of full refresh
                 setPlan(currentPlan => {
                     const newPlanTopics = currentPlan.plan_topics.map(topic => {
@@ -156,7 +200,7 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                     return { ...currentPlan, plan_topics: newPlanTopics };
                 });
                 notifications.show({ title: 'Note Synced', message: 'Your timeline has updated instantly.', color: 'teal' });
-            } else {
+            } else if (!isGuestMode) {
                 // Fallback to old method if setPlan is not provided
                 if (onNoteGenerated) await onNoteGenerated();
                 notifications.show({ title: 'Note Synced', message: 'Reloading data...', color: 'teal' });
@@ -253,6 +297,14 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                     return topic;
                 });
                 return { ...currentPlan, plan_topics: newPlanTopics };
+            });
+        }
+
+        if (newlyGeneratedNotes.length > 0) {
+            setLocalNotes(currentNotes => {
+                const existingNotes = new Map(currentNotes.map(note => [note.sub_topic_text, note]));
+                newlyGeneratedNotes.forEach(note => existingNotes.set(note.sub_topic_text, note));
+                return Array.from(existingNotes.values());
             });
         }
 
@@ -397,7 +449,7 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                             {internalSubTopics.map((subTopic, index) => {
                                 // Guest Logic for existing note detection
                                 const guestNote = isGuestMode ? guestArtifact?.generatedNotes?.find(n => n.sub_topic_text === subTopic.text) : null;
-                                const v2_note = dayTopic.new_notes?.find(n => n.sub_topic_text === subTopic.text);
+                                const v2_note = localNotes.find(n => n.sub_topic_text === subTopic.text);
                                 const v1_note = (index === 0 && dayTopic.generated_notes) ? { notes_markdown: dayTopic.generated_notes, sub_topic_text: subTopic.text } : null;
                                 
                                 const existingNote = isGuestMode ? guestNote : (v2_note || v1_note);
@@ -529,7 +581,12 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
             <QuizSetupModal opened={quizSetupOpened} onClose={closeQuizSetup} onStartQuiz={handleStartQuiz} isLoading={isGeneratingQuiz} />
             {quizQuestions && <QuizRunner questions={quizQuestions} onClose={() => setQuizQuestions(null)} onSubmit={handleSubmitQuiz} />}
             {quizResults && <QuizResults results={quizResults} onClose={() => setQuizResults(null)} onRetake={() => { setQuizResults(null); openQuizSetup(); }} />}
-            <FullscreenNoteViewer noteData={noteToView} onClose={() => setNoteToView(null)} onUpdate={onUpdate} />
+            <FullscreenNoteViewer
+                noteData={noteToView}
+                onClose={() => setNoteToView(null)}
+                onUpdate={onUpdate}
+                onNoteUpdate={patchNoteLocally}
+            />
 
             {/* Bulk Modal */}
             <Modal
@@ -549,7 +606,7 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                     <ScrollArea.Autosize mah={300}>
                         <Stack gap="xs">
                             {internalSubTopics.map((sub, i) => {
-                                const exists = isGuestMode ? guestArtifact?.generatedNotes?.find(n => n.sub_topic_text === sub.text) : dayTopic.new_notes?.find(n => n.sub_topic_text === sub.text);
+                                const exists = isGuestMode ? guestArtifact?.generatedNotes?.find(n => n.sub_topic_text === sub.text) : localNotes.find(n => n.sub_topic_text === sub.text);
                                 const isSelected = bulkNoteSelection.includes(sub.text);
                                 return (
                                     <Paper 

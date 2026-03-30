@@ -157,6 +157,13 @@ body {
     color: #000000 !important; 
 }
 
+.print-footer {
+    margin-top: 1rem;
+    font-size: 10pt;
+    color: #444 !important;
+    text-align: center;
+}
+
 /* --- PRINT MEDIA QUERY (The "Ink" Engine) --- */
 @media print {
 
