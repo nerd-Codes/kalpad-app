@@ -7,7 +7,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { IconPrinter } from '@tabler/icons-react';
 
 import supabase from '@/lib/supabaseClient';
-import { HighlightableMarkdown } from '@/components/HighlightableMarkdown';
+import { PrintableMarkdownBlock } from '@/components/print/PrintableMarkdownBlock';
 
 import './print.css';
 
@@ -71,66 +71,6 @@ export default function PrintNotePage() {
     if (error) return <Box p="xl"><Alert color="red" title="Error">{error}</Alert></Box>;
     if (!note) return <Box p="xl"><Alert color="yellow">Note not found.</Alert></Box>;
 
-    const customRenderers = {
-        p: ({ node, children, ...props }) => {
-            const hasMathBlock = (nodes) => {
-                if (!nodes) return false;
-                const arr = Array.isArray(nodes) ? nodes : [nodes];
-                return arr.some((child) => {
-                    if (!child || typeof child !== 'object') return false;
-                    const cls = child.props?.className ?? '';
-                    if (cls.includes('katex-display')) return true;
-                    if (child.props?.children) return hasMathBlock(child.props.children);
-                    return false;
-                });
-            };
-
-            const childArr = Array.isArray(children) ? children : [children];
-            if (hasMathBlock(childArr)) {
-                return <div style={{ margin: '0.5em 0' }}>{children}</div>;
-            }
-
-            return <p {...props}>{children}</p>;
-        },
-        span: ({ node, children, className, ...props }) => {
-            if (className?.includes('katex-display')) {
-                return (
-                    <div
-                        className={className}
-                        style={{
-                            display: 'block',
-                            margin: '1.4em auto',
-                            textAlign: 'center',
-                            overflowX: 'auto',
-                            maxWidth: '100%',
-                        }}
-                        {...props}
-                    >
-                        {children}
-                    </div>
-                );
-            }
-
-            return <span className={className} {...props}>{children}</span>;
-        },
-        img: ({ node, ...props }) => {
-            const isSvg = props.src && props.src.endsWith('.svg');
-            const finalStyle = {
-                maxWidth: '100%',
-                maxHeight: '1000px',
-                borderRadius: '0',
-                backgroundColor: 'transparent',
-                padding: isSvg ? '1rem' : '0',
-                margin: '1.5rem auto',
-                display: 'block',
-            };
-
-            return (
-                <img {...props} style={finalStyle} alt={props.alt || 'Figure'} />
-            );
-        },
-    };
-
     return (
         <Box>
             <Box
@@ -170,10 +110,9 @@ export default function PrintNotePage() {
                     <Title order={2} className="print-title">{note.plan_topics.topic_name}</Title>
                     <Title order={1} className="print-subtitle">{note.sub_topic_text}</Title>
 
-                    <HighlightableMarkdown
+                    <PrintableMarkdownBlock
                         markdown={note.notes_markdown}
-                        highlights={Array.isArray(note.highlights) ? note.highlights : []}
-                        components={customRenderers}
+                        highlights={note.highlights}
                         onHighlightsRendered={() => setHighlightsReady(true)}
                     />
 

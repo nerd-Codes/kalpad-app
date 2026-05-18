@@ -61,7 +61,7 @@ function RecoveryEngineMockup() {
                         transition={{ duration: 0.4 }}
                     >
                         <Stack gap="sm">
-                            <Text size="xs" fw={700} c="red.4" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Yesterday • Missed</Text>
+                            <Text size="xs" fw={700} c="red.4" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Yesterday: Missed</Text>
                             <GlassCard p="md" style={{ border: '1px solid rgba(255, 59, 48, 0.4)', background: 'rgba(255, 59, 48, 0.05)', position: 'relative', overflow: 'hidden' }}>
                                 {/* Warning Strip */}
                                 <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', background: '#FF3B30' }} />
@@ -70,13 +70,13 @@ function RecoveryEngineMockup() {
                                     <Title order={4} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>Day 14: Electromagnetism</Title>
                                     <Badge color="red" variant="filled">0/4 Tasks</Badge>
                                 </Group>
-                                <Text size="sm" c="dimmed" mb="md">You missed 6 hours of scheduled deep work. Study debt accumulating.</Text>
+                                <Text size="sm" c="dimmed" mb="md">You missed 6 hours of study. KalPad will spread the work out realistically.</Text>
                                 
                                 <Box p="sm" style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                                     <Group justify="space-between">
                                         <Group gap="xs">
                                             <IconAlertCircle size={16} color="#FF3B30" />
-                                            <Text size="sm" fw={600} c="white">Timeline Compromised</Text>
+                                            <Text size="sm" fw={600} c="white">Plan Needs Update</Text>
                                         </Group>
                                         <Badge variant="outline" color="red" style={{ cursor: 'pointer', boxShadow: '0 0 10px rgba(255,59,48,0.2)' }} className="animate-pulse">
                                             REGENERATE PLAN
@@ -101,16 +101,16 @@ function RecoveryEngineMockup() {
                         <Box style={{ position: 'relative', width: '100%' }}>
                             <GlassCard p="xl" style={{ border: '1px solid rgba(191, 90, 242, 0.5)', background: '#111113', textAlign: 'center', boxShadow: '0 0 40px rgba(191, 90, 242, 0.2)' }}>
                                 <IconWand size={32} color="#BF5AF2" className="animate-spin-slow" style={{ animationDuration: '3s' }} />
-                                <Title order={4} c="white" mt="md" mb="sm" style={{ fontFamily: 'var(--font-lexend)' }}>Constitutional AI Active</Title>
+                                <Title order={4} c="white" mt="md" mb="sm" style={{ fontFamily: 'var(--font-lexend)' }}>Updating Your Plan</Title>
                                 
                                 <Stack gap="xs" align="center">
                                     <Text size="xs" ff="monospace" c="dimmed">Analyzing study debt: 6h</Text>
                                     <Group gap="xs" style={{ position: 'relative' }}>
-                                        <Text size="xs" ff="monospace" c="white" fw={600}>Calculating X vs. Y Heuristic...</Text>
+                                        <Text size="xs" ff="monospace" c="white" fw={600}>Checking what still matters...</Text>
                                     
                                     </Group>
                                     <Text size="xs" ff="monospace" c="dimmed">Pace adjusted from 6h/day to 4.5h/day</Text>
-                                    <Text size="xs" ff="monospace" c="violet.4">Rebuilding timeline geometry...</Text>
+                                    <Text size="xs" ff="monospace" c="violet.4">Rebuilding your daily plan...</Text>
                                 </Stack>
                             </GlassCard>
                             
@@ -130,7 +130,7 @@ function RecoveryEngineMockup() {
                     >
                         <Stack gap="sm">
                             <Group justify="space-between">
-                                <Text size="xs" fw={700} c="green.4" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Timeline Restored</Text>
+                                <Text size="xs" fw={700} c="green.4" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Plan Updated</Text>
                                 <Badge color="green" variant="light" leftSection={<IconActivityHeartbeat size={12}/>}>REALISTIC PACE</Badge>
                             </Group>
 
@@ -154,7 +154,7 @@ function RecoveryEngineMockup() {
                                 <Group justify="space-between" mb="xs">
                                     <Title order={5} c="gray.4" style={{ fontFamily: 'var(--font-lexend)' }}>Tomorrow: Electromagnetism (Part 2)</Title>
                                 </Group>
-                                <Text size="xs" c="dimmed">Ampere's Law & Solenoids pushed here. Low-ROI chapter 16 amputated to make room.</Text>
+                                <Text size="xs" c="dimmed">Ampere's Law & Solenoids moved here. Low-priority chapter 16 shifted to make room.</Text>
                             </GlassCard>
                         </Stack>
                     </motion.div>
@@ -192,7 +192,7 @@ export function TheGodMode() {
                                 style={{ borderColor: 'rgba(255,255,255,0.1)', color: '#86868B', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', letterSpacing: '0.1em' }}
                                 leftSection={<IconRotateClockwise size={12} color="#34C759" />}
                             >
-                                THE REGENERATION ENGINE
+                                WHEN YOU FALL BEHIND
                             </Badge>
 
                             <Title 
@@ -213,19 +213,19 @@ export function TheGodMode() {
                             </Title>
 
                             <Text size="lg" c="gray.4" lh={1.7} style={{ fontFamily: 'var(--font-inter)' }}>
-                                Standard study planners are built for perfect students. They break the moment you skip a day. KalPad is built for reality.
+                                Normal study planners assume every day goes perfectly. KalPad adjusts when real life gets in the way.
                             </Text>
 
-                            {/* The Heuristic Explanation */}
+                            {/* The Recovery Explanation */}
                             <Box p="lg" style={{ borderLeft: '3px solid #BF5AF2', background: 'linear-gradient(90deg, rgba(191, 90, 242, 0.05) 0%, transparent 100%)' }}>
                                 <Group gap="sm" mb="xs">
                                     <ThemeIcon variant="light" color="violet" size="sm" radius="xl"><IconActivityHeartbeat size={14}/></ThemeIcon>
-                                    <Text size="sm" fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>The "X vs. Y" Heuristic</Text>
+                                    <Text size="sm" fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>The Reality Check</Text>
                                 </Group>
                                 <Text size="sm" c="dimmed" lh={1.6}>
-                                    When you hit "Regenerate", the AI analyzes your failed tasks. It calculates your *actual* study velocity vs your *planned* velocity, and dynamically rebuilds a mathematically realistic timeline. 
+                                    When you hit "Regenerate", KalPad checks what you missed, how much time is left, and how fast you can actually study. Then it rebuilds a realistic day-wise plan.
                                     <br/><br/>
-                                    <span style={{ color: 'white', fontWeight: 600 }}>No guilt trips. Just a new, flawless path to victory.</span>
+                                    <span style={{ color: 'white', fontWeight: 600 }}>No guilt trips. Just a clearer next step.</span>
                                 </Text>
                             </Box>
                         </Stack>

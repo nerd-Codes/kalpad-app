@@ -11,23 +11,23 @@ const serifItalic = {
     fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
     fontStyle: 'italic',
     fontWeight: 400,
-    color: '#F5F5F7', 
+    color: '#BF5AF2',
     textTransform: 'lowercase'
 };
 
 const FEATURES = [
     {
         id: "01",
-        title: "Hidden Dependency Analysis",
-        subtitle: "IT FINDS THE TRAPS",
+        title: "Prerequisite Check",
+        subtitle: "KNOW WHAT TO STUDY FIRST",
         icon: IconHierarchy,
         color: "#BF5AF2", // Purple
-        desc: "Most students fail because they try to study 'Chapter 5' without knowing it relies on a concept from 'Chapter 2'.",
-        detail: "KalPad scans the entire syllabus graph. If a topic has a hidden prerequisite, the AI detects it and forces you to study the foundation first. No more hitting walls.",
+        desc: "Some chapters only make sense after you finish the basics.",
+        detail: "KalPad checks your syllabus order and places foundation topics before advanced ones so you do not get stuck halfway.",
         visual: (
             <Box p="md" style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(191, 90, 242, 0.2)' }}>
                 <Group justify="space-between" mb="xs">
-                    <Badge variant="filled" color="dark" size="xs">Dependency Graph</Badge>
+                    <Badge variant="filled" color="dark" size="xs">Study Order</Badge>
                     <IconAlertTriangle size={14} color="#BF5AF2" />
                 </Group>
                 <Stack gap="xs" align="center">
@@ -36,7 +36,7 @@ const FEATURES = [
                     </Box>
                     <IconArrowDown size={12} color="gray" />
                     <Box style={{ padding: '4px 12px', borderRadius: '4px', border: '1px solid #BF5AF2', background: 'rgba(191, 90, 242, 0.1)', width: '100%', textAlign: 'center' }}>
-                        <Text size="10px" c="violet.2" fw={700}>⚠️ Missing: Limits & Continuity</Text>
+                        <Text size="10px" c="violet.2" fw={700}>Missing: Limits & Continuity</Text>
                     </Box>
                 </Stack>
             </Box>
@@ -44,12 +44,12 @@ const FEATURES = [
     },
     {
         id: "02",
-        title: "Golden Question Extraction",
-        subtitle: "IT PREDICTS THE EXAM",
+        title: "Important Question Practice",
+        subtitle: "PRACTICE WHAT REPEATS",
         icon: IconTarget,
         color: "#FFD700", // Gold
-        desc: "Studying everything is a rookie mistake. The AI identifies the specific 'Archetype Questions' that appear every year.",
-        detail: "It injects these 'Golden Questions' directly into your daily mission. You don't just learn the theory; you learn exactly what will be on the test paper.",
+        desc: "Every exam has patterns, and students should not have to find them manually.",
+        detail: "KalPad adds high-yield questions into your daily work so you learn the theory and the common ways it gets asked.",
         visual: (
             <Box p="md" style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.2)' }}>
                 <Group justify="space-between" mb="xs">
@@ -69,12 +69,12 @@ const FEATURES = [
     },
     {
         id: "03",
-        title: "The Weakness Database",
-        subtitle: "IT NEVER FORGETS",
+        title: "Weak Topics Tracker",
+        subtitle: "REVISE WHAT NEEDS WORK",
         icon: IconDatabase,
         color: "#22d3ee", // Cyan
-        desc: "Static plans don't know you failed a quiz yesterday. KalPad does.",
-        detail: "Every time you get a question wrong, the system logs it in your 'Weakness DNA'. Future plans automatically schedule extra revision for these specific topics until you master them.",
+        desc: "A normal timetable does not know which topic confused you yesterday. KalPad does.",
+        detail: "When you miss a question, KalPad remembers the topic and schedules extra revision until it feels solid.",
         visual: (
             <Box p="md" style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(34, 211, 238, 0.2)' }}>
                 <Group justify="space-between" align="center">
@@ -107,7 +107,7 @@ export function TheBlueprint() {
                         variant="filled" size="md" radius="xl" color="dark"
                         style={{ border: '1px solid rgba(255,255,255,0.1)', letterSpacing: '0.1em' }}
                     >
-                        SYSTEM ARCHITECTURE
+                        WHAT IT HELPS WITH
                     </Badge>
                     <Title 
                         order={2} 
@@ -120,8 +120,8 @@ export function TheBlueprint() {
                             maxWidth: '900px'
                         }}
                     >
-                        We built the <span style={{ ...serifItalic, color: '#86868B' }}>brain</span><br/>
-                        you wish you had.
+                        A smarter way to <span style={{ ...serifItalic, textShadow: '0 5px 20px rgba(191, 90, 242, 0.25)' }}>study</span><br/>
+                        when time is short.
                     </Title>
                 </Stack>
 

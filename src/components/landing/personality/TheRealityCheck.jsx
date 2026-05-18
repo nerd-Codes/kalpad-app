@@ -2,6 +2,7 @@
 "use client";
 
 import { useRef } from 'react';
+import Image from 'next/image';
 import { Container, Title, Text, Box, Group, Stack, Avatar, Grid } from '@mantine/core';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { IconBrandDiscordFilled, IconQuote, IconActivityHeartbeat } from '@tabler/icons-react';
@@ -58,13 +59,63 @@ function ServerStatus() {
                         transition={{ duration: 1.5, repeat: Infinity }}
                         style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#34C759', boxShadow: '0 0 10px #34C759' }} 
                     />
-                    <Text size="xs" fw={700} c="green.4" tt="uppercase" style={{ letterSpacing: '0.1em' }}>KalPad Core Online</Text>
+                    <Text size="xs" fw={700} c="green.4" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Used by IITians, NITians & future doctors</Text>
                 </Group>
                 <Box style={{ width: 1, height: 16, backgroundColor: 'rgba(255,255,255,0.1)' }} />
                 <Group gap="xs">
                     <IconActivityHeartbeat size={16} color="#86868B" />
                     <Text size="xs" c="dimmed" fw={600} style={{ fontFamily: 'monospace' }}>100+ STUDENTS ACTIVE</Text>
                 </Group>
+            </Group>
+        </GlassCard>
+    );
+}
+
+function InstitutionProofCard() {
+    return (
+        <GlassCard
+            p={{ base: 'lg', md: 'xl' }}
+            style={{
+                background: 'linear-gradient(135deg, rgba(21, 21, 26, 0.88) 0%, rgba(14, 14, 18, 0.96) 100%)',
+                border: '1px solid rgba(191, 90, 242, 0.22)',
+                boxShadow: '0 32px 70px -35px rgba(191, 90, 242, 0.55)',
+                width: '100%',
+                backdropFilter: 'blur(24px)'
+            }}
+        >
+            <Group gap="xl" wrap="wrap" justify="space-between" align="center">
+                <Box
+                    style={{
+                        position: 'relative',
+                        width: 180,
+                        height: 96,
+                        borderRadius: 20,
+                        overflow: 'hidden',
+                        backgroundColor: 'rgba(255,255,255,0.98)',
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        flexShrink: 0
+                    }}
+                >
+                    <Image
+                        src="/mchiie.avif"
+                        alt="MHCIIE logo"
+                        fill
+                        sizes="180px"
+                        style={{ objectFit: 'contain', padding: '12px' }}
+                    />
+                </Box>
+
+                <Stack gap={6} style={{ flex: 1, minWidth: 260 }}>
+                    <Text size="11px" fw={800} c="violet.3" tt="uppercase" style={{ letterSpacing: '0.18em' }}>
+                        Officially Incubated
+                    </Text>
+                    <Title order={3} c="white" lh={1.2} style={{ fontFamily: 'var(--font-lexend)', maxWidth: '820px' }}>
+                        KalPad is officially incubated by MHCIIE at Hansraj College.
+                    </Title>
+                    <Text size="sm" c="gray.4" lh={1.65} maw={760}>
+                        Mahatma Hansraj Centre for Innovation, Incubation and Entrepreneurship
+                    </Text>
+                </Stack>
             </Group>
         </GlassCard>
     );
@@ -103,6 +154,8 @@ export function TheRealityCheck() {
             }} />
 
             <Container size="xl" style={{ position: 'relative', zIndex: 10 }}>
+                
+
                 {/* THE FIX: Native Mantine Grid for deterministic column rendering */}
                 <Grid gutter={{ base: 60, lg: 80 }} align="center">
                     
@@ -111,7 +164,7 @@ export function TheRealityCheck() {
                         <Stack gap="xl" pr={{ base: 0, lg: 40 }}>
                             <Group gap="sm">
                                 <IconQuote size={24} color="#BF5AF2" style={{ opacity: 0.5 }} />
-                                <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.2em' }}>THE MANIFESTO</Text>
+                                <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.2em' }}>STUDENT REALITY</Text>
                             </Group>
 
                             <Title 
@@ -124,13 +177,13 @@ export function TheRealityCheck() {
                                     letterSpacing: '-0.02em'
                                 }}
                             >
-                                You are living <span style={{ fontStyle: 'italic', color: '#BF5AF2' }}>two lives.</span> The student you're supposed to be, and the hustler you actually are.
+                                One app for the part of studying <span style={{ fontStyle: 'italic', color: '#BF5AF2' }}>no one teaches you.</span>
                             </Title>
 
                             <Text size="lg" c="gray.4" lh={1.7} style={{ fontFamily: 'var(--font-inter)' }}>
-                                The intern. The developer. The creator. Your "real" education often feels like it's happening at 2 AM on a side project, not in a 9 AM compulsory lecture. 
+                                Classes, coaching, internships, projects, family plans: students are juggling more than just a timetable. The hard part is not always studying. It is deciding what to study first.
                                 <br/><br/>
-                                The problem isn't the work; it's the friction. The staring contest with a 50-page PDF when your brain is already fried. KalPad isn't a magic wand to bypass learning. <span style={{ color: 'white', fontWeight: 600 }}>It's a weapon to bypass the friction.</span>
+                                KalPad reads the syllabus mess and turns it into small daily steps. <span style={{ color: 'white', fontWeight: 600 }}>You still learn the topic. We just make the starting point obvious.</span>
                             </Text>
 
                             <Box mt="md">
@@ -164,8 +217,8 @@ export function TheRealityCheck() {
                             {/* Widget 1: Anchored Top Left */}
                             <Box style={{ position: 'absolute', top: '5%', left: 0, zIndex: 10 }}>
                                 <MessageWidget 
-                                    avatar="A" name="Aditya" handle="@adi_codes" time="Today at 2:14 AM"
-                                    message="Bro the AI literally figured out I was weak in Vector Calculus and rescheduled my entire week to compensate. Actually terrifying but I'll take it."
+                                    avatar="A" name="Aditya" handle="B.Tech student" time="Today at 2:14 AM"
+                                    message="KalPad noticed I kept missing Vector Calculus questions and moved revision earlier in the week. Saved me from guessing what to fix."
                                     yOffset={y1} rotate={-3} color="#FF9500"
                                 />
                             </Box>
@@ -173,8 +226,8 @@ export function TheRealityCheck() {
                             {/* Widget 2: Anchored Center Right */}
                             <Box style={{ position: 'absolute', top: '35%', right: 0, zIndex: 12 }}>
                                 <MessageWidget 
-                                    avatar="P" name="Priya" handle="@priya_dev" time="Yesterday at 11:45 PM"
-                                    message="Generated a 7-day crash course for my OS internals. KalPad stripped out 40 pages of fluff from the professor's slides. Absolute lifesaver."
+                                    avatar="P" name="Priya" handle="NIT student" time="Yesterday at 11:45 PM"
+                                    message="I had one week for OS internals. It turned my messy syllabus into a day-wise plan and gave notes I could actually read."
                                     yOffset={y2} rotate={2} color="#BF5AF2"
                                 />
                             </Box>
@@ -182,8 +235,8 @@ export function TheRealityCheck() {
                             {/* Widget 3: Anchored Bottom Left */}
                             <Box style={{ position: 'absolute', bottom: '5%', left: '10%', zIndex: 14 }}>
                                 <MessageWidget 
-                                    avatar="K" name="Kabir" handle="@kabir_x" time="Sunday at 4:20 PM"
-                                    message="The YouTube Scout feature is broken. It found a 12 min MIT lecture that explained what my textbook failed to do in 3 chapters. GG."
+                                    avatar="K" name="Kabir" handle="NEET aspirant" time="Sunday at 4:20 PM"
+                                    message="The YouTube lecture suggestions saved me so much time. I got a short explanation instead of opening ten random tabs."
                                     yOffset={y3} rotate={-1} color="#34C759"
                                 />
                             </Box>

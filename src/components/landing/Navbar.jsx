@@ -2,11 +2,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Group, Button, Title, Box, Burger, Menu } from '@mantine/core';
+import { Group, Button, Title, Box } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconLogin, IconLayoutDashboard, IconLogout, IconUser } from '@tabler/icons-react';
+import { IconBolt, IconLayoutDashboard } from '@tabler/icons-react';
 import { Interactive } from '@/components/Interactive';
 import supabase from '@/lib/supabaseClient';
 
@@ -75,30 +75,6 @@ export function Navbar() {
                         </Title>
                     </Link>
 
-                    {/* 2. Desktop Links */}
-                    <Group gap="xs" visibleFrom="sm">
-                        <Button 
-                            component={Link} href="/about" 
-                            variant="subtle" color="gray" size="compact-sm" radius="xl"
-                            style={{ color: 'rgba(255,255,255,0.7)' }}
-                        >
-                            About
-                        </Button>
-                        <Button 
-                            component={Link} href="/pricing" 
-                            variant="subtle" color="gray" size="compact-sm" radius="xl"
-                            style={{ color: 'rgba(255,255,255,0.7)' }}
-                        >
-                            Pricing
-                        </Button>
-                        <Button 
-                            component={Link} href="/contact" 
-                            variant="subtle" color="gray" size="compact-sm" radius="xl"
-                            style={{ color: 'rgba(255,255,255,0.7)' }}
-                        >
-                            Contact Us
-                        </Button>
-                    </Group>
 
                     {/* 3. Action Area (Auth Aware) */}
                     <Group gap="xs">
@@ -115,6 +91,23 @@ export function Navbar() {
                                     style={{ color: 'white', fontWeight: 500 }}
                                 >
                                     Sign In
+                                </Button>
+                                <Button
+                                    component={Link}
+                                    href="/guest-plan"
+                                    variant="light"
+                                    color="cyan"
+                                    size="sm"
+                                    radius="xl"
+                                    visibleFrom="md"
+                                    leftSection={<IconBolt size={16} />}
+                                    style={{
+                                        color: 'white',
+                                        backgroundColor: 'rgba(34, 211, 238, 0.12)',
+                                        border: '1px solid rgba(34, 211, 238, 0.25)'
+                                    }}
+                                >
+                                    Instant Guest Mode
                                 </Button>
                                 
                                 <Button 
@@ -134,21 +127,40 @@ export function Navbar() {
                             </>
                         ) : (
                             // --- LOGGED IN STATE ---
-                            <Button 
-                                component={Link} 
-                                href="/dashboard" 
-                                variant="gradient" 
-                                gradient={{ from: '#BF5AF2', to: '#5E5CE6', deg: 135 }}
-                                size="sm" 
-                                radius="xl"
-                                leftSection={<IconLayoutDashboard size={16} />}
-                                style={{ 
-                                    boxShadow: '0 4px 15px rgba(191, 90, 242, 0.3)',
-                                    border: '1px solid rgba(255,255,255,0.1)'
-                                }}
-                            >
-                                Dashboard
-                            </Button>
+                            <>
+                                <Button
+                                    component={Link}
+                                    href="/dashboard"
+                                    variant="gradient"
+                                    gradient={{ from: '#BF5AF2', to: '#5E5CE6', deg: 135 }}
+                                    size="sm"
+                                    radius="xl"
+                                    leftSection={<IconLayoutDashboard size={16} />}
+                                    style={{
+                                        boxShadow: '0 4px 15px rgba(191, 90, 242, 0.3)',
+                                        border: '1px solid rgba(255,255,255,0.1)'
+                                    }}
+                                >
+                                    Dashboard
+                                </Button>
+                                <Button
+                                    component={Link}
+                                    href="/guest-plan"
+                                    variant="light"
+                                    color="cyan"
+                                    size="sm"
+                                    radius="xl"
+                                    visibleFrom="md"
+                                    leftSection={<IconBolt size={16} />}
+                                    style={{
+                                        color: 'white',
+                                        backgroundColor: 'rgba(34, 211, 238, 0.12)',
+                                        border: '1px solid rgba(34, 211, 238, 0.25)'
+                                    }}
+                                >
+                                    Instant Guest Mode
+                                </Button>
+                            </>
                         )}
 
                         {/* Mobile/Profile Menu */}

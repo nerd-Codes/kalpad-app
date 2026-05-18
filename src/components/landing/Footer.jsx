@@ -54,11 +54,11 @@ export function Footer() {
                                 KalPad
                             </Title>
                             <Text size="xs" c="dimmed" mt={4} fw={500} tt="uppercase" style={{ letterSpacing: '0.1em' }}>
-                                Genius OS
+                                AI study friend
                             </Text>
                         </Box>
                         <Text size="sm" c="dimmed" lh={1.6} maw={250}>
-                            The AI strategist that turns academic chaos into a winning streak.
+                            The AI study friend that turns a messy syllabus into a clear daily plan.
                         </Text>
                         <Group gap="xs">
                             <Interactive>

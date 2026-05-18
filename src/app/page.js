@@ -78,7 +78,7 @@ export default function LandingPage() {
                 <Hero />
                 <TheRealityCheck />
                 <TheMethodology />
-                < TheBlueprint />
+                <TheBlueprint />
                 <TheEngineRoom />
                 <TheGodMode />
                 <ThePledge />

@@ -709,6 +709,7 @@ WRITING STYLE (Balanced):
 - Sub_topic types to use: "Concept", "Problem", "Derivation", "Summary", "Challenge"
 - For every "core" or Hard/Intense topic: generate one "Challenge" sub_topic with a GOLDEN QUESTION.
   Format: "GOLDEN QUESTION: [The single most important exam-style question for this topic]"
+- BUNDLING (MANDATORY): Group by CONCEPT, not by task type. Recall + Formula + Problem + Summary for the same concept = ONE sub_topic entry with all tasks described together in one sentence. Do NOT create separate entries for each task type.
 `,
     hardcore: `
 WRITING STYLE (Hardcore — go deep, no shortcuts):
@@ -717,6 +718,7 @@ WRITING STYLE (Hardcore — go deep, no shortcuts):
 - EVERY core or Hard topic MUST include a GOLDEN QUESTION Challenge sub_topic.
 - Do NOT create easy tasks for Hard/Intense days. Demand full engagement.
 - Assume the user is willing to work hard — write tasks that reflect that.
+- BUNDLING (MANDATORY): Group by CONCEPT, not by task type. Recall + Formula + Problem + Summary for the same concept = ONE sub_topic entry with all tasks described together in one sentence. Do NOT create separate entries for each task type.
 `,
     sprint: `
 WRITING STYLE (Sprint — maximum score velocity):
@@ -725,20 +727,22 @@ WRITING STYLE (Sprint — maximum score velocity):
 - EVERY single day must have at least one GOLDEN QUESTION Challenge sub_topic.
 - Tasks should be exam-centric: "Solve 5 past paper questions on X", "Identify and solve the most common trap question type for Y"
 - Time is the scarcest resource. Every sub_topic must earn its place.
+- BUNDLING (MANDATORY): Group by CONCEPT, not by task type. Recall + Formula + Problem + Summary for the same concept = ONE sub_topic entry with all tasks described together in one sentence. Do NOT create separate entries for each task type.
 `,
     revision: `
 WRITING STYLE (Revision — active recall, no re-teaching):
 - The user already knows this material. Do NOT explain concepts from scratch. Trigger memory.
-- Sub_topic types to use: "Recall", "Formula", "Problem", "Summary"
-- Task verbs: "Recall X without notes", "Write out formula for Y from memory", "Solve 3 quick problems on Z", "Summarise chapter in 5 bullet points"
+- Task verbs to USE WITHIN a sub_topic: "Recall X without notes", "write out formula from memory", "solve N quick problems on Z", "summarise in bullet points"
 - Zero lengthy explanations. Every task is a test of existing knowledge.
+- BUNDLING (MANDATORY): Group by CONCEPT, not by task type. Recall + Formula + Problem + Summary for the same concept = ONE sub_topic entry with all tasks described together in one sentence. Do NOT create separate entries for each task type.
 `,
     skill: `
 WRITING STYLE (Skill Builder — build things, not notes):
 - Every day must produce a tangible output: a component, a working script, a configured tool.
 - Sub_topic types to use: "Build", "Code", "Practice", "Project", "Configure"
-- Theory sub_topics must immediately link to practice: "Understand X concept (15 min), then implement it in your project (45 min)"
+- Theory must immediately link to practice within the SAME sub_topic: "(1h 15min) HTTP Routing: understand REST principles (15 min), then implement GET/POST/DELETE routes in your Express app (1h)"
 - No sub_topic should be purely passive. Reading must lead to doing.
+- BUNDLING (MANDATORY): Group by CONCEPT, not by task type. Recall + Formula + Problem + Summary for the same concept = ONE sub_topic entry with all tasks described together in one sentence. Do NOT create separate entries for each task type.
 `,
   };
   return directives[planMode] || directives.default;
@@ -978,10 +982,25 @@ OVERALL STUDY CONTEXT:
 ${phase3Directive}
 
 TIME IN SUB-TOPICS (MANDATORY): Every sub_topic text MUST begin with the estimated time in parentheses.
-  ✓ CORRECT: "(30 min) Study Newton's First Law — focus on the concept of inertia and real-world examples."
-  ✓ CORRECT: "(1h) Solve 10 integration problems covering substitution and integration by parts."
-  ✗ WRONG: "Study Newton's First Law." (no time)
 The sum of all sub_topic times for a day must closely match that day's total study hours.
+
+SUB-TOPIC DESCRIPTION QUALITY (MANDATORY): Every sub_topic text must be richly descriptive so that
+a notes-generation AI receiving ONLY this text can produce a complete, deep, textbook-quality chapter
+without needing any other context. Think of each sub_topic as a mini-brief for a subject-matter expert.
+
+A great sub_topic description answers all of:
+  - WHAT concepts/topics are being studied (name them explicitly — no vague labels)
+  - WHAT specific tasks are being performed (recall, derive, solve problems, summarise)
+  - WHAT angle or focus to take (e.g. "emphasising physical intuition", "focusing on exam-pattern traps")
+  - WHAT prior concepts connect to this (one brief link to what came before)
+
+  ✗ WEAK:   "(1h) Study Z-Transform properties."
+  ✗ WEAK:   "(45 min) Recall ROC and solve problems."
+  ✓ STRONG: "(1h 15min) Z-Transform Properties — Linearity, Time-Shifting, Frequency-Scaling, Convolution, and Differentiation: write each property formula from memory with its proof sketch; solve 3 problems that combine at least two properties (e.g. time-shift + convolution); note which properties break down outside the ROC."
+  ✓ STRONG: "(1h 30min) Region of Convergence (ROC) — building on the Z-transform definition: state and explain the 5 key ROC properties; sketch and label ROCs for finite-duration, right-sided infinite, and left-sided infinite sequences; connect ROC boundaries to the unit circle and DTFT existence; summarise the causality-stability-ROC triangle in 3 bullet points."
+
+The notes generator uses ONLY the sub_topic text as its input — it has no access to the day plan,
+syllabus, or any other context. Every concept, formula name, and task must be spelled out explicitly.
 
 TOPIC NAME FORMAT (MANDATORY): In the topic_name field, always include the hours:
   ✓ CORRECT: "Newton's Laws of Motion (2h)"

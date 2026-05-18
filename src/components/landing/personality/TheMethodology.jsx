@@ -3,7 +3,7 @@
 
 import { Container, Title, Text, Box, Stack, Badge, SimpleGrid, Group, ThemeIcon } from '@mantine/core';
 import { motion } from 'framer-motion';
-import { IconFileUpload, IconCpu, IconFocus2, IconArrowRight, IconBook, IconBrandYoutube } from '@tabler/icons-react';
+import { IconFileUpload, IconCpu, IconFocus2, IconBook, IconBrandYoutube } from '@tabler/icons-react';
 import { GlassCard } from '@/components/GlassCard';
 
 // --- EDITORIAL FONT STYLE ---
@@ -11,35 +11,35 @@ const serifItalic = {
     fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
     fontStyle: 'italic',
     fontWeight: 400,
-    color: '#F5F5F7', 
+    color: '#BF5AF2',
     textTransform: 'lowercase'
 };
 
-// --- DATA: THE 3-STEP PROTOCOL ---
+// --- DATA: THE 3-STEP FLOW ---
 const STEPS = [
     {
         step: "01",
-        title: "We Triage",
+        title: "Find What Matters",
         icon: IconFileUpload,
         color: "#BF5AF2", // Purple
         desc: "You upload the confusing, 50-page syllabus PDF.",
-        detail: "The AI scans it, identifies high-yield topics, calculates the time remaining, and ruthlessly cuts the fluff."
+        detail: "KalPad checks the important topics, your deadline, and what can wait so you do not waste time on low-priority extras."
     },
     {
         step: "02",
-        title: "We Architect",
+        title: "Make The Plan",
         icon: IconCpu,
         color: "#22d3ee", // Cyan
-        desc: "We build the entire resource stack instantly.",
-        detail: "No Googling. The system generates textbook-quality notes and curates the exact YouTube lectures you need for every single topic."
+        desc: "Your study plan, notes, and lectures come together in one place.",
+        detail: "No endless searching. KalPad creates readable notes and finds useful YouTube explanations for the topics on your schedule."
     },
     {
         step: "03",
-        title: "You Conquer",
+        title: "You Study",
         icon: IconFocus2,
         color: "#34C759", // Green
         desc: "You log in and just study.",
-        detail: "No planning fatigue. No 'where do I start' anxiety. You just execute the mission in front of you."
+        detail: "No planning fatigue. No 'where do I start' anxiety. You open today's task and get moving."
     }
 ];
 
@@ -78,7 +78,7 @@ export function TheMethodology() {
                         variant="filled" size="md" radius="xl" color="gray"
                         style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', letterSpacing: '0.1em' }}
                     >
-                        THE PROTOCOL
+                        HOW IT WORKS
                     </Badge>
                     <Title 
                         order={2} 
@@ -91,8 +91,8 @@ export function TheMethodology() {
                             maxWidth: '900px'
                         }}
                     >
-                        We handle the <span style={{ ...serifItalic, color: '#86868B' }}>meta-work.</span><br/>
-                        You handle the learning.
+                        We handle the <span style={{ ...serifItalic, textShadow: '0 5px 20px rgba(191, 90, 242, 0.25)' }}>planning.</span><br/>
+                        You focus on the learning.
                     </Title>
                 </Stack>
 
@@ -101,7 +101,7 @@ export function TheMethodology() {
                     {STEPS.map((item, index) => {
                         const isLast = index === STEPS.length - 1;
                         return (
-                            <Box key={index} style={{ position: 'relative' }}>
+                            <Box key={index} style={{ position: 'relative', height: '100%' }}>
                                 <motion.div
                                     initial={{ opacity: 0, y: 20 }}
                                     whileInView={{ opacity: 1, y: 0 }}
@@ -117,7 +117,8 @@ export function TheMethodology() {
                                             border: `1px solid ${item.color}30`,
                                             boxShadow: `0 0 40px -20px ${item.color}20`,
                                             display: 'flex', flexDirection: 'column',
-                                            position: 'relative', zIndex: 10
+                                            position: 'relative', zIndex: 10,
+                                            minHeight: '100%'
                                         }}
                                     >
                                         <Group justify="space-between" mb="xl">
@@ -143,14 +144,6 @@ export function TheMethodology() {
                                         <Text size="sm" c="gray.5" lh={1.6}>
                                             {item.detail}
                                         </Text>
-
-                                        {/* Micro-Visuals for context */}
-                                        {index === 1 && (
-                                            <Group mt="auto" pt="lg" gap="xs">
-                                                <Badge size="xs" variant="outline" color="gray" leftSection={<IconBook size={10}/>}>AI Notes</Badge>
-                                                <Badge size="xs" variant="outline" color="gray" leftSection={<IconBrandYoutube size={10}/>}>Lectures</Badge>
-                                            </Group>
-                                        )}
                                     </GlassCard>
                                 </motion.div>
 

@@ -50,9 +50,9 @@ function TriageSimulator() {
 
             <Box mb="xl">
                 <Group justify="space-between" align="flex-end" mb="md">
-                    <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Triage Engine Simulation</Text>
+                    <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Study Time Preview</Text>
                     <Badge color={triagedCount > 0 ? "red" : "green"} variant="light" size="sm">
-                        {triagedCount > 0 ? "RUTHLESS MODE" : "ALL CLEAR"}
+                        {triagedCount > 0 ? "PRIORITIZED" : "ALL CLEAR"}
                     </Badge>
                 </Group>
                 
@@ -64,7 +64,7 @@ function TriageSimulator() {
                         transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
                     >
                         <Text size="xs" fw={700} c="#BF5AF2" style={{ letterSpacing: '0.05em' }}>
-                            ← Drag to simulate →
+                            Drag to try
                         </Text>
                     </motion.div>
                 </Group>
@@ -125,8 +125,8 @@ function TriageSimulator() {
                                 </Group>
                                 <Group gap="xs">
                                     <Text size="xs" c="dimmed">{item.hours}h</Text>
-                                    {!item.isTriaged && <Badge size="xs" color="gray" variant="outline" style={{ border: 'none', backgroundColor: 'rgba(255,255,255,0.05)' }}>{item.roi} ROI</Badge>}
-                                    {item.isTriaged && <Badge size="xs" color="red" variant="filled">AMPUTATED</Badge>}
+                                    {!item.isTriaged && <Badge size="xs" color="gray" variant="outline" style={{ border: 'none', backgroundColor: 'rgba(255,255,255,0.05)' }}>{item.roi} priority</Badge>}
+                                    {item.isTriaged && <Badge size="xs" color="red" variant="filled">Skipped</Badge>}
                                 </Group>
                             </Group>
                         </motion.div>
@@ -149,7 +149,7 @@ function IllustratorMockup() {
             {/* The SVG Black Body Radiation Graph */}
             <Box p="sm" style={{ backgroundColor: '#0A0A0C', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <Text size="xs" fw={700} c="white" mb="sm" ta="center" style={{ fontFamily: 'var(--font-lexend)' }}>
-                    Black Body Radiation & UV Catastrophe
+                    Black Body Radiation
                 </Text>
                 
                 <svg width="100%" height="120" viewBox="0 0 300 120" style={{ overflow: 'visible' }}>
@@ -161,7 +161,7 @@ function IllustratorMockup() {
                     <line x1="30" y1="10" x2="30" y2="100" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
                     <line x1="30" y1="100" x2="290" y2="100" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
                     <text x="5" y="55" fill="#888" fontSize="8" transform="rotate(-90 10 55)">Intensity</text>
-                    <text x="140" y="115" fill="#888" fontSize="8">Wavelength (λ)</text>
+                    <text x="140" y="115" fill="#888" fontSize="8">Wavelength</text>
 
                     {/* Classical Curve (Rayleigh-Jeans) - Shoots to infinity */}
                     <motion.path 
@@ -242,7 +242,7 @@ function QuizMockup() {
                 >
                     <Box mt="xs" p="sm" style={{ background: '#111113', borderRadius: '12px', border: '1px solid rgba(52, 199, 89, 0.2)', position: 'relative', overflow: 'hidden' }}>
                         <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '3px', background: '#34C759' }} />
-                        <Text size="10px" fw={700} c="#34C759" mb={4} tt="uppercase" style={{ letterSpacing: '0.05em' }}>AI Context Lens</Text>
+                        <Text size="10px" fw={700} c="#34C759" mb={4} tt="uppercase" style={{ letterSpacing: '0.05em' }}>Why This Was Wrong</Text>
                         <Text size="xs" c="gray.3" lh={1.5}>
                             You reversed the logic. Classical mechanics (Rayleigh-Jeans) failed because it assumed <span style={{ color: '#fff', fontWeight: 600 }}>continuous</span> energy. It was Max Planck who fixed it by proving energy is <span style={{ color: '#fff', fontWeight: 600 }}>quantized</span> ($E=hv$).
                         </Text>
@@ -259,7 +259,7 @@ function ScoutMockup() {
         <Box style={{ position: 'relative', height: '100%', minHeight: '200px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Group justify="center" mb="lg">
                 <IconSearch size={18} color="#FF9500" className="animate-pulse" />
-                <Text size="xs" ff="monospace" c="orange.4" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Scanning Transcripts...</Text>
+                <Text size="xs" ff="monospace" c="orange.4" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Checking Lectures...</Text>
             </Group>
             
             <Stack gap="sm">
@@ -289,7 +289,7 @@ function ScoutMockup() {
                         </Box>
                         <Box style={{ flex: 1 }}>
                             <Text size="sm" c="white" fw={600} lh={1.2}>MIT 8.01: Work & Energy</Text>
-                            <Text size="10px" c="orange.4" mt={4} fw={500}>Highest Information Density</Text>
+                            <Text size="10px" c="orange.4" mt={4} fw={500}>Best short explanation</Text>
                         </Box>
                         <Badge size="xs" color="orange" variant="filled">14m</Badge>
                     </Group>
@@ -313,7 +313,7 @@ export function TheEngineRoom() {
                         radius="xl"
                         style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: '#F5F5F7', border: '1px solid rgba(255,255,255,0.1)', letterSpacing: '0.1em', padding: '12px 16px' }}
                     >
-                        THE ENGINE ROOM
+                        WHAT KALPAD DOES
                     </Badge>
                     <Title 
                         order={2} 
@@ -326,8 +326,8 @@ export function TheEngineRoom() {
                             maxWidth: '900px'
                         }}
                     >
-                        Not a planner.<br/>
-                        <span style={serifItalic}>A strategic operations command.</span>
+                        Not just a timetable.<br/>
+                        <span style={serifItalic}>A calmer way to study.</span>
                     </Title>
                 </Stack>
 
@@ -352,10 +352,10 @@ export function TheEngineRoom() {
                                             <IconTargetArrow size={24} color="#BF5AF2" />
                                         </ThemeIcon>
                                         <Title order={3} c="white" style={{ fontFamily: 'var(--font-lexend)', fontSize: '2rem', letterSpacing: '-0.03em' }}>
-                                            The Strategist
+                                            Smart Plan Builder
                                         </Title>
                                         <Text c="gray.4" size="lg" lh={1.6} style={{ fontFamily: 'var(--font-inter)' }}>
-                                            When time runs out, the AI doesn't just cram everything in. It calculates study debt and <span style={{...serifItalic, fontSize: '1.1em'}}>ruthlessly amputates</span> low-yield topics to save your core grade.
+                                            When time runs out, KalPad does not cram everything in. It keeps the important topics first and moves low-priority work out of the way.
                                         </Text>
                                     </Stack>
                                 </Grid.Col>
@@ -381,8 +381,8 @@ export function TheEngineRoom() {
                                 <IllustratorMockup />
                             </Box>
                             <Stack gap="xs">
-                                <Group gap="xs"><IconChartLine size={18} color="#BF5AF2"/><Text fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)', fontSize: '1.2rem', letterSpacing: '-0.02em' }}><span style={serifItalic}>Multimodal</span> RAG</Text></Group>
-                                <Text size="sm" c="dimmed" lh={1.5} style={{ fontFamily: 'var(--font-inter)' }}>Our AI writes textbook-level notes and dynamically codes Python/Mermaid to generate exact visual aids instantly.</Text>
+                                <Group gap="xs"><IconChartLine size={18} color="#BF5AF2"/><Text fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)', fontSize: '1.2rem', letterSpacing: '-0.02em' }}><span style={serifItalic}>Clear</span> Notes & Diagrams</Text></Group>
+                                <Text size="sm" c="dimmed" lh={1.5} style={{ fontFamily: 'var(--font-inter)' }}>KalPad turns hard topics into readable notes and useful visuals so the idea clicks faster.</Text>
                             </Stack>
                         </GlassCard>
                     </Grid.Col>
@@ -401,7 +401,7 @@ export function TheEngineRoom() {
                                 <Grid.Col span={{ base: 12, sm: 6 }}>
                                     <Stack gap="xs">
                                         <Group gap="xs"><IconVideo size={20} color="#FF9500"/><Title order={4} c="white" style={{ fontFamily: 'var(--font-lexend)', fontSize: '1.2rem', letterSpacing: '-0.02em' }}>The Lecture Scout</Title></Group>
-                                        <Text size="sm" c="dimmed" lh={1.6} style={{ fontFamily: 'var(--font-inter)' }}>A multi-agent crawler navigates YouTube, analyzes transcripts, and finds the single highest-density 15-minute explanation so you don't waste 2 hours.</Text>
+                                        <Text size="sm" c="dimmed" lh={1.6} style={{ fontFamily: 'var(--font-inter)' }}>KalPad checks YouTube lecture transcripts and finds a short, useful explanation so you do not waste 2 hours searching.</Text>
                                     </Stack>
                                 </Grid.Col>
                                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -426,8 +426,8 @@ export function TheEngineRoom() {
                             <Grid gutter="xl" style={{ height: '100%' }}>
                                 <Grid.Col span={{ base: 12, sm: 6 }}>
                                     <Box mb="xl">
-                                        <Group gap="xs" mb="sm"><IconBrain size={20} color="#34C759"/><Title order={4} c="white" style={{ fontFamily: 'var(--font-lexend)', fontSize: '1.2rem', letterSpacing: '-0.02em' }}>Active Recall V2</Title></Group>
-                                        <Text size="sm" c="dimmed" lh={1.6} style={{ fontFamily: 'var(--font-inter)' }}>Not just a quiz. If you fail a question, the AI Tutor instantly generates a personalized explanation to patch your <span style={{...serifItalic, fontSize: '1.1em'}}>specific knowledge gap.</span></Text>
+                                        <Group gap="xs" mb="sm"><IconBrain size={20} color="#34C759"/><Title order={4} c="white" style={{ fontFamily: 'var(--font-lexend)', fontSize: '1.2rem', letterSpacing: '-0.02em' }}>Practice That Learns</Title></Group>
+                                        <Text size="sm" c="dimmed" lh={1.6} style={{ fontFamily: 'var(--font-inter)' }}>If you miss a question, KalPad explains the mistake and brings that topic back for revision.</Text>
                                     </Box>
                                 </Grid.Col>
                                 <Grid.Col span={{ base: 12, sm: 6 }}>

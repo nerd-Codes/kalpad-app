@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const lexend = Lexend({ subsets: ["latin"], variable: '--font-lexend' });
 
 export const metadata = {
-  title: "KalPad - Your AI Study Mentor",
+  title: "KalPad - Your AI topper friend",
   description: "Turn 'Kal Padhunga' into reality.",
   manifest: "/manifest.json",
   verification: {
@@ -20,14 +20,14 @@ export const metadata = {
   },
 
     openGraph: {
-    title: 'KalPad: Your AI Academic Strategist',
-    description: 'The brutally honest AI partner that turns academic chaos into a clear battle plan. Built by a student, for students.',
+    title: 'KalPad - Your AI topper friend',
+    description: 'The AI study friend that turns a messy syllabus into a clear daily plan. Built by a student, for students.',
     images: [
       {
         url: 'https://kalpad-app.vercel.app/og-image.png', // Absolute URL
-        width: 1890,
-        height: 1035,
-        alt: 'KalPad - The greatest minds did not waste their cognitive budget on menial tasks.',
+        width: 1910,
+        height: 973,
+        alt: 'KalPad landing page preview',
       },
     ],
     type: 'website',

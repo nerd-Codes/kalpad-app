@@ -11,7 +11,7 @@ import { ShimmerButton } from '@/components/landing/ShimmerButton';
 import { notifications } from '@mantine/notifications';
 import { isSameDay, parseISO, format, isToday } from 'date-fns';
 import { 
-    IconFlame, IconShare3, IconVideo, IconRefresh, IconPlayerPlay, IconChevronRight, IconChevronLeft, IconBrain, IconTrash
+    IconFlame, IconShare3, IconVideo, IconRefresh, IconPlayerPlay, IconChevronRight, IconChevronLeft, IconBrain, IconTrash, IconDownload
 } from '@tabler/icons-react';
 import { 
     Container, Title, Text, Loader, Alert, Group, Button, Box, 
@@ -27,6 +27,7 @@ import { RegeneratePlanModal } from '@/components/RegeneratePlanModal';
 import { wittyFacts as cramSheetFacts } from '@/lib/newplanFacts';
 
 import { QuizOrchestratorModal } from '@/components/QuizOrchestratorModal';
+import { getDayNoteSections } from '@/lib/dayNotes';
 
 import Link from 'next/link';
 
@@ -247,6 +248,47 @@ export default function PlanDetailPage() {
         finally { setIsForging(false); }
     };
 
+    const handleDownloadDayNotes = () => {
+        const selectedDayTopic = plan?.plan_topics?.[selectedDayIndex];
+        if (!selectedDayTopic) return;
+
+        const printableSections = getDayNoteSections(selectedDayTopic);
+        if (printableSections.length === 0) {
+            notifications.show({
+                title: 'No Notes Yet',
+                message: 'Generate at least one note for this day before exporting.',
+                color: 'yellow',
+            });
+            return;
+        }
+
+        const printWindow = window.open(`/print/day/${selectedDayTopic.id}`, '_blank');
+        if (!printWindow) {
+            notifications.show({
+                title: 'Popup Blocked',
+                message: 'Please allow popups to export the day notes.',
+                color: 'yellow',
+            });
+            return;
+        }
+
+        const handleMessage = (event) => {
+            if (event.source === printWindow && event.data === 'KALPAD_PRINT_READY') {
+                printWindow.print();
+                window.removeEventListener('message', handleMessage);
+            }
+        };
+
+        const handleAfterPrint = () => {
+            printWindow.close();
+            printWindow.removeEventListener('afterprint', handleAfterPrint);
+            window.removeEventListener('message', handleMessage);
+        };
+
+        window.addEventListener('message', handleMessage);
+        printWindow.addEventListener('afterprint', handleAfterPrint, { once: true });
+    };
+
     const handleConfirmBulkGenerate = async () => {
         if (bulkNoteSelection.length === 0) return;
         setIsBulkGenerating(true); closeBulkNoteModal();
@@ -318,6 +360,9 @@ export default function PlanDetailPage() {
     };
 
     const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+    const selectedDayTopic = plan?.plan_topics?.[selectedDayIndex] || null;
+    const selectedDayNoteCount = selectedDayTopic ? getDayNoteSections(selectedDayTopic).length : 0;
+    const canDownloadSelectedDayNotes = selectedDayNoteCount > 0;
 
     return (
     <AppLayout session={session}>
@@ -380,6 +425,17 @@ export default function PlanDetailPage() {
                                     onClick={() => cramSheet?.status === 'complete' ? router.push(`/cram-sheet/${cramSheet.id}`) : handleForgeCramSheet()}
                                 >
                                     {cramSheet?.status === 'complete' ? 'View Sheet' : 'Cram Sheet'}
+                                </Button>
+                                <Button
+                                    variant="light"
+                                    color="blue"
+                                    radius="xl"
+                                    size="xs"
+                                    leftSection={<IconDownload size={16} />}
+                                    onClick={handleDownloadDayNotes}
+                                    disabled={!canDownloadSelectedDayNotes}
+                                >
+                                    Day Notes File
                                 </Button>
                                 <Button variant="light" color="violet" radius="xl" size="xs" leftSection={<IconRefresh size={16}/>} onClick={openRegenerateModal}>Refine Plan</Button>
                                 <Button variant="default" radius="xl" size="xs" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan}>Share</Button>
@@ -504,6 +560,16 @@ export default function PlanDetailPage() {
                                             </Button>
                                             <Button fullWidth variant="light" color="yellow" leftSection={<IconFlame size={16} color="orange"/>} loading={isForging} onClick={() => cramSheet?.status === 'complete' ? router.push(`/cram-sheet/${cramSheet.id}`) : handleForgeCramSheet()}>
                                                 {cramSheet?.status === 'complete' ? 'View Cram Sheet' : 'Forge Cram Sheet'}
+                                            </Button>
+                                            <Button
+                                                fullWidth
+                                                variant="light"
+                                                color="blue"
+                                                leftSection={<IconDownload size={16} />}
+                                                onClick={handleDownloadDayNotes}
+                                                disabled={!canDownloadSelectedDayNotes}
+                                            >
+                                                Download Day Notes
                                             </Button>
                                             <Button fullWidth variant="light" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan} loading={isSharing}>Share</Button>
                                             <Button fullWidth variant="light" color="violet" onClick={openRegenerateModal} leftSection={<IconRefresh size={16} />}>Refine Plan</Button>

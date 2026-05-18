@@ -119,7 +119,7 @@ function ScreenshotSlicer() {
             */}
             <img 
                 src="/dashboard-screenshot.png" 
-                alt="KalPad OS Dashboard"
+                alt="KalPad study dashboard"
                 style={{ 
                     width: '100%', 
                     height: 'auto', 
@@ -221,10 +221,10 @@ export function Hero() {
             />
 
             {/* --- THE CHAOS LAYER (Floating Threats - Now Z-Index 100) --- */}
-            <FloatingThreat icon={IconFileText} text="Syllabus_v4_FINAL.pdf" x={12} y={25} delay={0} duration={8} rotate={-12} blur />
-            <FloatingThreat icon={IconClock} text="72:00:00 Remaining" x={75} y={15} delay={2} duration={9} rotate={8} blur />
-            <FloatingThreat icon={IconBattery1} text="Focus < 10%" x={15} y={55} delay={4} duration={7} rotate={-5} blur />
-            <FloatingThreat icon={IconBrain} text="Cognitive Overload" x={82} y={50} delay={1} duration={8} rotate={15} blur />
+            <FloatingThreat icon={IconFileText} text="Messy syllabus PDF" x={12} y={25} delay={0} duration={8} rotate={-12} blur />
+            <FloatingThreat icon={IconClock} text="Exam in 72 hours" x={75} y={15} delay={2} duration={9} rotate={8} blur />
+            <FloatingThreat icon={IconBattery1} text="Focus running low" x={15} y={55} delay={4} duration={7} rotate={-5} blur />
+            <FloatingThreat icon={IconBrain} text="Too much to revise" x={82} y={50} delay={1} duration={8} rotate={15} blur />
 
             {/* --- MAIN TYPOGRAPHY & CTA (Center Stage) --- */}
             <Container size="xl" style={{ position: 'relative', zIndex: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '22vh', flex: 1 }}>
@@ -234,7 +234,7 @@ export function Hero() {
                     <Group justify="center" mb="lg">
                         {/* THE FIX: Shorter, punchier badge */}
                         <Badge variant="outline" size="sm" style={{ borderColor: 'rgba(255,255,255,0.15)', color: '#86868B', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', letterSpacing: '0.15em', padding: '14px 20px' }}>
-                            THE ACADEMIC CHEAT CODE
+                            BUILT FOR STUDENTS
                         </Badge>
                     </Group>
 
@@ -253,7 +253,7 @@ export function Hero() {
                             fontFamily: 'var(--font-lexend)'
                         }}
                     >
-                        <span style={{ zIndex: 1 }}>Survive the</span>
+                        <span style={{ zIndex: 1 }}>SURVIVE THE</span>
                         <span style={{ 
                             fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif', 
                             fontStyle: 'italic', 
@@ -264,18 +264,18 @@ export function Hero() {
                             zIndex: 2,           // Pulls "chaos" in front of "Survive"
                             textShadow: '0 10px 30px rgba(191, 90, 242, 0.4)'
                         }}>
-                            chaos.
+                            chaos
                         </span>
                     </Title>
 
                     <Text size="xl" c="gray.4" mt="xl" mb={40} maw={550} mx="auto" style={{ fontFamily: 'var(--font-inter)', lineHeight: 1.6 }}>
-                        You are out of time and out of focus. KalPad is an AI OS that ingests your mess and outputs a ruthless, tactical timeline.
+                        Upload your syllabus, pick your exam date, and get a clear day-wise plan with notes, practice, and lectures when you need them.
                     </Text>
 
                     {/* THE FIX: Split CTAs */}
                     <Group justify="center" gap="md">
                         <MagneticButton href="/guest-plan" primary={true}>
-                            <Text size="md" fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>Guest Mode</Text>
+                            <Text size="md" fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>Try Guest Mode</Text>
                             <IconArrowRight size={18} color="white" />
                         </MagneticButton>
 

@@ -72,6 +72,29 @@ body {
     line-height: 1.3 !important;
 }
 
+.print-day-meta {
+    margin-top: -0.5rem;
+    margin-bottom: 1.5rem;
+    color: #555 !important;
+    font-size: 10.5pt;
+    text-align: left;
+}
+
+.print-note-section {
+    margin: 2rem 0 2.5rem;
+}
+
+.print-section-title {
+    font-size: 16pt !important;
+    margin-bottom: 1rem !important;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid #ddd;
+}
+
+.print-section-divider {
+    margin: 2rem 0 0;
+}
+
 /* --- TEXT ELEMENTS --- */
 .printable-content p {
     margin-bottom: 1em;

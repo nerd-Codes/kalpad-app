@@ -17,14 +17,14 @@ const serifItalic = {
     textTransform: 'lowercase'
 };
 
-// --- DATA: THE FREE ARSENAL ---
+// --- DATA: THE FREE TOOLKIT ---
 const FREE_ARSENAL = [
-    { label: "Constitutional Chain-of-Thought AI", value: "ACTIVE" },
-    { label: "Syllabus Triage Engine", value: "ACTIVE" },
-    { label: "Multimodal RAG (Note Gen)", value: "DAILY CREDITS" },
-    { label: "Active Recall Engine", value: "DAILY CREDITS" },
-    { label: "YouTube Lecture Scout", value: "STANDARD ACCESS" },
-    { label: "Mobile App Access", value: "UNRESTRICTED" },
+    { label: "Smart study plan", value: "ACTIVE" },
+    { label: "Important topic priority", value: "ACTIVE" },
+    { label: "AI notes and diagrams", value: "DAILY CREDITS" },
+    { label: "Active recall practice", value: "DAILY CREDITS" },
+    { label: "Useful YouTube lectures", value: "STANDARD ACCESS" },
+    { label: "Mobile app access", value: "UNRESTRICTED" },
 ];
 
 export function ThePledge() {
@@ -39,7 +39,7 @@ export function ThePledge() {
                         style={{ borderColor: 'rgba(52, 199, 89, 0.4)', color: '#34C759', letterSpacing: '0.1em', backgroundColor: 'rgba(52, 199, 89, 0.05)' }}
                         leftSection={<IconHeartHandshake size={14}/>}
                     >
-                        THE PLEDGE
+                        FREE TO START
                     </Badge>
                     <Title 
                         order={2} 
@@ -73,11 +73,11 @@ export function ThePledge() {
                         <Stack gap="xl">
                             {/* The Core Message */}
                             <Text size="xl" c="white" lh={1.6} fw={400} ta="center" style={{ fontFamily: 'var(--font-lexend)' }}>
-                                We don't gatekeep grades. The Free Tier isn't a "trial." <br/>
-                                <span style={{ color: '#34C759' }}>It is a complete academic weapon.</span>
+                                We don't gatekeep good study tools. The Free Tier isn't a "trial." <br/>
+                                <span style={{ color: '#34C759' }}>It is a complete study toolkit.</span>
                             </Text>
 
-                            <Divider color="rgba(255,255,255,0.1)" label="SYSTEM CAPABILITIES ASSIGNED TO YOU" labelPosition="center" />
+                            <Divider color="rgba(255,255,255,0.1)" label="WHAT YOU GET" labelPosition="center" />
 
                             {/* The Spec Sheet */}
                             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
@@ -99,9 +99,9 @@ export function ThePledge() {
                                     <Stack gap={4}>
                                         <Text size="xs" fw={700} c="dimmed" tt="uppercase">Transparency Note</Text>
                                         <Text size="sm" c="gray.5" lh={1.5}>
-                                            We only charge for "Unlimited" plans because GPU compute costs us money. 
+                                            We only charge for "Unlimited" plans because AI generation costs real money.
                                             But if you have the discipline to finish one mission before starting the next, 
-                                            <span style={{ color: 'white', fontWeight: 600 }}> the free daily credits are mathematically sufficient to ace any syllabus.</span>
+                                            <span style={{ color: 'white', fontWeight: 600 }}> the free daily credits are enough to seriously test KalPad on your syllabus.</span>
                                         </Text>
                                     </Stack>
                                 </Group>
@@ -111,7 +111,7 @@ export function ThePledge() {
                             <Group justify="center" gap="xl" mt="sm">
                                 <Stack gap={0} align="center">
                                     <Text size="xs" c="dimmed" tt="uppercase" fw={700} style={{ letterSpacing: '0.1em' }}>Financial Cost</Text>
-                                    <Text size="2.5rem" fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)', lineHeight: 1 }}>₹0</Text>
+                                    <Text size="2.5rem" fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)', lineHeight: 1 }}>Rs 0</Text>
                                 </Stack>
                                 <div style={{ width: '1px', height: '40px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
                                 <Stack gap={0} align="center">
@@ -159,7 +159,7 @@ export function ThePledge() {
                                             INSTANT GUEST MODE
                                         </Text>
                                         <Text size="xs" c="rgba(255,255,255,0.8)" fw={600} mt={4} tt="uppercase" style={{ letterSpacing: '0.1em' }}>
-                                            No Login • No Credit Card • 10 Seconds
+                                            No Login - No Credit Card - 10 Seconds
                                         </Text>
                                     </Box>
                                     <IconArrowRight size={32} color="white" />
