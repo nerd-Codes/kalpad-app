@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from 'react';
-import { Modal, Stack, SimpleGrid, Group, Button, Text, Title, Box, ThemeIcon, Loader, ScrollArea, Progress, Radio, UnstyledButton, RingProgress, Center, Accordion, Badge, Paper } from '@mantine/core';
+import { Modal, Stack, SimpleGrid, Group, Button, Text, Title, Box, ThemeIcon, Loader, ScrollArea, Progress, RingProgress, Center, Accordion, Paper } from '@mantine/core';
 import { IconBolt, IconBrain, IconPuzzle, IconRocket, IconTarget, IconChevronLeft, IconChevronRight, IconCheck, IconChartBar, IconTrophy, IconAlertTriangle, IconRefresh, IconX } from '@tabler/icons-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMediaQuery } from '@mantine/hooks';
 import { Interactive } from '@/components/Interactive';
 import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from './landing/ShimmerButton';
+import { QuizRichText } from '@/components/quiz/QuizRichText';
+import { useUniformOptionHeight } from '@/hooks/useUniformOptionHeight';
 
 // --- VISUAL CONSTANTS ---
 const MODES = [
@@ -20,15 +22,16 @@ const glassModalStyles = {
     content: { 
         backgroundColor: '#1C1C1E', 
         border: '1px solid rgba(255, 255, 255, 0.1)', 
-        borderRadius: '24px',
+        borderRadius: 0,
         boxShadow: '0 40px 80px -12px rgba(0, 0, 0, 0.6)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        maxHeight: '85vh'
+        height: '100vh',
+        maxHeight: '100vh'
     },
     header: { backgroundColor: 'transparent', paddingBottom: 0, zIndex: 10 },
-    body: { padding: '0', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+    body: { padding: '0', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 },
     title: { fontFamily: 'var(--font-lexend)', fontWeight: 600, color: 'white', fontSize: '1.25rem' },
     close: { color: 'gray', transition: 'all 0.2s', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' } }
 };
@@ -129,10 +132,10 @@ function RunnerView({ questions, onComplete, onAbort }) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState({});
     const [direction, setDirection] = useState(1);
-    const isMobile = useMediaQuery('(max-width: 48em)');
 
     const currentQuestion = questions[currentIndex];
     const progressVal = ((currentIndex + 1) / questions.length) * 100;
+    const { optionHeight, setOptionRef } = useUniformOptionHeight(currentQuestion.options);
 
     const handleSelect = (option) => {
         setAnswers(prev => ({ ...prev, [currentIndex]: option }));
@@ -180,7 +183,7 @@ function RunnerView({ questions, onComplete, onAbort }) {
     return (
         <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             {/* HUD */}
-            <Box p={isMobile ? 'md' : '32px'} pb={0}>
+            <Box p={{ base: 'md', md: '32px' }} pb={0}>
                 <Group justify="space-between" mb="xs">
                     <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Objective {currentIndex + 1} / {questions.length}</Text>
                     <Text size="xs" fw={700} c="#BF5AF2">{Math.round(progressVal)}%</Text>
@@ -189,22 +192,43 @@ function RunnerView({ questions, onComplete, onAbort }) {
             </Box>
 
             {/* Question Area */}
-            <ScrollArea style={{ flex: 1 }}>
-                <Box p={isMobile ? 'md' : '32px'}>
+            <ScrollArea style={{ flex: 1, minHeight: 0 }} type="auto">
+                <Box p={{ base: 'md', md: '32px' }}>
                     <AnimatePresence mode="wait" custom={direction}>
                         <motion.div key={currentIndex} custom={direction} variants={variants} initial="enter" animate="center" exit="exit" transition={{ type: "spring", stiffness: 300, damping: 25 }}>
                             <Stack gap="xl">
-                                <Title order={3} style={{ fontFamily: 'var(--font-lexend)', fontWeight: 500, lineHeight: 1.4, fontSize: isMobile ? '1.25rem' : '1.5rem' }}>{currentQuestion.question_text}</Title>
+                                <QuizRichText
+                                    content={currentQuestion.question_text}
+                                    variant="question"
+                                    style={{ fontSize: 'clamp(1.25rem, 2vw, 1.55rem)' }}
+                                />
                                 <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
                                     {currentQuestion.options.map((option, i) => {
                                         const isSelected = answers[currentIndex] === option;
                                         return (
-                                            <Interactive key={i} onClick={() => handleSelect(option)} className="h-full">
-                                                <GlassCard p="md" h="100%" style={{ backgroundColor: isSelected ? 'rgba(191, 90, 242, 0.15)' : 'rgba(255,255,255,0.03)', border: isSelected ? '1px solid #BF5AF2' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', gap: '16px', minHeight: '70px' }}>
-                                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', border: isSelected ? '7px solid #BF5AF2' : '2px solid rgba(255,255,255,0.3)', backgroundColor: 'transparent', transition: 'all 0.2s ease', flexShrink: 0 }} />
-                                                    <Text size="md" c={isSelected ? 'white' : 'dimmed'} fw={isSelected ? 600 : 400} style={{ lineHeight: 1.4 }}>{option}</Text>
-                                                </GlassCard>
-                                            </Interactive>
+                                            <Box key={i} ref={setOptionRef(i)} style={{ height: optionHeight ? `${optionHeight}px` : 'auto', width: '100%' }}>
+                                                <Interactive onClick={() => handleSelect(option)} className="h-full" fullWidth>
+                                                    <GlassCard
+                                                        p="md"
+                                                        h="100%"
+                                                        style={{
+                                                            backgroundColor: isSelected ? 'rgba(191, 90, 242, 0.15)' : 'rgba(255,255,255,0.03)',
+                                                            border: isSelected ? '1px solid #BF5AF2' : '1px solid rgba(255,255,255,0.08)',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            display: 'flex',
+                                                            alignItems: 'flex-start',
+                                                            gap: '16px',
+                                                            height: '100%',
+                                                            width: '100%',
+                                                            minHeight: optionHeight ? undefined : '88px',
+                                                        }}
+                                                    >
+                                                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', border: isSelected ? '7px solid #BF5AF2' : '2px solid rgba(255,255,255,0.3)', backgroundColor: 'transparent', transition: 'all 0.2s ease', flexShrink: 0, marginTop: '2px' }} />
+                                                        <QuizRichText content={option} variant="option" style={{ color: isSelected ? '#FFFFFF' : '#A1A1AA', flex: 1 }} />
+                                                    </GlassCard>
+                                                </Interactive>
+                                            </Box>
                                         );
                                     })}
                                 </SimpleGrid>
@@ -215,10 +239,10 @@ function RunnerView({ questions, onComplete, onAbort }) {
             </ScrollArea>
 
             {/* Controls */}
-            <Box p={isMobile ? 'md' : '32px'} pt="md" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+            <Box p={{ base: 'md', md: '32px' }} pt="md" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
                 <Group justify="space-between">
                     <Button variant="subtle" color="gray" radius="xl" onClick={handleBack} disabled={currentIndex === 0} leftSection={<IconChevronLeft size={18} />} styles={{ root: { paddingLeft: 8 } }}>Back</Button>
-                    <ShimmerButton onClick={handleNext} disabled={!answers[currentIndex]} size={isMobile ? "md" : "lg"} radius="xl" style={{ paddingRight: 24, paddingLeft: 24, width: isMobile ? 'auto' : undefined }}>
+                    <ShimmerButton onClick={handleNext} disabled={!answers[currentIndex]} size="lg" radius="xl" style={{ paddingRight: 24, paddingLeft: 24 }}>
                         <Group gap="xs">
                             <span>{currentIndex === questions.length - 1 ? 'Submit Mission' : 'Next'}</span>
                             {currentIndex === questions.length - 1 ? <IconCheck size={18} /> : <IconChevronRight size={18} />}
@@ -234,19 +258,22 @@ function RunnerView({ questions, onComplete, onAbort }) {
 function ResultsView({ results, onRetake, onClose }) {
     const { score, feedback_summary, full_results } = results;
     const passed = score >= 50;
-    const isMobile = useMediaQuery('(max-width: 48em)');
 
     let color = score >= 80 ? '#34C759' : score >= 50 ? '#FF9500' : '#FF3B30';
+    const scoreFontSize = score === 100 ? '2.65rem' : '3rem';
     
     return (
-        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <ScrollArea h="5vh" style={{ flex: 1 }}>
-                <Stack gap="xl" p={isMobile ? 'md' : '32px'}>
+        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+            <ScrollArea
+                h="calc(100vh - 168px)"
+                type="auto"
+            >
+                <Stack gap="xl" p={{ base: 'md', md: '32px' }}>
                     <SimpleGrid cols={{ base: 1, sm: 1 }} spacing="lg">
                         <Box style={{ display: 'flex', justifyContent: 'center', padding: '20px 0', position: 'relative' }}>
                              <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.8, 0.5] }} transition={{ duration: 3, repeat: Infinity }} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '160px', height: '160px', borderRadius: '50%', background: `radial-gradient(circle, ${color}30 0%, transparent 70%)`, filter: 'blur(30px)', zIndex: 0 }} />
                             <div style={{ position: 'relative', zIndex: 1 }}>
-                                <RingProgress sections={[{ value: score, color: color }, { value: 100 - score, color: 'rgba(255,255,255,0.1)' }]} size={200} thickness={16} roundCaps label={<Center><Stack align="center" gap={0}><Text c={color} fw={800} style={{ fontSize: '3rem', fontFamily: 'var(--font-lexend)', lineHeight: 0.9 }}>{score}%</Text><Text size="xs" c="dimmed" fw={700} tt="uppercase">Accuracy</Text></Stack></Center>} />
+                                <RingProgress sections={[{ value: score, color: color }, { value: 100 - score, color: 'rgba(255,255,255,0.1)' }]} size={200} thickness={16} roundCaps label={<Center><Stack align="center" gap={0}><Text c={color} fw={800} style={{ fontSize: scoreFontSize, fontFamily: 'var(--font-lexend)', lineHeight: 0.9 }}>{score}%</Text><Text size="xs" c="dimmed" fw={700} tt="uppercase">Accuracy</Text></Stack></Center>} />
                             </div>
                         </Box>
                         <GlassCard p="lg" style={{ borderLeft: `4px solid ${color}`, backgroundColor: 'rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -254,7 +281,7 @@ function ResultsView({ results, onRetake, onClose }) {
                                 <ThemeIcon size="lg" radius="md" variant="light" color={passed ? 'green' : 'orange'}>{passed ? <IconTrophy size={20} /> : <IconAlertTriangle size={20} />}</ThemeIcon>
                                 <Text size="sm" fw={700} c="white" tt="uppercase" style={{ marginTop: 4 }}>Performance Analysis</Text>
                             </Group>
-                            <Text size="sm" c="dimmed" lh={1.6}>{feedback_summary}</Text>
+                            <QuizRichText content={feedback_summary} variant="summary" />
                         </GlassCard>
                     </SimpleGrid>
                     <Stack gap="md">
@@ -263,16 +290,16 @@ function ResultsView({ results, onRetake, onClose }) {
                             {full_results.map((item, index) => (
                                 <Accordion.Item value={String(index)} key={index}>
                                     <Accordion.Control icon={<ThemeIcon color={item.is_correct ? 'green' : 'red'} variant="light" radius="xl" size="sm">{item.is_correct ? <IconCheck size={14} /> : <IconX size={14} />}</ThemeIcon>}>
-                                        <Text size="sm" fw={500} lineClamp={1}>{item.question_text}</Text>
+                                        <QuizRichText content={item.question_text} inline truncate style={{ fontSize: '0.95rem', fontWeight: 500, color: '#FFFFFF' }} />
                                     </Accordion.Control>
                                     <Accordion.Panel>
                                         <Stack gap="md">
-                                            <Text size="md" fw={600} style={{ fontFamily: 'var(--font-lexend)' }}>{item.question_text}</Text>
+                                            <QuizRichText content={item.question_text} variant="question" style={{ fontSize: '1.1rem' }} />
                                             <Group grow align="flex-start">
-                                                <Paper p="xs" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 59, 48, 0.1)', borderColor: 'rgba(255, 59, 48, 0.2)' }}><Text size="10px" c="red.3" fw={700} mb={4}>YOUR ANSWER</Text><Text size="sm" c="white">{item.user_answer || "Skipped"}</Text></Paper>
-                                                <Paper p="xs" radius="md" withBorder style={{ backgroundColor: 'rgba(52, 199, 89, 0.1)', borderColor: 'rgba(52, 199, 89, 0.2)' }}><Text size="10px" c="green.3" fw={700} mb={4}>CORRECT ANSWER</Text><Text size="sm" c="white">{item.correct_answer}</Text></Paper>
+                                                <Paper p="xs" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 59, 48, 0.1)', borderColor: 'rgba(255, 59, 48, 0.2)' }}><Text size="10px" c="red.3" fw={700} mb={4}>YOUR ANSWER</Text><QuizRichText content={item.user_answer || 'Skipped'} variant="answer" /></Paper>
+                                                <Paper p="xs" radius="md" withBorder style={{ backgroundColor: 'rgba(52, 199, 89, 0.1)', borderColor: 'rgba(52, 199, 89, 0.2)' }}><Text size="10px" c="green.3" fw={700} mb={4}>CORRECT ANSWER</Text><QuizRichText content={item.correct_answer} variant="answer" /></Paper>
                                             </Group>
-                                            {!item.is_correct && <Box p="md" style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}><Text size="10px" fw={700} c="dimmed" mb={4}>EXPLANATION</Text><Text size="sm" c="white" lh={1.5}>{item.ai_explanation}</Text></Box>}
+                                            {!item.is_correct && <Box p="md" style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}><Text size="10px" fw={700} c="dimmed" mb={4}>EXPLANATION</Text><QuizRichText content={item.ai_explanation} variant="explanation" /></Box>}
                                         </Stack>
                                     </Accordion.Panel>
                                 </Accordion.Item>
@@ -281,7 +308,7 @@ function ResultsView({ results, onRetake, onClose }) {
                     </Stack>
                 </Stack>
             </ScrollArea>
-            <Box p={isMobile ? 'md' : '32px'} pt="md" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+            <Box p={{ base: 'md', md: '32px' }} pt="md" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
                 <Group justify="flex-end">
                     <Button variant="default" onClick={onClose} radius="xl" style={{ border: 'none', backgroundColor: 'transparent' }}>Dismiss</Button>
                     <ShimmerButton onClick={onRetake} leftSection={<IconRefresh size={18} />} radius="xl" style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)' }}>Retake Quiz</ShimmerButton>
@@ -297,7 +324,6 @@ export function QuizOrchestratorModal({ opened, onClose, planTopicId }) {
     const [config, setConfig] = useState(null);
     const [questions, setQuestions] = useState(null);
     const [results, setResults] = useState(null);
-    const isMobile = useMediaQuery('(max-width: 48em)');
 
     // Reset state when opened
     if (!opened && state !== 'SETUP') {
@@ -382,17 +408,13 @@ export function QuizOrchestratorModal({ opened, onClose, planTopicId }) {
             opened={opened} 
             onClose={onClose} 
             title={<Group gap="xs">{icon}<Text inherit>{title}</Text></Group>}
-            centered 
-            size="lg"
-            fullScreen={state === 'RUNNER' || isMobile} // Immersive mode during quiz
+            fullScreen
             styles={glassModalStyles}
             overlayProps={{ blur: 8, opacity: 0.8 }}
             transitionProps={{ transition: 'zoom', duration: 200 }}
             zIndex={7000}
         >
-            <scrollArea style={{ height: '70vh' }}>
             {content}
-            </scrollArea>
         </Modal>
     );
 }

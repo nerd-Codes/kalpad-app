@@ -1,13 +1,13 @@
 // src/components/QuizResults.jsx
 "use client";
 
-import { Modal, Stack, Title, Text, RingProgress, Accordion, Group, Badge, Paper, ScrollArea, Button, Center, Box, ThemeIcon } from '@mantine/core';
+import { Modal, Stack, Text, RingProgress, Accordion, Group, Paper, ScrollArea, Button, Center, Box, ThemeIcon } from '@mantine/core';
 import { IconCheck, IconX, IconRefresh, IconTrophy, IconAlertTriangle, IconChartBar } from '@tabler/icons-react';
 import { motion } from 'framer-motion';
 import { GlassCard } from './GlassCard';
 import { ShimmerButton } from './landing/ShimmerButton';
-import { Interactive } from '@/components/Interactive';
 import { useMediaQuery } from '@mantine/hooks';
+import { QuizRichText } from '@/components/quiz/QuizRichText';
 // --- VISUAL CONSTANTS ---
 const glassModalStyles = {
     content: { 
@@ -115,9 +115,7 @@ export function QuizResults({ results, onClose, onRetake }) {
                                 <Text size="sm" fw={700} c="white" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
                                     Performance Analysis
                                 </Text>
-                                <Text size="md" c="dimmed" lh={1.6}>
-                                    {feedback_summary}
-                                </Text>
+                                <QuizRichText content={feedback_summary} variant="summary" />
                             </Stack>
                         </Group>
                     </GlassCard>
@@ -156,25 +154,27 @@ export function QuizResults({ results, onClose, onRetake }) {
                                             </ThemeIcon>
                                         }
                                     >
-                                        <Text size="sm" fw={500} lineClamp={1}>{item.question_text}</Text>
+                                        <QuizRichText content={item.question_text} inline truncate style={{ fontSize: '0.95rem', fontWeight: 500, color: '#FFFFFF' }} />
                                     </Accordion.Control>
                                     
                                     <Accordion.Panel>
                                         <Stack gap="md">
                                             {/* Question Text */}
-                                            <Text size="md" fw={600} style={{ fontFamily: 'var(--font-lexend)' }}>
-                                                {item.question_text}
-                                            </Text>
+                                            <QuizRichText
+                                                content={item.question_text}
+                                                variant="question"
+                                                style={{ fontSize: '1.1rem' }}
+                                            />
                                             
                                             {/* Answer Comparison */}
                                             <Group grow align="flex-start">
                                                 <Paper p="xs" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 59, 48, 0.1)', borderColor: 'rgba(255, 59, 48, 0.2)' }}>
                                                     <Text size="xs" c="red.3" fw={700} mb={4}>YOUR ANSWER</Text>
-                                                    <Text size="sm" c="white">{item.user_answer || "Skipped"}</Text>
+                                                    <QuizRichText content={item.user_answer || 'Skipped'} variant="answer" />
                                                 </Paper>
                                                 <Paper p="xs" radius="md" withBorder style={{ backgroundColor: 'rgba(52, 199, 89, 0.1)', borderColor: 'rgba(52, 199, 89, 0.2)' }}>
                                                     <Text size="xs" c="green.3" fw={700} mb={4}>CORRECT ANSWER</Text>
-                                                    <Text size="sm" c="white">{item.correct_answer}</Text>
+                                                    <QuizRichText content={item.correct_answer} variant="answer" />
                                                 </Paper>
                                             </Group>
 
@@ -182,7 +182,7 @@ export function QuizResults({ results, onClose, onRetake }) {
                                             {!item.is_correct && (
                                                 <Box p="md" style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>
                                                     <Text size="xs" fw={700} c="dimmed" mb={4}>EXPLANATION</Text>
-                                                    <Text size="sm" c="white" lh={1.5}>{item.ai_explanation}</Text>
+                                                    <QuizRichText content={item.ai_explanation} variant="explanation" />
                                                 </Box>
                                             )}
                                         </Stack>

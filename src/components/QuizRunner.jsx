@@ -1,28 +1,30 @@
 "use client";
 
 import { useState } from 'react';
-import { Modal, Stack, Title, Text, Group, Button, Box, Progress, SimpleGrid, ScrollArea, ThemeIcon } from '@mantine/core';
-import { IconChevronRight, IconChevronLeft, IconCheck, IconTarget, IconCircle } from '@tabler/icons-react';
+import { Modal, Stack, Text, Group, Button, Box, Progress, SimpleGrid, ScrollArea } from '@mantine/core';
+import { IconChevronRight, IconChevronLeft, IconCheck, IconTarget } from '@tabler/icons-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useMediaQuery } from '@mantine/hooks';
 import { Interactive } from '@/components/Interactive';
 import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from './landing/ShimmerButton';
+import { QuizRichText } from '@/components/quiz/QuizRichText';
+import { useUniformOptionHeight } from '@/hooks/useUniformOptionHeight';
 
 // --- VISUAL CONSTANTS ---
 const glassModalStyles = {
     content: { 
         backgroundColor: '#1C1C1E', 
         border: '1px solid rgba(255, 255, 255, 0.1)', 
-        borderRadius: '24px',
+        borderRadius: 0,
         boxShadow: '0 40px 80px -12px rgba(0, 0, 0, 0.6)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-         maxHeight: '85vh' 
+        height: '100vh',
+        maxHeight: '100vh',
     },
     header: { backgroundColor: 'transparent', paddingBottom: 0, zIndex: 10 },
-    body: { padding: '0', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+    body: { padding: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 },
     title: { fontFamily: 'var(--font-lexend)', fontWeight: 600, color: 'white', fontSize: '1.25rem' },
     close: { color: 'gray', transition: 'all 0.2s', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' } }
 };
@@ -31,11 +33,11 @@ export function QuizRunner({ questions, onSubmit, onClose }) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState({});
     const [direction, setDirection] = useState(1); // 1 = Next, -1 = Back
-    const isMobile = useMediaQuery('(max-width: 48em)');
 
     const currentQuestion = questions[currentIndex];
     const progressVal = ((currentIndex + 1) / questions.length) * 100;
     const isAnswered = answers[currentIndex] !== undefined;
+    const { optionHeight, setOptionRef } = useUniformOptionHeight(currentQuestion.options);
 
     // --- HANDLERS ---
     const handleSelect = (option) => {
@@ -95,18 +97,16 @@ export function QuizRunner({ questions, onSubmit, onClose }) {
             title={<Group gap="xs"><IconTarget size={20} color="#BF5AF2"/><Text inherit>Live Combat</Text></Group>} 
             size="xl" 
             centered
-            fullScreen={isMobile}
+            fullScreen
             styles={glassModalStyles}
             overlayProps={{ blur: 8, opacity: 0.8 }}
             transitionProps={{ transition: 'slide-up', duration: 200 }}
             zIndex={7000}
-            scrollArea ="inside"
         >
-            <ScrollArea h="70vh" type="auto">
-            <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 
                 {/* 1. HUD: PROGRESS (Sticky Top) */}
-                <Box p={isMobile ? 'md' : '32px'} pb={0}>
+                <Box p={{ base: 'md', md: '32px' }} pb={0}>
                     <Group justify="space-between" mb="xs">
                         <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>
                             Objective {currentIndex + 1} / {questions.length}
@@ -125,8 +125,8 @@ export function QuizRunner({ questions, onSubmit, onClose }) {
                 </Box>
 
                 {/* 2. QUESTION & OPTIONS (Scrollable Middle) */}
-                <ScrollArea style={{ flex: 1 }}>
-                    <Box p={isMobile ? 'md' : '32px'}>
+                <ScrollArea style={{ flex: 1, minHeight: 0 }} type="auto">
+                    <Box p={{ base: 'md', md: '32px' }}>
                         <AnimatePresence mode="wait" custom={direction}>
                             <motion.div
                                 key={currentIndex}
@@ -139,42 +139,51 @@ export function QuizRunner({ questions, onSubmit, onClose }) {
                             >
                                 <Stack gap="xl">
                                     {/* The Question */}
-                                    <Title order={3} style={{ fontFamily: 'var(--font-lexend)', fontWeight: 500, lineHeight: 1.4, fontSize: isMobile ? '1.25rem' : '1.5rem' }}>
-                                        {currentQuestion.question_text}
-                                    </Title>
+                                    <QuizRichText
+                                        content={currentQuestion.question_text}
+                                        variant="question"
+                                        style={{ fontSize: 'clamp(1.25rem, 2vw, 1.55rem)' }}
+                                    />
 
                                     {/* The Options Grid */}
                                     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
                                         {currentQuestion.options.map((option, i) => {
                                             const isSelected = answers[currentIndex] === option;
                                             return (
-                                                <Interactive key={i} onClick={() => handleSelect(option)} className="h-full">
-                                                    <GlassCard 
-                                                        p="md" 
-                                                        h="100%"
-                                                        style={{ 
-                                                            backgroundColor: isSelected ? 'rgba(191, 90, 242, 0.15)' : 'rgba(255,255,255,0.03)',
-                                                            border: isSelected ? '1px solid #BF5AF2' : '1px solid rgba(255,255,255,0.08)',
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s ease',
-                                                            display: 'flex', alignItems: 'center', gap: '16px',
-                                                            minHeight: '70px'
-                                                        }}
-                                                    >
-                                                        {/* Radio Circle */}
-                                                        <div style={{
-                                                            width: '24px', height: '24px', borderRadius: '50%',
-                                                            border: isSelected ? '7px solid #BF5AF2' : '2px solid rgba(255,255,255,0.3)',
-                                                            backgroundColor: 'transparent',
-                                                            transition: 'all 0.2s ease',
-                                                            flexShrink: 0
-                                                        }} />
-                                                        
-                                                        <Text size="md" c={isSelected ? 'white' : 'dimmed'} fw={isSelected ? 600 : 400} style={{ lineHeight: 1.4 }}>
-                                                            {option}
-                                                        </Text>
-                                                    </GlassCard>
-                                                </Interactive>
+                                                <Box key={i} ref={setOptionRef(i)} style={{ height: optionHeight ? `${optionHeight}px` : 'auto' }}>
+                                                    <Interactive onClick={() => handleSelect(option)} className="h-full">
+                                                        <GlassCard 
+                                                            p="md" 
+                                                            h="100%"
+                                                            style={{ 
+                                                                backgroundColor: isSelected ? 'rgba(191, 90, 242, 0.15)' : 'rgba(255,255,255,0.03)',
+                                                                border: isSelected ? '1px solid #BF5AF2' : '1px solid rgba(255,255,255,0.08)',
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.2s ease',
+                                                                display: 'flex',
+                                                                alignItems: 'flex-start',
+                                                                gap: '16px',
+                                                                height: '100%',
+                                                                minHeight: optionHeight ? undefined : '88px',
+                                                            }}
+                                                        >
+                                                            <div style={{
+                                                                width: '24px', height: '24px', borderRadius: '50%',
+                                                                border: isSelected ? '7px solid #BF5AF2' : '2px solid rgba(255,255,255,0.3)',
+                                                                backgroundColor: 'transparent',
+                                                                transition: 'all 0.2s ease',
+                                                                flexShrink: 0,
+                                                                marginTop: '2px',
+                                                            }} />
+
+                                                            <QuizRichText
+                                                                content={option}
+                                                                variant="option"
+                                                                style={{ color: isSelected ? '#FFFFFF' : '#A1A1AA', flex: 1 }}
+                                                            />
+                                                        </GlassCard>
+                                                    </Interactive>
+                                                </Box>
                                             );
                                         })}
                                     </SimpleGrid>
@@ -185,7 +194,7 @@ export function QuizRunner({ questions, onSubmit, onClose }) {
                 </ScrollArea>
 
                 {/* 3. NAVIGATION CONTROLS (Sticky Bottom) */}
-                <Box p={isMobile ? 'md' : '32px'} pt="md" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+                <Box p={{ base: 'md', md: '32px' }} pt="md" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
                     <Group justify="space-between">
                         <Button 
                             variant="subtle" 
@@ -202,9 +211,9 @@ export function QuizRunner({ questions, onSubmit, onClose }) {
                         <ShimmerButton 
                             onClick={handleNext} 
                             disabled={!isAnswered}
-                            size={isMobile ? "md" : "lg"}
+                            size="lg"
                             radius="xl"
-                            style={{ paddingRight: 24, paddingLeft: 24, width: isMobile ? 'auto' : undefined }}
+                            style={{ paddingRight: 24, paddingLeft: 24 }}
                         >
                             <Group gap="xs">
                                 <span>{currentIndex === questions.length - 1 ? 'Submit Mission' : 'Next Objective'}</span>
@@ -214,7 +223,6 @@ export function QuizRunner({ questions, onSubmit, onClose }) {
                     </Group>
                 </Box>
             </Box>
-            </ScrollArea>
         </Modal>
     );
 }

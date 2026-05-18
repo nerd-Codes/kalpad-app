@@ -1,0 +1,131 @@
+.root {
+  color: inherit;
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+.root :where(p) {
+  margin: 0;
+}
+
+.root :where(p + p, ul, ol, blockquote, pre) {
+  margin-top: 0.75em;
+}
+
+.root :where(ul, ol) {
+  padding-left: 1.25em;
+}
+
+.root :where(li + li) {
+  margin-top: 0.35em;
+}
+
+.root :where(strong) {
+  color: inherit;
+  font-weight: 700;
+}
+
+.root :where(em) {
+  color: inherit;
+}
+
+.root :where(code) {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 0.12em 0.38em;
+  font-family: "Fira Code", monospace;
+  font-size: 0.92em;
+}
+
+.root :where(pre) {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow-x: auto;
+  padding: 0.9em 1em;
+}
+
+.root :where(pre code) {
+  background: transparent;
+  padding: 0;
+}
+
+.root :where(.katex) {
+  color: inherit;
+  font-size: 1.02em;
+}
+
+.root :where(.katex-display) {
+  margin: 0.85em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.15em 0;
+}
+
+.question {
+  color: #ffffff;
+  font-family: var(--font-lexend), sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.45;
+}
+
+.option {
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.summary {
+  color: #a1a1aa;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.answer {
+  color: #ffffff;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.explanation {
+  color: #ffffff;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.inline {
+  display: block;
+}
+
+.inline :where(p) {
+  display: inline;
+}
+
+.inline :where(ul, ol) {
+  display: inline;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inline :where(li) {
+  display: inline;
+}
+
+.inline :where(li + li)::before {
+  content: " • ";
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.truncate :where(.katex-display) {
+  display: inline-block;
+  margin: 0;
+  max-width: 100%;
+  vertical-align: middle;
+}

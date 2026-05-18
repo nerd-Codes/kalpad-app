@@ -15,11 +15,9 @@ import supabase from '@/lib/supabaseClient';
 // --- IMPORTS FOR KALPAD OS DESIGN SYSTEM ---
 import { GlassCard } from '@/components/GlassCard';
 import { ShimmerButton } from './landing/ShimmerButton';
+import { QuizOrchestratorModal } from './QuizOrchestratorModal';
 
 // --- LOGIC IMPORTS ---
-import { QuizSetupModal } from './QuizSetupModal';
-import { QuizRunner } from './QuizRunner';
-import { QuizResults } from './QuizResults';
 import { notifications } from '@mantine/notifications';
 import { useDisclosure } from '@mantine/hooks';
 import { useLoading } from '@/context/LoadingContext';
@@ -216,40 +214,7 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
     };
 
     // Quiz Logic
-    const [quizSetupOpened, { open: openQuizSetup, close: closeQuizSetup }] = useDisclosure(false);
-    const [quizQuestions, setQuizQuestions] = useState(null);
-    const [quizResults, setQuizResults] = useState(null);
-    const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
-    const [isEvaluatingQuiz, setIsEvaluatingQuiz] = useState(false);
-    const [quizConfig, setQuizConfig] = useState(null);
-
-    const handleStartQuiz = async (config) => {
-        setIsGeneratingQuiz(true); setQuizConfig(config); closeQuizSetup();
-        try {
-            const response = await fetch('/api/generate-quiz', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan_topic_id: dayTopic.id, ...config }),
-            });
-            if (!response.ok) throw new Error((await response.json()).error);
-            setQuizQuestions((await response.json()).questions);
-        } catch (err) { notifications.show({ title: 'Error', message: err.message, color: 'red' }); } 
-        finally { setIsGeneratingQuiz(false); }
-    };
-    
-    const handleSubmitQuiz = async (attempts) => {
-        setIsEvaluatingQuiz(true); setQuizQuestions(null);
-        try {
-             const response = await fetch('/api/evaluate-quiz-submission', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan_topic_id: dayTopic.id, attempts, quiz_mode: quizConfig.quiz_mode }),
-            });
-             if (!response.ok) throw new Error((await response.json()).error);
-             setQuizResults(await response.json());
-        } catch (err) { notifications.show({ title: 'Error', message: err.message, color: 'red' }); } 
-        finally { setIsEvaluatingQuiz(false); }
-    };
+    const [quizOpened, { open: openQuiz, close: closeQuiz }] = useDisclosure(false);
 
     // Bulk Logic
     const handleConfirmBulkGenerate = async () => {
@@ -562,8 +527,7 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
                         >
                             <Group justify="center">
                                 <ShimmerButton 
-                                    onClick={openQuizSetup}
-                                    loading={isGeneratingQuiz || isEvaluatingQuiz}
+                                    onClick={openQuiz}
                                     style={{ width: '100%' }}
                                 >
                                     <Group gap="xs" justify="center">
@@ -578,9 +542,7 @@ export function TimelineDayCard({ plan, dayTopic, onUpdate, isInitiallyCollapsed
             </GlassCard>
 
             {/* --- MODALS --- */}
-            <QuizSetupModal opened={quizSetupOpened} onClose={closeQuizSetup} onStartQuiz={handleStartQuiz} isLoading={isGeneratingQuiz} />
-            {quizQuestions && <QuizRunner questions={quizQuestions} onClose={() => setQuizQuestions(null)} onSubmit={handleSubmitQuiz} />}
-            {quizResults && <QuizResults results={quizResults} onClose={() => setQuizResults(null)} onRetake={() => { setQuizResults(null); openQuizSetup(); }} />}
+            <QuizOrchestratorModal opened={quizOpened} onClose={closeQuiz} planTopicId={dayTopic.id} />
             <FullscreenNoteViewer
                 noteData={noteToView}
                 onClose={() => setNoteToView(null)}
