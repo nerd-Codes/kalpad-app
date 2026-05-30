@@ -1,15 +1,21 @@
 // src/app/api/forge-cram-sheet/route.js
 //
-// ARCHITECTURE: 4-Phase Global Compression Pipeline
+// ARCHITECTURE: 5-Phase Outline-First Pipeline
 //
-//   Phase 1 | Parallel Extraction  -> Flash, all topics simultaneously. Richer schema
-//            |                        including exam_traps and connects_to.
-//   Phase 2 | Global Architect     -> ONE call that sees ALL miner JSON and plans
-//            |                        the entire section structure + word budgets
-//            |                        BEFORE any prose is written.
-//   Phase 3 | Parallel Sections    -> One writer per section, all parallel.
-//            |                        Each writer knows the global plan so no dupes.
-//   Phase 4 | JS Assembly          -> No LLM. Collects sections, prepends TOC, saves.
+//   Phase 1 | Subtopic Collection   -> Pure JS. Flat list of subtopics grouped by day.
+//   Phase 2 | Batch Outlines        -> Parallel, one call per batch of 5 days.
+//            |                         Each batch gets subtopics + notes content.
+//            |                         Produces exhaustive outline: headings, formulas,
+//            |                         derivations, traps — no depth ceiling.
+//   Phase 3 | Global Merge Pass     -> CONDITIONAL. Skipped if only one batch exists.
+//            |                         One call receiving all batch outlines.
+//            |                         Deduplicates, orders foundational → advanced,
+//            |                         produces a single master outline.
+//   Phase 4 | Parallel Section      -> One writer per top-level section.
+//            |                         Each writer gets its section outline + global
+//            |                         heading list to avoid cross-section repetition.
+//            |                         No word budget ceiling — outline determines scope.
+//   Phase 5 | JS Assembly           -> TOC + merge + save. No LLM.
 
 import { getVertexAIModel } from '@/lib/vertexai';
 import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/routeAuth';
@@ -17,7 +23,7 @@ import { logRouteResult, resolveRouteAuth, unauthorizedResponse } from '@/lib/ro
 export const dynamic = 'force-dynamic';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SECTION 1 — SHARED LATEX RULES
+// SECTION 1 — SHARED RULES
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LATEX_RULES = `
@@ -32,194 +38,204 @@ LATEX RULES (KATEX COMPATIBLE — UNBREAKABLE):
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SECTION 2 — PROMPT BUILDERS
+// SECTION 2 — PURE JS HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildExtractionPrompt(examName, topicName, sourceText) {
-    const topicId = topicName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const preview = sourceText.substring(0, 14000);
-    return `You are a meticulous Academic Auditor. Extract ALL exam-relevant information.
-This extraction builds a cram sheet for "${examName}".
-
-Topic: "${topicName}"
-Source:
-"""
-${preview}
-"""
-
-Return ONLY valid JSON (no prose, no fences):
-{
-  "topic_id": "${topicId}",
-  "topic_name": "${topicName}",
-  "formulas": [
-    {
-      "name": "Human-readable formula name",
-      "latex": "Formula in valid KaTeX — no $$ wrappers here, just the math",
-      "variables": "where X = ..., Y = ... (all variables defined concisely)"
+/**
+ * Phase 1 — pure JS, no LLM.
+ * Returns an array of batch objects, each covering up to BATCH_SIZE days.
+ * Each batch contains the day number, topic name, subtopic texts, and notes content.
+ */
+function buildDayBatches(planData, batchSize = 5) {
+    const batches = [];
+    for (let i = 0; i < planData.length; i += batchSize) {
+        const days = planData.slice(i, i + batchSize).map(day => ({
+            day:         day.day,
+            topic_name:  day.topic_name,
+            subtopics:   (day.sub_topics || []).map(st => st.text).filter(Boolean),
+            notes:       day.generated_notes?.[0]?.notes_markdown || null,
+        }));
+        batches.push({
+            batch_index: batches.length,
+            day_range:   `Day ${days[0].day}–${days[days.length - 1].day}`,
+            days,
+        });
     }
-  ],
-  "definitions": [
-    {
-      "term": "Technical term",
-      "one_liner": "Precise one-sentence definition at ${examName} level"
-    }
-  ],
-  "exam_traps": [
-    {
-      "trap": "The exact wrong intuition students bring into the exam room",
-      "correction": "The correct statement in one sentence"
-    }
-  ],
-  "key_facts": ["One directly-examinable sentence — no fluff"],
-  "connects_to": ["Name of another topic this directly enables or depends on"]
+    return batches;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 3 — PROMPT BUILDERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Phase 2 — Batch Outline Prompt.
+ *
+ * Given 1–5 days of subtopics and notes, produce an exhaustive outline.
+ * The outline declares every formula, derivation, definition, and exam trap
+ * that should appear in the final cram sheet for these days.
+ * No depth ceiling — the outline's scope is the writer's contract.
+ */
+function buildBatchOutlinePrompt(examName, batch) {
+    const daysSummary = batch.days.map(d => {
+        const notesPreview = d.notes
+            ? d.notes.substring(0, 8000)
+            : null;
+        return `
+--- Day ${d.day}: ${d.topic_name} ---
+Subtopics covered:
+${d.subtopics.map(s => `  • ${s}`).join('\n') || '  (none listed)'}
+${notesPreview ? `\nNotes content (use as primary source):\n${notesPreview}` : '\n(No notes generated yet — derive from subtopic names and your knowledge of ${examName})'}`;
+    }).join('\n');
+
+    return `You are a master academic editor building a cram sheet outline for "${examName}".
+
+Your job is to produce an EXHAUSTIVE, STRUCTURED OUTLINE for ${batch.day_range} of the study plan.
+This outline will be handed to a writer who will expand each point into polished cram sheet content.
+Your outline determines the scope — miss nothing that matters for the exam.
+
+${daysSummary}
+
+PRODUCE AN OUTLINE with these exact elements for each major concept found in the content above:
+
+## [Concept / Topic Name]
+
+### Formulas
+- Formula name: [latex expression — just the math, no $$ here]
+  Variables: [define every symbol]
+  Condition: [when it applies, any constraints]
+
+### Key Theory Points
+- [One crisp, examinable sentence per point. Not summaries — facts a student must know.]
+
+### Derivations Required
+- [Name of derivation + one sentence on what it proves. Only include if it is actually
+  examinable or conceptually load-bearing for this topic at ${examName} level.]
+
+### Exam Traps
+- Trap: [The exact wrong intuition students hold going into the exam]
+  Correct: [The right statement in one sentence]
+
+### Connections
+- [What prerequisite concept this builds on → what future concept this enables]
 
 RULES:
-- Extract every formula. The Architect decides importance — not you.
-- exam_traps are MANDATORY. Minimum 1. If the source text doesn't state one, derive it from common
-  mistakes students make on ${examName} for this topic.
-- key_facts must be directly examinable. Not summaries. Not "this is important."
-- If the source text is sparse (no real notes), still extract what you can and add "sparse_source": true.`;
+1. Cover EVERY concept in the days provided. Do not summarise or skip topics.
+2. Every formula present in the notes MUST appear in the outline.
+3. Every exam trap you know of for ${examName} for these topics MUST appear.
+4. If notes are provided, they are your primary source. Do not contradict them.
+5. If notes are absent, use your knowledge of ${examName} syllabus for these topics.
+6. Do NOT write the actual cram sheet prose — only the outline structure above.
+7. Do NOT add a preamble or explanation. Start directly with the first ## heading.
+8. Group related subtopics under shared concept headings where logical.
+   (e.g. "Unit Impulse", "Unit Step", "Exponential Sequence" → "## Standard DT Sequences")`;
 }
 
 
-function buildArchitectPrompt(examName, allExtractions, planDays) {
-    const totalFormulas    = allExtractions.reduce((s, e) => s + (e.formulas?.length    || 0), 0);
-    const totalDefinitions = allExtractions.reduce((s, e) => s + (e.definitions?.length || 0), 0);
-    const totalTraps       = allExtractions.reduce((s, e) => s + (e.exam_traps?.length  || 0), 0);
-    const wordTarget       = Math.min(2500, Math.max(800, allExtractions.length * 90));
+/**
+ * Phase 3 — Global Merge Prompt (only called when batches > 1).
+ *
+ * Receives all batch outlines as a single document.
+ * Deduplicates formulas and concepts that appear in multiple batches.
+ * Reorders from foundational to advanced.
+ * Produces one master outline the writers work from.
+ */
+function buildMergePrompt(examName, batchOutlines) {
+    const allOutlines = batchOutlines.map((outline, i) =>
+        `=== BATCH ${i + 1} OUTLINE ===\n${outline}\n`
+    ).join('\n\n');
 
-    return `You are a master academic architect planning a cram sheet.
-Exam: "${examName}"
-Plan: ${planDays} days, ${allExtractions.length} topics
+    return `You are merging ${batchOutlines.length} batch outlines into one master cram sheet outline for "${examName}".
 
-Extraction Summary:
-- Total formulas: ${totalFormulas}
-- Total definitions: ${totalDefinitions}
-- Total exam traps: ${totalTraps}
+${allOutlines}
 
-ALL TOPIC EXTRACTIONS:
-${JSON.stringify(allExtractions, null, 2)}
+YOUR TASK:
+Produce ONE unified master outline by:
 
-Plan the ENTIRE cram sheet structure before any writing begins.
-Return ONLY valid JSON (no prose, no fences):
+1. DEDUPLICATION — If the same formula, concept, or exam trap appears in multiple batches,
+   keep it ONCE in the most appropriate section. Mark canonical entries with [CANONICAL].
+   Other batches that reference the same content should note: [→ see Section: X]
 
-{
-  "exam_name": "${examName}",
-  "total_word_target": ${wordTarget},
-  "subject_type": "quantitative OR qualitative OR mixed",
-  "opening_summary": "2-3 sentences: what this plan covers and what the student can do after reviewing this sheet. Exam-specific, not generic.",
-  "sections": [
-    {
-      "section_id": "s1",
-      "heading": "Short substantive heading — NOT Day X, NOT Introduction",
-      "rationale": "One sentence: why these topics belong together",
-      "assigned_topic_ids": ["topic_id_1", "topic_id_2"],
-      "word_budget": 300,
-      "priority": "high OR medium OR low",
-      "section_type": "formula_heavy OR definition_heavy OR mixed OR exam_strategy",
-      "cross_references": ["heading of another section to briefly link to"]
-    }
-  ],
-  "global_dedup_log": [
-    {
-      "formula_name": "Name of formula appearing in multiple topics",
-      "canonical_topic_id": "The topic whose version is the master",
-      "duplicate_topic_ids": ["Other topic IDs with duplicates — writers skip it there"]
-    }
-  ]
-}
+2. REORDERING — Rearrange sections from FOUNDATIONAL to ADVANCED, ignoring original day order.
+   A student reading the cram sheet should be able to follow it without confusion.
+   Prerequisites always appear before the concepts that depend on them.
 
-ARCHITECTURE RULES:
-1. CLUSTER by academic significance, not day order.
-2. Sections flow from foundational to advanced.
-3. word_budget values MUST sum to exactly ${wordTarget}.
-4. Identify ALL duplicate formulas in global_dedup_log.
-5. section_type drives formatting: formula_heavy = Formula-First, definition_heavy = Hierarchical,
-   exam_strategy = Tips and traps only.
-6. 1-6 topics per section. Every topic_id must appear in exactly one section.
-7. NEVER name a section "Introduction", "Overview", "Summary", or "Day X".`;
+3. CONSOLIDATION — If two batches cover different aspects of the same topic
+   (e.g. "Z-Transform Definition" in batch 1 and "Z-Transform Properties" in batch 2),
+   merge them under one ## heading with the content from both.
+
+4. PRESERVATION — Do not lose any formula, trap, or theory point in the process.
+   If in doubt, keep it. The writers will handle density.
+
+OUTPUT: The complete master outline in the same structured format as the input outlines.
+(## headings → ### Formulas / Key Theory / Derivations / Exam Traps / Connections)
+Start directly with the first ## heading. No preamble.`;
 }
 
 
-function buildSectionWriterPrompt(examName, section, sectionExtractions, architectPlan, dedupLog) {
-    const exclusions = dedupLog
-        .filter(d => !section.assigned_topic_ids.includes(d.canonical_topic_id)
-                  && d.duplicate_topic_ids.some(id => section.assigned_topic_ids.includes(id)))
-        .map(d => d.formula_name);
-
-    const crossRefNote = section.cross_references?.length
-        ? `Cross-reference where relevant: ${section.cross_references.join(', ')}.`
-        : '';
-
-    const formatGuides = {
-        formula_heavy: `FORMAT: Formula-First.
-For each formula:
-1. Display math on its own line (with blank lines around $$)
-2. Variable glossary: "where $X$ = ..., $Y$ = ..."
-3. 1-2 Quick Intuition bullets (what it physically means)
-4. Exam trap in blockquote if one exists for this formula`,
-
-        definition_heavy: `FORMAT: Hierarchical.
-For each concept:
-1. **Bold Term** — concise definition
-2. Cause-and-effect with arrows: A → B → C
-3. Exam trap in blockquote if one exists`,
-
-        mixed: `FORMAT: Blend Formula-First for quantitative concepts, Hierarchical for qualitative ones.
-Use your judgment per concept.`,
-
-        exam_strategy: `FORMAT: Tips and Traps only. No derivations.
-Every trap goes in a blockquote: > ⚠️ **Trap:** [trap]. **Correct:** [correction]
-Use bullets for pattern-recognition tips.
-This section is for the student's final 30 minutes before entering the exam hall.`,
-    };
-
-    const formatGuide = formatGuides[section.section_type] || formatGuides.mixed;
-
-    const globalStructureList = architectPlan.sections
-        .map(s => s.section_id === section.section_id
-            ? `-> [YOUR SECTION] ## ${s.heading}`
-            : `   ## ${s.heading}`)
+/**
+ * Phase 4 — Section Writer Prompt.
+ *
+ * Given one ## section from the master outline, writes the actual cram sheet content.
+ * Knows the global heading list to avoid repeating content from other sections.
+ * No word budget ceiling — the outline determines depth.
+ */
+function buildSectionWriterPrompt(examName, sectionOutline, allHeadings, sectionIndex) {
+    const otherHeadings = allHeadings
+        .filter((_, i) => i !== sectionIndex)
+        .map(h => `  • ${h}`)
         .join('\n');
 
     return `You are writing ONE section of a cram sheet for "${examName}".
-This is a compression artifact — maximum information per word, zero fluff.
+This is a compression artifact — every word must earn exam marks.
 
-YOUR BRIEF:
-Heading:      ${section.heading}
-Priority:     ${section.priority}
-Section type: ${section.section_type}
-Word budget:  ${section.word_budget} words (hard limit — do not exceed by more than 10%)
-${crossRefNote}
+THE OTHER SECTIONS IN THIS CRAM SHEET (do NOT repeat their content):
+${otherHeadings || '  (this is the only section)'}
 
-GLOBAL STRUCTURE (do NOT repeat content from other sections):
-${globalStructureList}
+YOUR SECTION OUTLINE (expand this into polished cram sheet content):
+${sectionOutline}
 
-YOUR EXTRACTION DATA:
-${JSON.stringify(sectionExtractions, null, 2)}
+WRITING INSTRUCTIONS:
 
-${exclusions.length > 0 ? `SKIP THESE (already in another section): ${exclusions.join(', ')}` : ''}
+FOR FORMULAS:
+$$
+[formula here]
+$$
+**where** $X$ = [meaning] ([unit if applicable]), $Y$ = [meaning]...
+Then: 1–2 "Quick Intuition" bullets — what the formula physically means, not just what it says.
+Then: exam trap blockquote if one exists for this formula.
 
-${formatGuide}
+FOR KEY THEORY POINTS:
+Write as tight, direct sentences. **Bold** every technical term on first use.
+No "In this section we will..." — every sentence is a direct fact.
+
+FOR DERIVATIONS:
+*We derive this because: [what question it answers]. Without it, we cannot [what fails].*
+Then the derivation steps, numbered, each step justified in one short phrase.
+
+FOR EXAM TRAPS:
+> ⚠️ **Trap:** [wrong belief the student holds]
+> **Correct:** [right statement in one sentence]
+
+FOR CONNECTIONS:
+End the section with:
+**Builds on:** [specific prerequisite]
+**Enables:** [specific next concept]
+
+GENERAL RULES:
+1. Start directly with ## [section heading] — no preamble.
+2. Cover every point in the outline. Do not skip anything.
+3. Do not repeat content flagged as [→ see Section: X] in the outline — just write the cross-reference inline: *(→ see [section name])*
+4. No meta-commentary ("This section covers...").
+5. No padding. No "in conclusion". No summaries at the end.
 
 ${LATEX_RULES}
 
-WRITING RULES:
-1. Start directly with "## ${section.heading}" — no preamble.
-2. Bold every technical term on first use: **term**.
-3. Exam traps: > ⚠️ **Trap:** [wrong belief]. **Correct:** [right statement]
-4. No day references. No meta-commentary ("This section covers...").
-5. Cross-references inline: *(→ see [Section Heading])*
-6. Every sentence must be directly examinable. Cut anything that doesn't earn marks.
-7. Stay within your word budget.
-
-Output ONLY the markdown. Start with ## ${section.heading}.`;
+Output ONLY the markdown for this section.`;
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
-// SECTION 3 — POST HANDLER
+// SECTION 4 — POST HANDLER
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(request) {
@@ -253,7 +269,7 @@ export async function POST(request) {
 
             try {
 
-                // DB Setup — upsert on conflict (unchanged from original)
+                // ── DB Setup ──────────────────────────────────────────────────
                 const { data: newSheet, error: insertError } = await supabase
                     .from('generated_cram_sheets')
                     .insert({ plan_id, user_id: user.id, status: 'in_progress' })
@@ -278,7 +294,7 @@ export async function POST(request) {
                     cramSheetId = newSheet.id;
                 }
 
-                // Fetch plan
+                // ── Fetch Plan ────────────────────────────────────────────────
                 streamUpdate('status', { title: 'Fetching plan data...' });
 
                 const { data: masterPlanData, error: masterPlanError } = await supabase
@@ -298,127 +314,117 @@ export async function POST(request) {
                 const examName = masterPlanData.exam_name;
                 const planData = masterPlanData.plan_topics.sort((a, b) => a.day - b.day);
 
-                // ─── PHASE 1: PARALLEL EXTRACTION ────────────────────────────
-                // Flash, all topics simultaneously. No batching needed.
-                streamUpdate('status', { title: `Phase 1: Extracting material from ${planData.length} topics in parallel...` });
+                // ─── PHASE 1: SUBTOPIC COLLECTION (pure JS) ───────────────────
+                // Group subtopics by day, batch into groups of 5.
+                // No LLM involved. This is just data reshaping.
+                const batches = buildDayBatches(planData, 5);
+                const totalDays = planData.length;
 
-                const extractionModel = await getVertexAIModel('gemini-2.5-flash', {
-                    responseMimeType: 'application/json',
-                });
+                console.log(`[CramSheet] Phase 1: ${totalDays} days → ${batches.length} batch(es)`);
+                streamUpdate('status', { title: `${totalDays} days organised into ${batches.length} batch${batches.length > 1 ? 'es' : ''}. Building outlines...` });
 
-                const allExtractions = await Promise.all(
-                    planData.map(async (day) => {
-                        const sourceText = day.generated_notes?.[0]?.notes_markdown
-                            || `Topic: ${day.topic_name}.\nSub-topics: ${day.sub_topics?.map(st => st.text).join(', ') || 'none listed.'}`;
+                // ─── PHASE 2: BATCH OUTLINES (parallel) ──────────────────────
+                // One call per batch, all run simultaneously.
+                const model = await getVertexAIModel('gemini-2.5-flash');
 
+                const batchOutlines = await Promise.all(
+                    batches.map(async (batch) => {
                         try {
-                            const result = await extractionModel.generateContent({
-                                contents: [{ role: 'user', parts: [{ text: buildExtractionPrompt(examName, day.topic_name, sourceText) }] }]
+                            const result = await model.generateContent({
+                                contents: [{ role: 'user', parts: [{ text: buildBatchOutlinePrompt(examName, batch) }] }]
                             });
-                            const raw  = result.response.candidates[0].content.parts[0].text;
-                            const data = JSON.parse(raw.replace(/```json|```/g, '').trim());
-                            // Pin topic_id to a stable value regardless of what the LLM returned
-                            data.topic_id   = day.topic_name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                            data.topic_name = day.topic_name;
-                            return data;
+                            return result.response.candidates[0].content.parts[0].text.trim();
                         } catch (e) {
-                            console.warn(`Extraction failed for "${day.topic_name}":`, e.message);
-                            return {
-                                topic_id:     day.topic_name.replace(/[^a-z0-9]/gi, '_').toLowerCase(),
-                                topic_name:   day.topic_name,
-                                formulas:     [],
-                                definitions:  [],
-                                exam_traps:   [],
-                                key_facts:    [`${day.topic_name} — extraction failed, review manually.`],
-                                connects_to:  [],
-                                sparse_source: true,
-                            };
+                            console.warn(`[CramSheet] Outline failed for ${batch.day_range}:`, e.message);
+                            // Fallback: a minimal outline from topic names so we don't lose the batch
+                            return batch.days.map(d => `## ${d.topic_name}\n\n### Key Theory Points\n- See study notes for ${d.topic_name}.`).join('\n\n');
                         }
                     })
                 );
 
-                const validCount = allExtractions.filter(e => !e.sparse_source).length;
-                console.log(`[CramSheet] Phase 1 done. ${validCount}/${allExtractions.length} topics OK.`);
-                streamUpdate('status', { title: `Phase 1 done. ${validCount}/${allExtractions.length} topics extracted.` });
+                console.log(`[CramSheet] Phase 2 done. ${batchOutlines.length} outline(s) generated.`);
 
-                // ─── PHASE 2: GLOBAL ARCHITECT ────────────────────────────────
-                // One call, sees everything, plans everything.
-                streamUpdate('status', { title: 'Phase 2: Architecting global structure...' });
+                // ─── PHASE 3: GLOBAL MERGE PASS (conditional) ─────────────────
+                // Skip entirely if there is only one batch — nothing to merge.
+                // This saves one LLM call for plans ≤ 5 days.
+                let masterOutline;
 
-                const architectModel = await getVertexAIModel('gemini-2.5-flash', {
-                    responseMimeType: 'application/json',
-                });
+                if (batches.length === 1) {
+                    // Single batch — no merge needed. The outline IS the master outline.
+                    console.log('[CramSheet] Phase 3: SKIPPED (single batch, no merge needed).');
+                    streamUpdate('status', { title: 'Outline complete. Writing cram sheet...' });
+                    masterOutline = batchOutlines[0];
+                } else {
+                    // Multiple batches — run the merge pass to deduplicate and reorder.
+                    console.log(`[CramSheet] Phase 3: Merging ${batchOutlines.length} outlines...`);
+                    streamUpdate('status', { title: `Merging ${batchOutlines.length} outlines into master structure...` });
 
-                const architectResult = await architectModel.generateContent({
-                    contents: [{ role: 'user', parts: [{ text: buildArchitectPrompt(examName, allExtractions, planData.length) }] }]
-                });
-
-                let architectPlan;
-                try {
-                    const raw = architectResult.response.candidates[0].content.parts[0].text;
-                    architectPlan = JSON.parse(raw.replace(/```json|```/g, '').trim());
-                } catch (e) {
-                    throw new Error('Architect returned malformed JSON. Cannot proceed to writing.');
+                    try {
+                        const mergeResult = await model.generateContent({
+                            contents: [{ role: 'user', parts: [{ text: buildMergePrompt(examName, batchOutlines) }] }]
+                        });
+                        masterOutline = mergeResult.response.candidates[0].content.parts[0].text.trim();
+                        console.log('[CramSheet] Phase 3 done. Master outline ready.');
+                    } catch (e) {
+                        // If the merge fails, concatenate batch outlines as-is.
+                        // The writers will still produce valid content — just with possible duplicates.
+                        console.warn('[CramSheet] Phase 3 merge failed, falling back to concatenated outlines:', e.message);
+                        masterOutline = batchOutlines.join('\n\n---\n\n');
+                    }
                 }
 
-                if (!architectPlan?.sections?.length) {
-                    throw new Error('Architect produced no sections. Plan may be empty or all extractions failed.');
-                }
+                // ─── PHASE 4: PARALLEL SECTION WRITERS ───────────────────────
+                // Split the master outline into per-section chunks at ## boundaries.
+                // Each section gets its own writer call, all run simultaneously.
+                const sectionChunks = masterOutline
+                    .split(/\n(?=## )/)
+                    .map(s => s.trim())
+                    .filter(Boolean);
 
-                console.log(`[CramSheet] Phase 2 done. ${architectPlan.sections.length} sections. Target: ${architectPlan.total_word_target} words.`);
-                streamUpdate('status', { title: `Phase 2 done. Writing ${architectPlan.sections.length} sections...` });
+                // Extract just the heading text for cross-reference context
+                const allHeadings = sectionChunks.map(chunk => {
+                    const match = chunk.match(/^## (.+)/);
+                    return match ? match[1].trim() : 'Unnamed Section';
+                });
 
-                // ─── PHASE 3: PARALLEL SECTION WRITING ───────────────────────
-                // All sections run simultaneously. Deduplication is pre-resolved
-                // in the architect's global_dedup_log so there are no race conditions.
-                const writerModel   = await getVertexAIModel('gemini-2.5-flash');
-                const dedupLog      = architectPlan.global_dedup_log || [];
-                const extractionMap = new Map(allExtractions.map(e => [e.topic_id, e]));
+                console.log(`[CramSheet] Phase 4: Writing ${sectionChunks.length} section(s) in parallel...`);
+                streamUpdate('status', { title: `Writing ${sectionChunks.length} section${sectionChunks.length > 1 ? 's' : ''} in parallel...` });
 
                 const sectionOutputs = await Promise.all(
-                    architectPlan.sections.map(async (section, idx) => {
-                        const sectionExtractions = section.assigned_topic_ids
-                            .map(id => extractionMap.get(id))
-                            .filter(Boolean);
-
+                    sectionChunks.map(async (sectionOutline, idx) => {
                         try {
-                            const result = await writerModel.generateContent({
+                            const result = await model.generateContent({
                                 contents: [{
                                     role: 'user',
-                                    parts: [{ text: buildSectionWriterPrompt(
-                                        examName, section, sectionExtractions, architectPlan, dedupLog
-                                    ) }]
+                                    parts: [{ text: buildSectionWriterPrompt(examName, sectionOutline, allHeadings, idx) }]
                                 }]
                             });
                             return {
                                 order:   idx,
+                                heading: allHeadings[idx],
                                 content: result.response.candidates[0].content.parts[0].text.trim(),
                             };
                         } catch (e) {
-                            console.warn(`Section "${section.heading}" write failed:`, e.message);
+                            console.warn(`[CramSheet] Section write failed for "${allHeadings[idx]}":`, e.message);
+                            // Fallback: emit the raw outline section so the student still gets something
                             return {
                                 order:   idx,
-                                content: `## ${section.heading}\n\n*Section failed — review source material manually.*\n`,
+                                heading: allHeadings[idx],
+                                content: `## ${allHeadings[idx]}\n\n*Generation failed for this section. Source outline:*\n\n${sectionOutline}`,
                             };
                         }
                     })
                 );
 
-                // ─── PHASE 4: JS ASSEMBLY (no LLM) ───────────────────────────
+                // ─── PHASE 5: JS ASSEMBLY (no LLM) ───────────────────────────
                 sectionOutputs.sort((a, b) => a.order - b.order);
 
-                // Auto-generate TOC from architect's section headings
-                const tocLines = architectPlan.sections.map((s, i) => {
+                const tocLines = sectionOutputs.map((s, i) => {
                     const anchor = s.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-');
                     return `${i + 1}. [${s.heading}](#${anchor})`;
                 });
 
-                const opening = architectPlan.opening_summary
-                    ? `> ${architectPlan.opening_summary}\n\n`
-                    : '';
-
                 const finalCramSheet = [
-                    opening,
                     `## Contents\n\n${tocLines.join('\n')}\n`,
                     '',
                     ...sectionOutputs.map(s => s.content),
@@ -427,9 +433,8 @@ export async function POST(request) {
                     '*Generated by KalPad AI ✨ — Every word is a potential mark.*',
                 ].join('\n');
 
-                console.log(`[CramSheet] Phase 4 done. Total: ${finalCramSheet.length} chars.`);
+                console.log(`[CramSheet] Phase 5 done. Final: ${finalCramSheet.length} chars, ${sectionOutputs.length} sections.`);
 
-                // DB write
                 const { error: updateError } = await supabase
                     .from('generated_cram_sheets')
                     .update({ markdown_content: finalCramSheet, status: 'complete' })
