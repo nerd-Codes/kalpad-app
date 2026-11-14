@@ -1,233 +1,306 @@
 // src/components/payment/UpgradeModal.jsx
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Modal, Stack, Group, Title, Text, Box, Badge, SimpleGrid, ThemeIcon, List, Button } from '@mantine/core';
-import { IconCheck, IconDiamond, IconRocket, IconCrown, IconLockOpen, IconBug, IconUser, IconAlertTriangle } from '@tabler/icons-react';
-import { motion } from 'framer-motion';
-import { GlassCard } from '@/components/GlassCard';
-import { Interactive } from '@/components/Interactive';
-import { ShimmerButton } from '@/components/landing/ShimmerButton';
-import { PayURedirector } from './PayURedirector';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  IconArrowRight,
+  IconCheck,
+  IconCrown,
+  IconDiamond,
+  IconLockOpen,
+  IconRocket,
+  IconX,
+} from '@tabler/icons-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { notifications } from '@mantine/notifications';
-import { useMediaQuery } from '@mantine/hooks';
+import { PayURedirector } from './PayURedirector';
+import classes from './UpgradeModal.module.css';
 
-// --- CONFIGURATION ---
 const TIERS = [
-    {
-        id: 'pro_15',
-        name: 'The Sprint',
-        duration: '15 Days',
-        price: '₹49',
-        icon: IconRocket,
-        color: '#CD7F32', // Bronze
-        glow: 'rgba(205, 127, 50, 0.2)',
-        features: ['Unlimited Active Plans', 'Unlimited Note Generation', '15 Days Full Access']
-    },
-    {
-        id: 'pro_30',
-        name: 'The Marathon',
-        duration: '30 Days',
-        price: '₹79',
-        icon: IconDiamond,
-        color: '#E0E0E0', // Silver
-        glow: 'rgba(224, 224, 224, 0.2)',
-        features: ['Everything in Sprint', 'Unlimited AI Doubt Solver', 'Unlimited Smart Quizzes']
-    },
-    {
-        id: 'pro_90',
-        name: 'The Semester',
-        duration: '3 Months',
-        price: '₹129',
-        icon: IconCrown,
-        color: '#FFD700', // Gold
-        glow: 'rgba(255, 215, 0, 0.3)',
-        features: ['Early Access to YouTube Lecture Finder', 'Long-term Plan Support', 'Early Access to new Features'],
-        recommended: true
-    }
+  {
+    id: 'pro_15',
+    name: 'The Sprint',
+    duration: '15 days',
+    price: '₹49',
+    icon: IconRocket,
+    surface: 'var(--kp-butter)',
+    features: [
+      'Unlimited active study plans',
+      'Unlimited study note generation',
+      '15 days full desk access',
+    ],
+  },
+  {
+    id: 'pro_30',
+    name: 'The Marathon',
+    duration: '30 days',
+    price: '₹79',
+    icon: IconDiamond,
+    surface: 'var(--kp-mint)',
+    features: [
+      'Everything in Sprint',
+      'Unlimited AI tutor chat',
+      'Unlimited smart quizzes',
+    ],
+  },
+  {
+    id: 'pro_90',
+    name: 'The Semester',
+    duration: '3 months',
+    price: '₹129',
+    icon: IconCrown,
+    surface: 'var(--kp-periwinkle)',
+    features: [
+      'Everything in Marathon',
+      'Early access to YouTube lecture scout',
+      'Long-term revision & cram support',
+    ],
+    recommended: true,
+  },
 ];
 
-// --- MODAL STYLES ---
-const glassModalStyles = {
-    content: { 
-        backgroundColor: '#0F0F10', 
-        border: '1px solid rgba(255, 255, 255, 0.1)', 
-        borderRadius: '24px',
-        boxShadow: '0 40px 80px -12px rgba(0, 0, 0, 0.8)',
-    },
-    header: { backgroundColor: 'transparent', paddingBottom: 0 },
-    body: { padding: '24px' },
-    title: { fontFamily: 'var(--font-lexend)', fontWeight: 600, color: 'white' },
-    close: { color: 'gray', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' } }
-};
-
 export function UpgradeModal({ opened, onClose }) {
-    const [selectedPlan, setSelectedPlan] = useState('pro_90'); // Default to best value
-    const [loading, setLoading] = useState(false);
-    const [paymentData, setPaymentData] = useState(null);
-    const isMobile = useMediaQuery('(max-width: 48em)');
+  const [selectedPlan, setSelectedPlan] = useState('pro_90');
+  const [loading, setLoading] = useState(false);
+  const [paymentData, setPaymentData] = useState(null);
 
-    // --- HANDLER: INITIATE PAYMENT ---
-    const handlePurchase = async () => {
-        setLoading(true);
-        try {
-            const response = await fetch('/api/payment/initiate-payu', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ planId: selectedPlan })
-            });
-
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.error || "Payment initiation failed");
-            }
-
-            const data = await response.json();
-            
-            // This triggers the PayURedirector to take over
-            setPaymentData(data);
-
-        } catch (error) {
-            console.error(error);
-            notifications.show({
-                title: 'Gateway Error',
-                message: error.message,
-                color: 'red'
-            });
-            setLoading(false);
-        }
+  useEffect(() => {
+    if (!opened) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !loading) onClose?.();
     };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [opened, loading, onClose]);
 
-    return (
-        <>
-            <Modal 
-                opened={opened} 
-                onClose={onClose} 
-                title={<Group gap="xs"><IconLockOpen size={20} color="#BF5AF2"/><Text inherit>Unlock Full Potential</Text></Group>} 
-                size="xl" 
-                centered 
-                fullScreen={isMobile}
-                zIndex={7000}
-                styles={glassModalStyles}
-                overlayProps={{ blur: 10, opacity: 0.8 }}
-            >
-                <Stack gap="xl">
-                     <GlassCard p="md" style={{ border: '1px solid rgba(255, 59, 48, 0.2)', backgroundColor: 'rgba(255, 59, 48, 0.05)' }}>
-                                <Group align="flex-start" wrap="nowrap">
-                                    <ThemeIcon variant="light" color="red" size="lg" radius="md">
-                                        <IconUser size={20} />
-                                    </ThemeIcon>
-                                    <Box>
-                                        <Text size="sm" fw={700} c="white" tt="uppercase" mb={4}>Current Plan: Free Tier</Text>
-                                        <List 
-                                            size="xs" 
-                                            spacing={4} 
-                                            center 
-                                            icon={<ThemeIcon color="red" size={12} radius="xl" variant="transparent"><IconAlertTriangle size={12} /></ThemeIcon>}
-                                        >
-                                            <List.Item><Text c="dimmed" size="xs">Limited to 1 Active Study Plan</Text></List.Item>
-                                            <List.Item><Text c="dimmed" size="xs">Note Generation: Today Only</Text></List.Item>
-                                            <List.Item><Text c="dimmed" size="xs">Restricted Quiz & Doubt Credits</Text></List.Item>
-                                        </List>
-                                    </Box>
-                                </Group>
-                            </GlassCard>
+  const handlePurchase = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/payment/initiate-payu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId: selectedPlan }),
+      });
 
-                            <Text c="dimmed" size="sm" ta="center">
-                                Select a pass to remove all limits instantly.
-                            </Text>
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Payment initiation failed');
+      }
 
-                    <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="lg">
-                        {TIERS.map((tier) => {
-                            const isSelected = selectedPlan === tier.id;
-                            const isRec = tier.recommended;
+      const data = await response.json();
+      setPaymentData(data);
+    } catch (error) {
+      console.error(error);
+      notifications.show({
+        title: 'Gateway Error',
+        message: error.message,
+        color: 'red',
+      });
+      setLoading(false);
+    }
+  };
 
-                            return (
-                                <Interactive key={tier.id} onClick={() => setSelectedPlan(tier.id)} className="h-full">
-                                    <GlassCard 
-                                        p="lg" 
-                                        h="100%"
-                                        style={{ 
-                                            position: 'relative',
-                                            backgroundColor: isSelected ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
-                                            border: isSelected ? `2px solid ${tier.color}` : '1px solid rgba(255,255,255,0.05)',
-                                            boxShadow: isSelected ? `0 0 30px ${tier.glow}` : 'none',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                                            transform: isSelected ? 'scale(1.02)' : 'scale(1)'
-                                        }}
-                                    >
-                                        {isRec && (
-                                            <Badge 
-                                                variant="filled" 
-                                                color="yellow" 
-                                                size="xs" 
-                                                style={{ position: 'absolute', top: 12, right: 12, boxShadow: '0 0 10px rgba(255, 215, 0, 0.4)' }}
-                                            >
-                                                BEST VALUE
-                                            </Badge>
-                                        )}
+  const activeTier = TIERS.find((t) => t.id === selectedPlan) || TIERS[2];
 
-                                        <Stack align="center" gap="md">
-                                            <ThemeIcon 
-                                                size={50} 
-                                                radius="100%" 
-                                                variant="light" 
-                                                color={tier.color} 
-                                                style={{ backgroundColor: tier.glow, color: tier.color }}
-                                            >
-                                                <tier.icon size={24} />
-                                            </ThemeIcon>
+  const modalContent = (
+    <AnimatePresence>
+      {opened && (
+        <motion.div
+          className={classes.backdrop}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          onClick={() => {
+            if (!loading) onClose?.();
+          }}
+        >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Upgrade KalPad study pass"
+            className={classes.dialog}
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className={classes.headerRow}>
+              <div>
+                <p className={classes.eyebrow}>Study Pass</p>
+                <h2 className={classes.title}>Unlock your full study desk</h2>
+                <p className={classes.subtitle}>
+                  Remove plan, note, and AI tutor caps across your active exam timeline.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={classes.closeBtn}
+                onClick={onClose}
+                aria-label="Close upgrade dialog"
+                disabled={loading}
+              >
+                <IconX size={18} stroke={1.9} />
+              </button>
+            </div>
 
-                                            <Box ta="center">
-                                                <Text size="sm" c="dimmed" fw={700} tt="uppercase" style={{ letterSpacing: '0.05em' }}>{tier.name}</Text>
-                                                <Text size="2.5rem" fw={800} style={{ fontFamily: 'var(--font-lexend)', lineHeight: 1, color: 'white' }}>
-                                                    {tier.price}
-                                                </Text>
-                                                <Text size="xs" c="dimmed">{tier.duration}</Text>
-                                            </Box>
+            {/* Free Tier Limits Notice */}
+            <div className={classes.limitBanner}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span
+                  style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '11px',
+                    backgroundColor: 'var(--kp-apricot)',
+                    color: 'var(--kp-primary)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <IconLockOpen size={17} stroke={1.9} />
+                </span>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--kp-ink)' }}>
+                    Current plan: Free tier
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--kp-secondary)' }}>
+                    Upgrade anytime for one-off pass access with zero recurring auto-debits.
+                  </div>
+                </div>
+              </div>
+              <div className={classes.limitChips}>
+                <span className={classes.limitChip}>1 active plan</span>
+                <span className={classes.limitChip}>Today notes only</span>
+                <span className={classes.limitChip}>Capped quizzes</span>
+              </div>
+            </div>
 
-                                            <List 
-                                                spacing="xs" 
-                                                size="sm" 
-                                                center
-                                                icon={<ThemeIcon color="green" size={16} radius="xl" variant="filled"><IconCheck size={10} /></ThemeIcon>}
-                                            >
-                                                {tier.features.map((feat, i) => (
-                                                    <List.Item key={i}><Text size="xs" c="gray.3">{feat}</Text></List.Item>
-                                                ))}
-                                            </List>
-                                        </Stack>
-                                    </GlassCard>
-                                </Interactive>
-                            );
-                        })}
-                    </SimpleGrid>
+            {/* 3 Pass Cards */}
+            <div className={classes.tierGrid} role="radiogroup" aria-label="Select a study pass">
+              {TIERS.map((tier) => {
+                const Icon = tier.icon;
+                const isSelected = selectedPlan === tier.id;
+                return (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => setSelectedPlan(tier.id)}
+                    className={`${classes.tierCard} ${isSelected ? classes.tierCardSelected : ''}`}
+                    style={{
+                      backgroundColor: tier.surface,
+                      border: isSelected
+                        ? '2px solid var(--kp-primary)'
+                        : '1px solid var(--kp-border)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div className={classes.tierTopRow}>
+                        <span className={classes.tierIconChip}>
+                          <Icon size={18} stroke={1.9} />
+                        </span>
+                        {tier.recommended ? (
+                          <span className={classes.recommendedBadge}>Best value</span>
+                        ) : (
+                          isSelected && (
+                            <span
+                              style={{
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '999px',
+                                backgroundColor: 'var(--kp-primary)',
+                                color: 'var(--kp-on-primary)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <IconCheck size={13} stroke={2.4} />
+                            </span>
+                          )
+                        )}
+                      </div>
 
-                    <Box p="md" style={{ backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <Group justify="space-between" align="center">
-                             <Stack gap={0}>
-                                <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Total Due</Text>
-                                <Text size="xl" fw={700} c="white">{TIERS.find(t => t.id === selectedPlan)?.price}</Text>
-                             </Stack>
-                             
-                             <ShimmerButton 
-                                onClick={handlePurchase} 
-                                loading={loading}
-                                size="lg"
-                                radius="xl"
-                                style={{ padding: '0 40px', background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)' }}
-                             >
-                                Secure Checkout
-                             </ShimmerButton>
-                        </Group>
-                    </Box>
-                </Stack>
-            </Modal>
+                      <div>
+                        <div className={classes.tierName}>{tier.name}</div>
+                        <div className={classes.tierPriceRow}>
+                          <span className={classes.tierPrice}>{tier.price}</span>
+                          <span className={classes.tierDuration}>/ {tier.duration}</span>
+                        </div>
+                      </div>
+                    </div>
 
-            {/* --- THE SILENT LAUNCHER --- */}
-            {/* When paymentData is set, this component mounts and auto-submits the form */}
-            <PayURedirector paymentData={paymentData} />
-        </>
-    );
+                    <ul className={classes.featureList}>
+                      {tier.features.map((feat) => (
+                        <li key={feat} className={classes.featureItem}>
+                          <span className={classes.featureCheck}>
+                            <IconCheck size={10} stroke={2.6} />
+                          </span>
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Footer Checkout Bar */}
+            <div className={classes.checkoutBar}>
+              <div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-kp-mono)',
+                    fontSize: '10.5px',
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: 'var(--kp-secondary)',
+                  }}
+                >
+                  Total due · {activeTier.name} ({activeTier.duration})
+                </div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-kp-mono)',
+                    fontSize: '22px',
+                    fontWeight: 700,
+                    color: 'var(--kp-ink)',
+                    fontVariantNumeric: 'tabular-nums',
+                    marginTop: '2px',
+                  }}
+                >
+                  {activeTier.price}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className={classes.checkoutBtn}
+                onClick={handlePurchase}
+                disabled={loading}
+              >
+                <span>{loading ? 'Preparing checkout...' : 'Continue to checkout'}</span>
+                {!loading && <IconArrowRight size={16} stroke={2.1} />}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  return (
+    <>
+      {typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent}
+      <PayURedirector paymentData={paymentData} />
+    </>
+  );
 }

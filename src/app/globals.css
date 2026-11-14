@@ -1,25 +1,30 @@
 /* src/app/globals.css */
 @import '@mantine/core/styles.css';
 @import '@mantine/notifications/styles.css';
+@import '../styles/kalpad-tokens.css';
 
 :root {
-  /* Apple System Colors (Dark Mode Default for KalPad) */
-  --apple-bg: #00000000;         /* Pure OLED Black */
-  --apple-gray-1: #1C1C1E;     /* Secondary System Fill */
-  --apple-gray-2: #2C2C2E;     /* Tertiary System Fill */
-  --apple-gray-3: #3A3A3C;     /* Quaternary System Fill */
+  /* Graphite neutral ramp (Unslop design tokens) */
+  --apple-bg: #141415;          /* Page background */
+  --apple-deepest: #0f0f10;     /* Deepest surface (sidebar) */
+  --apple-gray-1: #19191b;      /* Card surface */
+  --apple-gray-2: #232325;      /* Raised surface */
+  --apple-gray-3: #2e2e32;      /* Active / hover surface */
   
-  --apple-text-primary: #F5F5F7;  /* High Contrast Text */
-  --apple-text-secondary: #86868B; /* Subtext */
+  --apple-text-primary: #ededed;   /* Primary text */
+  --apple-text-secondary: #a1a1a6; /* Secondary text */
+  --apple-text-muted: #85858b;     /* Muted text & icons */
   
-  --apple-blue: #2997FF;
-  --apple-purple: #BF5AF2;
+  --accent-amber: #D97706;         /* Library amber accent */
+  --accent-amber-hover: #B45309;
+  --accent-amber-subtle: rgba(217, 119, 6, 0.14);
+  --border-hairline: rgba(237, 237, 237, 0.08);
   
-  /* The "Deep Glass" Variables */
-  --glass-bg: rgba(28, 28, 30, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-shine: rgba(255, 255, 255, 0.12);
-  --glass-blur: 24px;
+  /* Quiet Surface Tokens */
+  --glass-bg: #19191b;
+  --glass-border: rgba(237, 237, 237, 0.08);
+  --glass-shine: rgba(255, 255, 255, 0.04);
+  --glass-blur: 0px;
 }
 
 html, body {
@@ -27,9 +32,10 @@ html, body {
   overflow-x: hidden;
   background-color: var(--apple-bg);
   color: var(--apple-text-primary);
-  /* The "Inter" font is applied via Mantine, but we ensure smoothing here */
-  -webkit-font-smoothing: subpixel-antialiased; 
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased; 
   -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
 }
 
 * {
@@ -39,35 +45,34 @@ html, body {
 }
 
 ::selection {
-  background: rgba(191, 90, 242, 0.3); /* Brand Purple Selection */
+  background: var(--accent-amber-subtle);
   color: #fff;
 }
 
-/* --- UTILITY: The "Deep Glass" Material --- */
+/* --- UTILITY: Clean Raised Surface --- */
 .apple-glass {
   background-color: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
   border: 1px solid var(--glass-border);
-  box-shadow: 
-    0 4px 24px -1px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(0, 0, 0, 0.02); /* Inner rim shadow */
+  box-shadow: inset 0 1px 0 0 var(--glass-shine);
 }
 
-/* --- UTILITY: Subtle Text Gradient for Headers --- */
+/* --- UTILITY: Clean Solid Header Text --- */
 .apple-text-gradient {
-  background: linear-gradient(135deg, #FFFFFF 0%, #A1A1AA 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--apple-text-primary);
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: initial;
+  background-clip: unset;
 }
-
 
 * {
   -webkit-tap-highlight-color: transparent;
 }
-*:focus {
-  outline: none !important;
+
+/* Accessible focus ring - replaces outline: none !important */
+:focus-visible {
+  outline: 2px solid #D97706;
+  outline-offset: 2px;
 }
 
 /* --- LITE MODE OVERRIDES --- */
@@ -85,16 +90,16 @@ body.lite-mode * {
 }
 
 mark {
-  background: rgba(255, 255, 0, 0.2); /* Transparent Yellow */
+  background: var(--accent-amber-subtle);
   color: inherit;
-  border-bottom: 2px solid #FFD700;
-  border-radius: 4px;
+  border-bottom: 1px solid var(--accent-amber);
+  border-radius: 2px;
   padding: 0 2px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease;
 }
 
 mark:hover {
-  background: rgba(255, 255, 0, 0.4);
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+  background: rgba(217, 119, 6, 0.24);
+  box-shadow: none;
 }

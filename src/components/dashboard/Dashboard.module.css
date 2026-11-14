@@ -1,0 +1,325 @@
+/* src/components/dashboard/Dashboard.module.css */
+
+.pageWrap {
+  position: relative;
+  width: 100%;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.bentoGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "session"
+    "ribbon"
+    "agenda"
+    "cadence";
+  gap: 22px;
+}
+
+.areaSession { grid-area: session; min-width: 0; }
+.areaRibbon { grid-area: ribbon; min-width: 0; }
+.areaAgenda { grid-area: agenda; min-width: 0; }
+.areaCadence { grid-area: cadence; min-width: 0; }
+
+@media (min-width: 1024px) {
+  .bentoGrid {
+    grid-template-columns: minmax(0, 1.32fr) minmax(360px, 1fr);
+    grid-template-areas:
+      "session ribbon"
+      "agenda cadence";
+    gap: 24px;
+    align-items: start;
+  }
+}
+
+.weekStripOnly {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.monthCalendarWrap {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .weekStripOnly {
+    display: none;
+  }
+
+  .monthCalendarWrap {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background-color: var(--kp-surface);
+    border: 1px solid var(--kp-border);
+    border-radius: 22px;
+    padding: 18px 20px;
+  }
+}
+
+.monthNavBtn {
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--kp-border);
+  background-color: var(--kp-raised);
+  color: var(--kp-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 140ms var(--kp-ease-enter),
+    border-color 140ms var(--kp-ease-enter),
+    transform 160ms var(--kp-ease-spring);
+}
+
+.monthNavBtn:hover {
+  border-color: var(--kp-border-strong);
+  transform: translateY(-1px);
+}
+
+.monthNavBtn:active {
+  transform: scale(0.94);
+}
+
+.monthTodayBtn {
+  appearance: none;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--kp-border);
+  background-color: var(--kp-raised);
+  color: var(--kp-ink);
+  font-family: var(--font-kp-mono);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 140ms var(--kp-ease-enter),
+    border-color 140ms var(--kp-ease-enter),
+    transform 160ms var(--kp-ease-spring);
+}
+
+.monthTodayBtn:hover {
+  border-color: var(--kp-border-strong);
+  transform: translateY(-1px);
+}
+
+.monthDayCell {
+  position: relative;
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition:
+    background-color 150ms var(--kp-ease-enter),
+    border-color 150ms var(--kp-ease-enter),
+    transform 180ms var(--kp-ease-spring);
+}
+
+.monthDayCell:hover:not(.monthDaySelected) {
+  background-color: var(--kp-raised);
+}
+
+.monthDayCell:active {
+  transform: scale(0.94);
+}
+
+.monthDayToday:not(.monthDaySelected) {
+  border-color: var(--kp-primary);
+}
+
+.monthDayPill {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background-color: var(--kp-primary);
+  z-index: 0;
+}
+
+.monthDayInner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.topLinearLoader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--kp-raised);
+  z-index: 1100;
+  overflow: hidden;
+}
+
+.topLinearBar {
+  width: 38%;
+  height: 100%;
+  background-color: var(--kp-orange);
+  animation: kpIndeterminate 1.2s var(--kp-ease-enter) infinite;
+}
+
+@keyframes kpIndeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.dayCell {
+  position: relative;
+  appearance: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  border-radius: 20px;
+  width: 100%;
+  padding: 0;
+  transition:
+    transform 240ms var(--kp-ease-spring),
+    background-color 180ms var(--kp-ease-enter);
+}
+
+.dayCellPill {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background-color: var(--kp-primary);
+  z-index: 0;
+}
+
+.dayCellContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+}
+
+.dayCell:hover:not(.dayCellActive) {
+  background-color: var(--kp-raised);
+}
+
+.dayCellActive {
+  transform: scale(1);
+}
+
+.dayCellInactive {
+  transform: scale(0.96);
+}
+
+.iconBtn44 {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 150ms var(--kp-ease-enter), transform 150ms var(--kp-ease-spring);
+}
+
+.iconBtn44:hover {
+  background-color: var(--kp-raised);
+}
+
+.iconBtn44:active {
+  transform: scale(0.95);
+}
+
+.topicCardSurface {
+  width: 100%;
+  border-radius: 20px;
+  background-color: var(--kp-surface);
+  border: 1px solid var(--kp-border);
+  padding: 15px 17px;
+  transition:
+    transform 220ms var(--kp-ease-spring),
+    border-color 160ms var(--kp-ease-enter),
+    box-shadow 220ms var(--kp-ease-enter);
+}
+
+.topicCardSurface:hover {
+  border-color: var(--kp-border-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(17, 19, 23, 0.06);
+}
+
+.checklistRow {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  width: 100%;
+  border-radius: 12px;
+  transition: background-color 140ms var(--kp-ease-enter);
+}
+
+.checklistRow:hover {
+  background-color: var(--kp-raised);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.completionWeeks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.completionRow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.completionCell {
+  height: 10px;
+  border-radius: 20px;
+  transition:
+    opacity 150ms var(--kp-ease-enter),
+    transform 180ms var(--kp-ease-spring);
+}
+
+.completionCell:hover {
+  opacity: 0.9;
+  transform: scale(1.22);
+}

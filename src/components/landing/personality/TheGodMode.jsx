@@ -2,230 +2,325 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Container, Title, Text, Box, Group, Stack, Badge, Grid, ThemeIcon } from '@mantine/core';
+import { Container, Title, Text, Box, Group, Stack, Badge, Grid } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconRotateClockwise, IconAlertCircle, IconCheck, IconPlayerPlayFilled, IconWand, IconActivityHeartbeat } from '@tabler/icons-react';
-import { GlassCard } from '@/components/GlassCard';
+import { IconRotateClockwise, IconAlertCircle, IconCheck, IconActivityHeartbeat, IconCalendar } from '@tabler/icons-react';
 
-// --- EDITORIAL FONT STYLE ---
-const serifItalic = {
-    fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
-    fontStyle: 'italic',
-    fontWeight: 400,
-    color: '#BF5AF2',
-    textTransform: 'lowercase'
-};
-
-// --- ORGANIC DOODLE: THE HEURISTIC CIRCLE ---
-function OrganicCircle({ delay }) {
-    return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay }}
-            style={{ position: 'absolute', top: '-15px', left: '-20px', right: '-20px', bottom: '-15px', zIndex: 10, pointerEvents: 'none' }}
-        >
-            <svg width="100%" height="100%" viewBox="0 0 200 60" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
-                <motion.path 
-                    d="M 10 30 Q 50 5 100 10 T 190 30 Q 150 55 100 50 T 10 30" 
-                    stroke="#34C759" strokeWidth="2" strokeDasharray="6 4" fill="none"
-                    initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.5, delay }}
-                />
-            </svg>
-        </motion.div>
-    );
-}
-
-// --- ANIMATED MOCKUP: THE RECOVERY ENGINE ---
+// --- SUB-COMPONENT: ANIMATED RECOVERY ENGINE SIMULATOR ---
 function RecoveryEngineMockup() {
-    const [phase, setPhase] = useState(0); // 0: Failed Day, 1: AI Intervening, 2: Restructured
+    const [phase, setPhase] = useState(0); // 0: Missed Debt, 1: Recalculating, 2: Restructured Realistic Pace
 
     useEffect(() => {
         const interval = setInterval(() => {
             setPhase((p) => (p + 1) % 3);
-        }, 4000); // 4 seconds per phase for readability
+        }, 4000); // 4 seconds per phase for calm legibility
         return () => clearInterval(interval);
     }, []);
 
     return (
-        <Box style={{ position: 'relative', height: '100%', minHeight: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <Box style={{ position: 'relative', height: '100%', minHeight: '380px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <AnimatePresence mode="wait">
-                
-                {/* PHASE 0: THE FAILURE (Anxiety) */}
+                {/* PHASE 0: MISSED SESSION (STUDY DEBT DETECTED) */}
                 {phase === 0 && (
                     <motion.div
                         key="phase0"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
-                        transition={{ duration: 0.4 }}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                     >
-                        <Stack gap="sm">
-                            <Text size="xs" fw={700} c="red.4" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Yesterday: Missed</Text>
-                            <GlassCard p="md" style={{ border: '1px solid rgba(255, 59, 48, 0.4)', background: 'rgba(255, 59, 48, 0.05)', position: 'relative', overflow: 'hidden' }}>
-                                {/* Warning Strip */}
-                                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', background: '#FF3B30' }} />
-                                
+                        <Stack gap="xs">
+                            <Group justify="space-between" align="center">
+                                <Text size="xs" fw={500} c="#85858b">
+                                    Yesterday: missed study session
+                                </Text>
+                                <Badge
+                                    size="xs"
+                                    radius="sm"
+                                    variant="outline"
+                                    style={{
+                                        borderColor: 'rgba(229, 72, 77, 0.3)',
+                                        color: '#e5484d',
+                                        backgroundColor: 'rgba(229, 72, 77, 0.08)'
+                                    }}
+                                >
+                                    3h study debt
+                                </Badge>
+                            </Group>
+
+                            <Box
+                                p="md"
+                                style={{
+                                    backgroundColor: '#19191b',
+                                    border: '1px solid rgba(229, 72, 77, 0.25)',
+                                    borderRadius: '10px',
+                                    position: 'relative',
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '3px', background: '#e5484d' }} />
+
                                 <Group justify="space-between" mb="xs">
-                                    <Title order={4} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>Day 14: Electromagnetism</Title>
-                                    <Badge color="red" variant="filled">0/4 Tasks</Badge>
+                                    <Text size="sm" c="#ededed" fw={500}>
+                                        Day 14: Electromagnetism &amp; Field Theory
+                                    </Text>
+                                    <Badge size="xs" radius="sm" variant="filled" style={{ backgroundColor: 'rgba(229, 72, 77, 0.15)', color: '#e5484d' }}>
+                                        0/4 tasks complete
+                                    </Badge>
                                 </Group>
-                                <Text size="sm" c="dimmed" mb="md">You missed 6 hours of study. KalPad will spread the work out realistically.</Text>
-                                
-                                <Box p="sm" style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                                    <Group justify="space-between">
-                                        <Group gap="xs">
-                                            <IconAlertCircle size={16} color="#FF3B30" />
-                                            <Text size="sm" fw={600} c="white">Plan Needs Update</Text>
+                                <Text size="xs" c="#a1a1a6" mb="md" lh={1.5}>
+                                    Missed 3 hours yesterday. KalPad automatically recalibrates your pace across remaining days without piling on guilt.
+                                </Text>
+
+                                <Box
+                                    p="sm"
+                                    style={{
+                                        backgroundColor: 'rgba(237, 237, 237, 0.03)',
+                                        border: '1px solid rgba(237, 237, 237, 0.08)',
+                                        borderRadius: '8px'
+                                    }}
+                                >
+                                    <Group justify="space-between" wrap="nowrap">
+                                        <Group gap="xs" wrap="nowrap">
+                                            <IconAlertCircle size={15} color="#e5484d" style={{ flexShrink: 0 }} />
+                                            <Text size="xs" fw={500} c="#ededed">
+                                                Study debt detected: 3.0h
+                                            </Text>
                                         </Group>
-                                        <Badge variant="outline" color="red" style={{ cursor: 'pointer', boxShadow: '0 0 10px rgba(255,59,48,0.2)' }} className="animate-pulse">
-                                            REGENERATE PLAN
+                                        <Badge
+                                            variant="outline"
+                                            size="xs"
+                                            radius="sm"
+                                            style={{
+                                                borderColor: 'rgba(237, 237, 237, 0.15)',
+                                                color: '#ededed',
+                                                backgroundColor: '#232325'
+                                            }}
+                                        >
+                                            Rebalance pace
                                         </Badge>
                                     </Group>
                                 </Box>
-                            </GlassCard>
+                            </Box>
                         </Stack>
                     </motion.div>
                 )}
 
-                {/* PHASE 1: THE INTERVENTION (Analysis) */}
+                {/* PHASE 1: RECALCULATING PACE ACROSS REMAINING DAYS */}
                 {phase === 1 && (
                     <motion.div
                         key="phase1"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.4 }}
-                        style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                     >
-                        <Box style={{ position: 'relative', width: '100%' }}>
-                            <GlassCard p="xl" style={{ border: '1px solid rgba(191, 90, 242, 0.5)', background: '#111113', textAlign: 'center', boxShadow: '0 0 40px rgba(191, 90, 242, 0.2)' }}>
-                                <IconWand size={32} color="#BF5AF2" className="animate-spin-slow" style={{ animationDuration: '3s' }} />
-                                <Title order={4} c="white" mt="md" mb="sm" style={{ fontFamily: 'var(--font-lexend)' }}>Updating Your Plan</Title>
-                                
-                                <Stack gap="xs" align="center">
-                                    <Text size="xs" ff="monospace" c="dimmed">Analyzing study debt: 6h</Text>
-                                    <Group gap="xs" style={{ position: 'relative' }}>
-                                        <Text size="xs" ff="monospace" c="white" fw={600}>Checking what still matters...</Text>
-                                    
-                                    </Group>
-                                    <Text size="xs" ff="monospace" c="dimmed">Pace adjusted from 6h/day to 4.5h/day</Text>
-                                    <Text size="xs" ff="monospace" c="violet.4">Rebuilding your daily plan...</Text>
-                                </Stack>
-                            </GlassCard>
-                            
-                            
+                        <Box
+                            p="xl"
+                            style={{
+                                backgroundColor: '#19191b',
+                                border: '1px solid rgba(237, 237, 237, 0.08)',
+                                borderRadius: '10px',
+                                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.04)',
+                                textAlign: 'center'
+                            }}
+                        >
+                            <Box style={{ display: 'inline-flex', padding: '10px', borderRadius: '8px', backgroundColor: '#232325', marginBottom: '12px' }}>
+                                <IconRotateClockwise size={20} color="#D97706" />
+                            </Box>
+
+                            <Title order={4} c="#ededed" fw={500} size="sm" mb="xs">
+                                Recalculating daily schedule
+                            </Title>
+
+                            <Stack gap={6} align="center">
+                                <Text size="xs" c="#85858b" style={{ fontFamily: 'var(--font-lexend), monospace' }} className="tabular-nums">
+                                    Analyzing study debt: 3.0h
+                                </Text>
+                                <Text size="xs" c="#a1a1a6">
+                                    Evaluating 12 remaining days before exam
+                                </Text>
+                                <Box
+                                    px="sm"
+                                    py={4}
+                                    style={{
+                                        backgroundColor: 'rgba(217, 119, 6, 0.1)',
+                                        border: '1px solid rgba(217, 119, 6, 0.2)',
+                                        borderRadius: '6px'
+                                    }}
+                                >
+                                    <Text size="xs" c="#D97706" fw={500} className="tabular-nums" style={{ fontFamily: 'var(--font-lexend), monospace' }}>
+                                        Missed 3 hours yesterday → redistributed +25 min/day over next 7 days → exam target maintained
+                                    </Text>
+                                </Box>
+                                <Text size="xs" c="#85858b">
+                                    Rebuilding daily quotas without schedule collapse
+                                </Text>
+                            </Stack>
                         </Box>
                     </motion.div>
                 )}
 
-                {/* PHASE 2: THE SAVE (Relief & Clarity) */}
+                {/* PHASE 2: RESTORED REALISTIC PACE */}
                 {phase === 2 && (
                     <motion.div
                         key="phase2"
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: 20, filter: 'blur(5px)' }}
-                        transition={{ type: "spring", stiffness: 120, damping: 15 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                     >
-                        <Stack gap="sm">
-                            <Group justify="space-between">
-                                <Text size="xs" fw={700} c="green.4" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Plan Updated</Text>
-                                <Badge color="green" variant="light" leftSection={<IconActivityHeartbeat size={12}/>}>REALISTIC PACE</Badge>
+                        <Stack gap="xs">
+                            <Group justify="space-between" align="center">
+                                <Text size="xs" fw={500} c="#4cc38a">
+                                    Plan updated: realistic pace restored
+                                </Text>
+                                <Badge
+                                    size="xs"
+                                    radius="sm"
+                                    variant="outline"
+                                    style={{
+                                        borderColor: 'rgba(76, 195, 138, 0.3)',
+                                        color: '#4cc38a',
+                                        backgroundColor: 'rgba(76, 195, 138, 0.08)'
+                                    }}
+                                    leftSection={<IconCheck size={12} />}
+                                >
+                                    Target maintained
+                                </Badge>
                             </Group>
 
-                            {/* Split Day 14a */}
-                            <GlassCard p="sm" style={{ border: '1px solid rgba(52, 199, 89, 0.3)', background: 'rgba(52, 199, 89, 0.05)', position: 'relative', overflow: 'hidden' }}>
-                                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', background: '#34C759' }} />
-                                <Group justify="space-between" mb="xs">
-                                    <Title order={5} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>Today: Electromagnetism (Part 1)</Title>
+                            {/* Split Today's Load */}
+                            <Box
+                                p="sm"
+                                style={{
+                                    backgroundColor: '#19191b',
+                                    border: '1px solid rgba(76, 195, 138, 0.25)',
+                                    borderRadius: '8px',
+                                    position: 'relative',
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '3px', background: '#4cc38a' }} />
+                                <Group justify="space-between" mb={2}>
+                                    <Text size="xs" fw={500} c="#ededed">
+                                        Today: Electromagnetism (Part 1)
+                                    </Text>
+                                    <Text size="xs" c="#85858b" className="tabular-nums" style={{ fontFamily: 'var(--font-lexend), monospace' }}>
+                                        2.5h quota
+                                    </Text>
                                 </Group>
-                                <Text size="xs" c="dimmed">AI Note: We split yesterday's load. Just focus on Biot-Savart Law today. 3 hours max.</Text>
-                            </GlassCard>
-
-                            {/* Link Arrow */}
-                            <Box style={{ display: 'flex', justifyContent: 'center', opacity: 0.5, margin: '-4px 0' }}>
-                                <IconRotateClockwise size={16} color="gray" />
+                                <Text size="xs" c="#a1a1a6">
+                                    Biot-Savart Law &amp; Magnetic Flux. Study debt split across the week so today stays manageable.
+                                </Text>
                             </Box>
 
-                            {/* Split Day 14b */}
-                            <GlassCard p="sm" style={{ border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', position: 'relative', overflow: 'hidden', opacity: 0.8 }}>
-                                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', background: 'gray' }} />
-                                <Group justify="space-between" mb="xs">
-                                    <Title order={5} c="gray.4" style={{ fontFamily: 'var(--font-lexend)' }}>Tomorrow: Electromagnetism (Part 2)</Title>
+                            {/* Quiet connector */}
+                            <Box style={{ display: 'flex', justifyContent: 'center', opacity: 0.5, margin: '-2px 0' }}>
+                                <IconRotateClockwise size={14} color="#85858b" />
+                            </Box>
+
+                            {/* Tomorrow's Load */}
+                            <Box
+                                p="sm"
+                                style={{
+                                    backgroundColor: '#19191b',
+                                    border: '1px solid rgba(237, 237, 237, 0.08)',
+                                    borderRadius: '8px',
+                                    position: 'relative',
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '3px', background: 'rgba(237, 237, 237, 0.2)' }} />
+                                <Group justify="space-between" mb={2}>
+                                    <Text size="xs" fw={500} c="#a1a1a6">
+                                        Tomorrow: Electromagnetism (Part 2)
+                                    </Text>
+                                    <Text size="xs" c="#85858b" className="tabular-nums" style={{ fontFamily: 'var(--font-lexend), monospace' }}>
+                                        2.5h quota
+                                    </Text>
                                 </Group>
-                                <Text size="xs" c="dimmed">Ampere's Law & Solenoids moved here. Low-priority chapter 16 shifted to make room.</Text>
-                            </GlassCard>
+                                <Text size="xs" c="#85858b">
+                                    Ampere&apos;s Law &amp; Solenoid practice problems. +25 min redistribution applied smoothly.
+                                </Text>
+                            </Box>
                         </Stack>
                     </motion.div>
                 )}
-
             </AnimatePresence>
         </Box>
     );
 }
 
-
 export function TheGodMode() {
     return (
-        <Box py={{ base: 100, md: 160 }} style={{ position: 'relative', zIndex: 10, backgroundColor: '#050505' }}>
-            
-            {/* Ambient Lighting */}
-            <div style={{
-                position: 'absolute', top: '50%', right: '0%',
-                width: '60vw', height: '60vw', transform: 'translateY(-50%)',
-                background: 'radial-gradient(circle, rgba(52, 199, 89, 0.05) 0%, transparent 60%)',
-                filter: 'blur(80px)', zIndex: 0, pointerEvents: 'none'
-            }} />
-
-            <Container size="xl" style={{ position: 'relative', zIndex: 10 }}>
-                <Grid gutter={{ base: 60, lg: 100 }} align="center">
-                    
+        <Box
+            py={{ base: 64, md: 96 }}
+            style={{
+                position: 'relative',
+                backgroundColor: 'transparent'
+            }}
+        >
+            <Container size="xl">
+                <Grid gutter={{ base: 40, lg: 60 }} align="center">
                     {/* --- LEFT: EDITORIAL COPY --- */}
                     <Grid.Col span={{ base: 12, lg: 6 }}>
-                        <Stack gap="xl">
-                            <Badge 
-                                variant="outline" 
-                                color="gray" 
-                                size="md" 
-                                radius="xl"
-                                style={{ borderColor: 'rgba(255,255,255,0.1)', color: '#86868B', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', letterSpacing: '0.1em' }}
-                                leftSection={<IconRotateClockwise size={12} color="#34C759" />}
-                            >
-                                WHEN YOU FALL BEHIND
-                            </Badge>
+                        <Stack gap="md">
+                            <Group gap="xs">
+                                <Badge
+                                    variant="outline"
+                                    size="sm"
+                                    radius="sm"
+                                    style={{
+                                        borderColor: 'rgba(237, 237, 237, 0.08)',
+                                        color: '#a1a1a6',
+                                        backgroundColor: 'rgba(237, 237, 237, 0.02)'
+                                    }}
+                                    leftSection={<IconRotateClockwise size={12} color="#D97706" />}
+                                >
+                                    When you fall behind
+                                </Badge>
+                            </Group>
 
-                            <Title 
-                                style={{ 
-                                    fontFamily: 'var(--font-lexend)', 
-                                    fontSize: 'clamp(3rem, 5vw, 4.5rem)', 
-                                    fontWeight: 800, 
-                                    lineHeight: 1.05,
-                                    letterSpacing: '-0.04em',
-                                    color: '#F5F5F7',
-                                    textTransform: 'uppercase'
+                            <Title
+                                order={2}
+                                style={{
+                                    fontFamily: 'var(--font-inter)',
+                                    fontSize: 'clamp(1.85rem, 3.5vw, 2.5rem)',
+                                    fontWeight: 500,
+                                    lineHeight: 1.2,
+                                    color: '#ededed',
+                                    letterSpacing: '-0.02em'
                                 }}
                             >
-                                Fall behind.<br/>
-                                <span style={{ ...serifItalic, textShadow: '0 5px 20px rgba(191, 90, 242, 0.3)' }}>
-                                    We'll catch you.
-                                </span>
+                                Fall behind? KalPad rebuilds your schedule without guilt
                             </Title>
 
-                            <Text size="lg" c="gray.4" lh={1.7} style={{ fontFamily: 'var(--font-inter)' }}>
-                                Normal study planners assume every day goes perfectly. KalPad adjusts when real life gets in the way.
+                            <Text size="sm" c="#a1a1a6" lh={1.7}>
+                                Traditional timetables break down the moment an unexpected event or illness derails a single afternoon. When you fall behind, KalPad automatically recalculates your remaining workload and spreads the study debt across the remaining calendar days realistically.
                             </Text>
 
-                            {/* The Recovery Explanation */}
-                            <Box p="lg" style={{ borderLeft: '3px solid #BF5AF2', background: 'linear-gradient(90deg, rgba(191, 90, 242, 0.05) 0%, transparent 100%)' }}>
-                                <Group gap="sm" mb="xs">
-                                    <ThemeIcon variant="light" color="violet" size="sm" radius="xl"><IconActivityHeartbeat size={14}/></ThemeIcon>
-                                    <Text size="sm" fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>The Reality Check</Text>
+                            {/* Coded recovery callout card */}
+                            <Box
+                                p="md"
+                                style={{
+                                    backgroundColor: '#19191b',
+                                    border: '1px solid rgba(237, 237, 237, 0.08)',
+                                    boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.04)',
+                                    borderRadius: '10px'
+                                }}
+                            >
+                                <Group gap="xs" mb="xs">
+                                    <IconActivityHeartbeat size={16} color="#D97706" />
+                                    <Text size="xs" fw={500} c="#ededed">
+                                        Pace Recovery Engine
+                                    </Text>
                                 </Group>
-                                <Text size="sm" c="dimmed" lh={1.6}>
-                                    When you hit "Regenerate", KalPad checks what you missed, how much time is left, and how fast you can actually study. Then it rebuilds a realistic day-wise plan.
-                                    <br/><br/>
-                                    <span style={{ color: 'white', fontWeight: 600 }}>No guilt trips. Just a clearer next step.</span>
+                                <Text size="xs" c="#a1a1a6" lh={1.6}>
+                                    Missed 3 hours yesterday → redistributed +25 min/day over next 7 days → exam target maintained.
+                                </Text>
+                                <Text size="xs" c="#85858b" mt={4}>
+                                    No cramming impossible 14-hour days. Just an updated, achievable plan that keeps your target intact without guilt.
                                 </Text>
                             </Box>
                         </Stack>
@@ -233,19 +328,19 @@ export function TheGodMode() {
 
                     {/* --- RIGHT: THE CINEMATIC MOCKUP --- */}
                     <Grid.Col span={{ base: 12, lg: 6 }}>
-                        <GlassCard 
-                            p={{ base: 'xl', md: 50 }} 
-                            style={{ 
+                        <Box
+                            p={{ base: 'md', md: 'xl' }}
+                            style={{
                                 height: '100%',
-                                background: 'linear-gradient(145deg, rgba(28,28,30,0.8) 0%, rgba(15,15,18,0.9) 100%)',
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                boxShadow: '0 30px 80px -20px rgba(0,0,0,0.8)'
+                                backgroundColor: '#19191b',
+                                border: '1px solid rgba(237, 237, 237, 0.08)',
+                                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.04)',
+                                borderRadius: '12px'
                             }}
                         >
                             <RecoveryEngineMockup />
-                        </GlassCard>
+                        </Box>
                     </Grid.Col>
-
                 </Grid>
             </Container>
         </Box>

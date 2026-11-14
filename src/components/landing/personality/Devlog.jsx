@@ -25,7 +25,7 @@ const LOGS = [
         description: 'Multi-modal RAG integrated. The system now "sees" your diagrams and "reads" your chaotic handwriting.',
         align: 'right',
         icon: IconGitCommit,
-        color: '#bf5af2', // Purple
+        color: '#D97706', // Amber
         status: 'DEPLOYED'
     },
     {
@@ -59,7 +59,7 @@ function LogNode({ log, index }) {
                     style={{
                         width: '16px', height: '16px', borderRadius: '50%',
                         backgroundColor: '#000', border: `2px solid ${log.color}`,
-                        boxShadow: `0 0 15px ${log.color}`,
+                        boxShadow: 'none',
                         willChange: 'transform' // FIX: GPU Hint
                     }}
                 />
@@ -89,7 +89,7 @@ function LogNode({ log, index }) {
                     
                     <Stack gap="xs">
                         <Group justify="space-between">
-                            <Text size="xs" ff="monospace" c={log.color} style={{ letterSpacing: '0.1em' }}>
+                            <Text size="xs" ff="monospace" c={log.color}>
                                 [{log.version}]
                             </Text>
                             {log.status === 'COMPILING...' && (
@@ -114,15 +114,15 @@ function LogNode({ log, index }) {
 
 export function Devlog() {
     return (
-        <Box py={{ base: 100, md: 160 }} style={{ position: 'relative', zIndex: 10 }}>
+        <Box py={{ base: 64, md: 96 }} style={{ position: 'relative', zIndex: 10 }}>
             <Container size="lg">
                 
                 {/* --- HEADER --- */}
                 <Stack align="center" ta="center" gap="md" mb={100}>
                     <Group gap="xs" style={{ opacity: 0.7 }}>
-                        <IconBroadcast size={18} className="text-purple-400" />
-                        <Text size="xs" ff="monospace" c="dimmed" tt="uppercase" style={{ letterSpacing: '0.2em' }}>
-                            LIVE TRANSMISSION
+                        <IconBroadcast size={18} className="text-amber-400" />
+                        <Text size="xs" ff="monospace" c="dimmed">
+                            Live transmission
                         </Text>
                     </Group>
                     <Title 

@@ -1,60 +1,54 @@
 // src/components/MetricsDeck.jsx
 "use client";
 
-import { Text, Group, Stack, Box, SimpleGrid, ThemeIcon, Divider } from '@mantine/core';
+import { Text, Group, Stack, Box, SimpleGrid } from '@mantine/core';
 import { GlassCard } from './GlassCard';
 import { Heatmap } from './Heatmap';
-import { IconFlame, IconTrendingUp, IconTargetArrow, IconCalendarStats } from '@tabler/icons-react';
+import { IconFlame, IconChecklist, IconFolders } from '@tabler/icons-react';
 
 // --- SUB-COMPONENT: Single Metric ---
-function StatItem({ label, value, icon: Icon, color }) {
+function StatItem({ label, value, unit, icon: Icon, isHighlight = false }) {
     return (
         <Box 
             p="md" 
             style={{ 
-                backgroundColor: 'rgba(255,255,255,0.03)', 
-                borderRadius: '16px',
-                border: '1px solid rgba(255,255,255,0.05)',
-                transition: 'transform 0.2s ease',
+                backgroundColor: isHighlight ? 'var(--accent-amber-subtle, rgba(217, 119, 6, 0.12))' : 'var(--apple-gray-2, #232325)', 
+                borderRadius: 8,
+                border: isHighlight 
+                    ? '1px solid rgba(217, 119, 6, 0.35)' 
+                    : '1px solid var(--glass-border, rgba(237, 237, 237, 0.08))',
                 cursor: 'default'
             }}
         >
-            <Group justify="space-between" align="flex-start" mb="xs">
-                <ThemeIcon 
-                    variant="light" 
-                    color={color} 
-                    radius="lg" 
-                    size="md"
-                    style={{ backgroundColor: `color-mix(in srgb, ${color}, transparent 85%)` }}
-                >
-                    <Icon size={18} stroke={2} />
-                </ThemeIcon>
+            <Group justify="space-between" align="center" mb={6}>
+                <Text size="xs" c="dimmed" style={{ letterSpacing: '0.01em' }}>
+                    {label}
+                </Text>
+                <Icon 
+                    size={16} 
+                    stroke={1.5} 
+                    color={isHighlight ? 'var(--accent-amber, #D97706)' : 'var(--apple-text-muted, #85858b)'} 
+                />
             </Group>
             
-            <Stack gap={0}>
+            <Group align="baseline" gap={4}>
                 <Text 
-                    size="2rem" 
-                    fw={700} 
+                    size="1.5rem" 
+                    fw={500} 
                     style={{ 
-                        lineHeight: 1, 
-                        letterSpacing: '-0.03em',
-                        fontFamily: 'var(--font-lexend)',
-                        color: 'var(--apple-text-primary)'
+                        lineHeight: 1.1, 
+                        fontVariantNumeric: 'tabular-nums',
+                        color: isHighlight ? 'var(--accent-amber, #D97706)' : 'var(--apple-text-primary, #ededed)'
                     }}
                 >
                     {value}
                 </Text>
-                <Text 
-                    size="xs" 
-                    fw={600} 
-                    tt="uppercase" 
-                    c="dimmed" 
-                    mt={6}
-                    style={{ letterSpacing: '0.05em' }}
-                >
-                    {label}
-                </Text>
-            </Stack>
+                {unit && (
+                    <Text size="xs" c="dimmed">
+                        {unit}
+                    </Text>
+                )}
+            </Group>
         </Box>
     );
 }
@@ -62,82 +56,67 @@ function StatItem({ label, value, icon: Icon, color }) {
 // --- MAIN COMPONENT ---
 export function MetricsDeck({ stats }) {
     return (
-        <GlassCard p={0} style={{ overflow: 'hidden' }}>
-            {/* The layout splits into two distinct zones */}
-            <SimpleGrid  spacing={0}>
-                
-                {/* ZONE 1: ACTIVITY (The Heatmap) */}
-                <Box 
-                    p="xl" 
-                    style={{ 
-                        borderRight: '1px solid rgba(255,255,255,0.05)',
-                        display: 'flex',
-                        flexDirection: 'column'
-                    }}
-                >
-                    <Group mb="lg" align="center">
-                        <ThemeIcon variant="transparent" color="gray">
-                            <IconCalendarStats size={20} />
-                        </ThemeIcon>
-                        <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>
-                            Consistency
-                        </Text>
-                    </Group>
-                    
-                    <Box style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {/* We wrap the Heatmap to handle overflow on very small screens */}
-                        <Box style={{ overflowX: 'auto', width: '100%', paddingBottom: '10px' }}>
-                            <Heatmap data={stats.completions} />
-                        </Box>
-                    </Box>
+        <GlassCard p="xl" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* ZONE 1: OVERVIEW METRICS */}
+            <Box>
+                <Group justify="space-between" align="center" mb="md">
+                    <Text size="sm" fw={500} c="var(--apple-text-primary, #ededed)">
+                        Overview
+                    </Text>
+                    <Text ff="monospace" size="11px" c="dimmed">
+                        [METRICS]
+                    </Text>
+                </Group>
+
+                <SimpleGrid cols={{ base: 1, sm: 3, lg: 1 }} spacing="sm">
+                    <StatItem 
+                        label="Study streak" 
+                        value={stats.currentStreak} 
+                        unit="days"
+                        icon={IconFlame} 
+                        isHighlight={stats.currentStreak > 0}
+                    />
+                    <StatItem 
+                        label="Weekly topics" 
+                        value={stats.weeklyCompleted} 
+                        unit="completed"
+                        icon={IconChecklist} 
+                    />
+                    <StatItem 
+                        label="Active plans" 
+                        value={stats.plansCreated} 
+                        unit="syllabi"
+                        icon={IconFolders} 
+                    />
+                </SimpleGrid>
+            </Box>
+
+            {/* ZONE 2: ACTIVITY HEATMAP */}
+            <Box style={{ borderTop: '1px solid var(--glass-border, rgba(237, 237, 237, 0.08))', paddingTop: 20 }}>
+                <Group justify="space-between" align="center" mb="sm">
+                    <Text size="sm" fw={500} c="var(--apple-text-primary, #ededed)">
+                        Study consistency
+                    </Text>
+                    <Text ff="monospace" size="11px" c="dimmed">
+                        11 weeks
+                    </Text>
+                </Group>
+
+                <Box style={{ overflowX: 'auto', paddingBottom: 6 }}>
+                    <Heatmap data={stats.completions} />
                 </Box>
 
-                {/* ZONE 2: PERFORMANCE (The Stats Grid) */}
-                <Box p="xl" style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}>
-                    <Group mb="lg" align="center">
-                        <ThemeIcon variant="transparent" color="gray">
-                            <IconTrendingUp size={20} />
-                        </ThemeIcon>
-                        <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>
-                            Performance
-                        </Text>
-                    </Group>
-
-                    <SimpleGrid cols={2} spacing="md">
-                        <StatItem 
-                            label="Day Streak" 
-                            value={stats.currentStreak} 
-                            icon={IconFlame} 
-                            color="#FF9500" // Apple Orange
-                        />
-                        <StatItem 
-                            label="Weekly XP" 
-                            value={stats.weeklyCompleted} 
-                            icon={IconTrendingUp} 
-                            color="#34C759" // Apple Green
-                        />
-                        <StatItem 
-                            label="Active Plans" 
-                            value={stats.plansCreated} 
-                            icon={IconTargetArrow} 
-                            color="#BF5AF2" // Apple Purple
-                        />
-                        {/* Placeholder or Future Stat */}
-                        <Box 
-                            style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                borderRadius: '16px',
-                                border: '1px dashed rgba(255,255,255,0.1)'
-                            }}
-                        >
-                            <Text size="xs" c="dimmed" ta="center">More Coming Soon</Text>
-                        </Box>
-                    </SimpleGrid>
-                </Box>
-
-            </SimpleGrid>
+                {/* Quiet Legend */}
+                <Group justify="flex-end" align="center" gap={4} mt="xs">
+                    <Text size="10px" c="dimmed">Less</Text>
+                    <Box w={8} h={8} bg="var(--apple-gray-2, #232325)" style={{ borderRadius: 1 }} />
+                    <Box w={8} h={8} bg="rgba(217, 119, 6, 0.25)" style={{ borderRadius: 1 }} />
+                    <Box w={8} h={8} bg="rgba(217, 119, 6, 0.50)" style={{ borderRadius: 1 }} />
+                    <Box w={8} h={8} bg="rgba(217, 119, 6, 0.75)" style={{ borderRadius: 1 }} />
+                    <Box w={8} h={8} bg="var(--accent-amber, #D97706)" style={{ borderRadius: 1 }} />
+                    <Text size="10px" c="dimmed">More</Text>
+                </Group>
+            </Box>
         </GlassCard>
     );
 }

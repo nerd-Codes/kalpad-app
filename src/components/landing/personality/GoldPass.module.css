@@ -8,13 +8,13 @@
     color: #4a2c0f;
     background: linear-gradient(145deg, #ffd700, #f0c541, #ffec80, #f0c541, #ffd700);
     border: 2px solid #ffde7a;
-    border-radius: 50px;
+    border-radius: 8px;
     cursor: pointer;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 0 20px #ffd700, 0 0 30px #f0c541, inset 0 0 10px rgba(255, 255, 255, 0.5);
+    box-shadow: none;
     z-index: 50;
-    transition: box-shadow 0.3s ease-in-out;
+    transition: opacity 0.3s ease-in-out;
 
     /* --- THIS IS THE DEFINITIVE FIX --- */
     /* This command forbids the text and icon from ever wrapping to a new line. */
@@ -22,7 +22,7 @@
 }
 
 .goldButton:hover {
-    box-shadow: 0 0 30px #ffd700, 0 0 45px #f0c541, inset 0 0 15px rgba(255, 255, 255, 0.7);
+    box-shadow: none;
 }
 
 .goldButton::before {
@@ -67,12 +67,12 @@
         font-size: 0.75rem;
         
         /* Reduce the intensity of the glow to be less overwhelming */
-        box-shadow: 0 0 10px #ffd700, 0 0 15px #f0c541, inset 0 0 5px rgba(255, 255, 255, 0.5);
+        box-shadow: none;
     }
 
     .goldButton:hover {
         /* Also tone down the hover effect on mobile */
-        box-shadow: 0 0 15px #ffd700, 0 0 25px #f0c541, inset 0 0 8px rgba(255, 255, 255, 0.7);
+        box-shadow: none;
     }
 
     .iconWrapper svg {

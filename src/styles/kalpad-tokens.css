@@ -1,0 +1,245 @@
+/* src/styles/kalpad-tokens.css */
+/* KalPad Design System — The Quiet Study Desk (1:1 parity with Android DESIGN.md) */
+
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/SpaceMono-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/SpaceMono-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/PlusJakartaSans-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/PlusJakartaSans-Medium.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/PlusJakartaSans-SemiBold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/PlusJakartaSans-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/PlusJakartaSans-ExtraBold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 800 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Caveat";
+  src: url("/fonts/Caveat-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+}
+
+:root,
+[data-kalpad-theme="light"],
+[data-kalpad-landing="true"] {
+  --font-kp-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-kp-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-kp-handwriting: "Caveat", cursive, sans-serif;
+
+  /* Warm Light Palette (First-run default) */
+  --kp-canvas: #F7F3E8;
+  --kp-surface: #FFFDF7;
+  --kp-raised: #EDE7D7;
+  --kp-ink: #111317;
+  --kp-secondary: #5A5E6D;
+  --kp-muted: #5A5E6D;
+  --kp-border: rgba(17, 19, 23, 0.12);
+  --kp-border-strong: rgba(17, 19, 23, 0.20);
+
+  --kp-primary: #242329;
+  --kp-on-primary: #F7F3E8;
+
+  /* Functional Pastels */
+  --kp-mint: #EAF5EE;
+  --kp-butter: #FFF7DC;
+  --kp-periwinkle: #EDE9FE;
+  --kp-apricot: #FFEDD5;
+  --kp-sky: #E0F2FE;
+
+  /* Accents & Semantic Inks */
+  --kp-orange: #FF5E00;
+  --kp-amber: #FFA028;
+  --kp-accent-ink: #873600;
+  --kp-success-ink: #176B45;
+  --kp-warning-ink: #704000;
+  --kp-error-ink: #B42318;
+  --kp-accent-subtle: rgba(255, 94, 0, 0.12);
+  --kp-success-subtle: rgba(16, 185, 129, 0.12);
+  --kp-error-subtle: rgba(239, 68, 68, 0.12);
+  --kp-neon-mint: #10B981;
+
+  /* Floating Nav & Rail (Charcoal in light mode) */
+  --kp-nav-surface: #08090B;
+  --kp-nav-unselected: rgba(247, 243, 232, 0.78);
+  --kp-nav-border: rgba(247, 243, 232, 0.18);
+  --kp-nav-selected-bg: #FFF7DC;
+  --kp-nav-selected-ink: #111317;
+  --kp-active-dot: #FFF7DC;
+
+  /* Shape & Motion */
+  --kp-radius-control: 12px;
+  --kp-radius-button: 16px;
+  --kp-radius-card: 20px;
+  --kp-radius-pill: 999px;
+  --kp-ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --kp-ease-exit: cubic-bezier(0.3, 0, 1, 1);
+  --kp-ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-kalpad-theme="dark"] {
+  /* Deep Forest Dark Palette (Designed palette, not an inversion) */
+  --kp-canvas: #121713;
+  --kp-surface: #1A211C;
+  --kp-raised: #252D27;
+  --kp-ink: #F4F0E6;
+  --kp-secondary: #BEC8BE;
+  --kp-muted: #A5B0A7;
+  --kp-border: #354138;
+  --kp-border-strong: #4B5A4F;
+
+  --kp-primary: #FFB764;
+  --kp-on-primary: #241A0D;
+
+  /* Tinted Dark Pastels */
+  --kp-mint: #1D382A;
+  --kp-butter: #3E301C;
+  --kp-periwinkle: #2B293D;
+  --kp-apricot: #3B2920;
+  --kp-sky: #20343A;
+
+  /* Semantic Inks on Dark */
+  --kp-orange: #FF5E00;
+  --kp-amber: #FFA028;
+  --kp-accent-ink: #FFBF76;
+  --kp-success-ink: #8DDBA8;
+  --kp-warning-ink: #FFD27B;
+  --kp-error-ink: #FF968D;
+  --kp-accent-subtle: rgba(255, 155, 67, 0.20);
+  --kp-success-subtle: rgba(32, 168, 102, 0.20);
+  --kp-error-subtle: rgba(223, 95, 85, 0.20);
+  --kp-neon-mint: #10B981;
+
+  /* Floating Nav & Rail (White surface in dark mode per DESIGN.md) */
+  --kp-nav-surface: #FFFFFF;
+  --kp-nav-unselected: #29271F;
+  --kp-nav-border: rgba(0, 0, 0, 0.15);
+  --kp-nav-selected-bg: #3E301C;
+  --kp-nav-selected-ink: #F4F0E6;
+  --kp-active-dot: #241A0D;
+}
+
+/* Focused light surface for Calendar / DatePicker in BOTH light and dark themes */
+.kp-date-picker-light {
+  --kp-canvas: #F7F3E8;
+  --kp-surface: #FFFDF7;
+  --kp-raised: #EDE7D7;
+  --kp-ink: #111317;
+  --kp-secondary: #5A5E6D;
+  --kp-muted: #5A5E6D;
+  --kp-border: rgba(17, 19, 23, 0.12);
+  --kp-border-strong: rgba(17, 19, 23, 0.20);
+  --kp-butter: #FFF7DC;
+  --kp-accent-ink: #873600;
+  --kp-orange: #FF5E00;
+  background-color: #F7F3E8;
+  color: #111317;
+}
+
+.kp-app-shell {
+  min-height: 100vh;
+  background-color: var(--kp-canvas);
+  color: var(--kp-ink);
+  font-family: var(--font-kp-sans);
+  transition: background-color 220ms var(--kp-ease-enter), color 220ms var(--kp-ease-enter);
+}
+
+.kp-app-shell *,
+.kp-app-shell *::before,
+.kp-app-shell *::after {
+  box-sizing: border-box;
+}
+
+/* Tactile button press & hover microanimation */
+.kp-tactile {
+  transition:
+    transform 190ms var(--kp-ease-spring),
+    background-color 160ms var(--kp-ease-enter),
+    border-color 160ms var(--kp-ease-enter),
+    box-shadow 180ms var(--kp-ease-enter),
+    opacity 160ms var(--kp-ease-enter);
+}
+
+.kp-tactile:hover:not(:disabled) {
+  transform: translateY(-1.5px);
+}
+
+.kp-tactile:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kp-app-shell,
+  .kp-tactile,
+  .kp-app-shell * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* Strict landing page isolation from dark mode */
+html[data-kalpad-theme="dark"] [data-kalpad-landing="true"],
+[data-kalpad-landing="true"] {
+  --kp-canvas: #F7F3E8 !important;
+  --kp-surface: #FFFDF7 !important;
+  --kp-raised: #EDE7D7 !important;
+  --kp-ink: #111317 !important;
+  --kp-secondary: #5A5E6D !important;
+  --kp-muted: #5A5E6D !important;
+  --kp-border: rgba(17, 19, 23, 0.12) !important;
+  --kp-border-strong: rgba(17, 19, 23, 0.20) !important;
+  --kp-primary: #242329 !important;
+  --kp-on-primary: #F7F3E8 !important;
+  --kp-butter: #FFF7DC !important;
+  --kp-mint: #EAF5EE !important;
+  --kp-sky: #E0F2FE !important;
+  --kp-apricot: #FFEDD5 !important;
+  --kp-periwinkle: #EDE9FE !important;
+  background-color: #F7F3E8 !important;
+  color: #111317 !important;
+}

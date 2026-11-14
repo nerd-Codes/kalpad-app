@@ -1,113 +1,151 @@
-// /src/app/print-cram-sheet/[cramSheetId]/page.js
+// src/app/print-cram-sheet/[cramSheetId]/page.js
 "use client";
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import supabase from '@/lib/supabaseClient';
+import { Box, Button, Group, Loader, Alert, Title, Text } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
+import { IconPrinter } from '@tabler/icons-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { Container, Button, Group, Title, Loader, Alert } from '@mantine/core';
-import { IconPrinter } from '@tabler/icons-react';
 
-// Import the definitive print stylesheet
-import './print.css'; // Adjust path if necessary based on your folder structure
+import supabase from '@/lib/supabaseClient';
+import './print.css';
 
 export default function PrintCramSheetPage() {
-    const params = useParams();
-    // --- FIX 1: Use the correct parameter name ---
-    const { cramSheetId } = params;
-    const [sheet, setSheet] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+  const params = useParams();
+  const { cramSheetId } = params;
+  const [sheet, setSheet] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-    useEffect(() => {
-        if (!cramSheetId) return;
-        
-        const fetchCramSheet = async () => {
-            try {
-               // --- FIX 2: Query the correct table with the correct fields ---
-               const { data, error: fetchError } = await supabase
-                .from('generated_cram_sheets')
-                .select('markdown_content, plan:study_plans ( exam_name )')
-                .eq('id', cramSheetId)
-                .single();
-                            
-                if (fetchError) throw fetchError;
-                if (!data) throw new Error("The requested Cram Sheet could not be found.");
-                setSheet(data);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
-        fetchCramSheet();
-    // --- FIX 3: Use the correct dependency ---
-    }, [cramSheetId]);
+  useEffect(() => {
+    if (!cramSheetId) return;
 
-    useEffect(() => {
-        if (!loading && sheet) {
-            if (window.opener) {
-                window.opener.postMessage('KALPAD_PRINT_READY', '*');
-            }
-        }
-    }, [loading, sheet]);
+    const fetchCramSheet = async () => {
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('generated_cram_sheets')
+          .select('markdown_content, plan:study_plans ( exam_name )')
+          .eq('id', cramSheetId)
+          .single();
 
-    const handlePrint = () => { window.print(); };
-
-    if (loading) return <Group justify="center" p="xl"><Loader /></Group>;
-    if (error) return <Container py="xl"><Alert color="red" title="Error">{error}</Alert></Container>;
-    if (!sheet) return <Container py="xl"><Alert color="yellow">Cram Sheet not found.</Alert></Container>;
-
-    const customRenderers = {
-        img: ({ node, ...props }) => {
-            const isSvg = props.src && props.src.endsWith('.svg');
-            const finalStyle = {
-                maxWidth: '100%',
-                maxHeight: '1500px',
-                borderRadius: '8px',
-                backgroundColor: '#FFFFFF',
-                padding: isSvg ? '0.5rem' : '0',
-            };
-            return (
-                <span style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}>
-                    <img {...props} style={finalStyle} alt={props.alt || 'illustration'} />
-                </span>
-            );
-        },
+        if (fetchError) throw fetchError;
+        if (!data) throw new Error('The requested Cram Sheet could not be found.');
+        setSheet(data);
+      } catch (err) {
+        setError(err.message || 'Could not load cram sheet for printing.');
+      } finally {
+        setLoading(false);
+      }
     };
-   // --- FIX 4: Use the correct data fields ---
-    const brandingFooter = "\n\n---\n\n*Crafted with the KalPad AI Study Mentor ✨*";
-    const contentToRender = sheet.markdown_content + brandingFooter;
 
+    fetchCramSheet();
+  }, [cramSheetId]);
+
+  useEffect(() => {
+    if (!loading && sheet && !isMobile) {
+      if (window.opener) {
+        try {
+          window.opener.postMessage('KALPAD_PRINT_READY', '*');
+        } catch (_) {}
+      } else {
+        const timer = setTimeout(() => window.print(), 400);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [loading, sheet, isMobile]);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  if (loading) {
     return (
-        <>
-            <Container size="md" py="xl">
-                <Group justify="flex-end" className="no-print" mb="xl">
-                    <Button leftSection={<IconPrinter size={16} />} onClick={handlePrint}>
-                        Print or Save as PDF
-                    </Button>
-                </Group>
-                
-                <div className="printable-content">
-                    {/* --- FIX 5: Use the correct data fields for titles --- */}
-                    <Title order={1}>Cram Sheet</Title>
-                    <Title order={2} fw={500} mb="xl">{sheet.plan.exam_name}</Title>
-                    
-                    <ReactMarkdown 
-                        remarkPlugins={[remarkGfm, remarkMath]}
-                        rehypePlugins={[rehypeRaw, rehypeKatex]}
-                        components={customRenderers}
-                    >
-                        {contentToRender}
-                    </ReactMarkdown>
-                </div>
-            </Container>
-        </>
+      <Group justify="center" align="center" style={{ minHeight: '60vh' }}>
+        <Loader color="#111827" size="md" />
+      </Group>
     );
+  }
+
+  if (error) {
+    return (
+      <Box p="xl" style={{ maxWidth: 600, margin: '40px auto' }}>
+        <Alert color="red" title="Could not prepare cram sheet">{error}</Alert>
+      </Box>
+    );
+  }
+
+  if (!sheet) {
+    return (
+      <Box p="xl" style={{ maxWidth: 600, margin: '40px auto' }}>
+        <Alert color="yellow" title="Cram Sheet not found">Cram sheet record could not be loaded.</Alert>
+      </Box>
+    );
+  }
+
+  const examName = sheet.plan?.exam_name || 'Study Course';
+
+  const customRenderers = {
+    img: ({ node, ...props }) => {
+      const isSvg = props.src && props.src.endsWith('.svg');
+      const finalStyle = {
+        maxWidth: '100%',
+        maxHeight: '1000px',
+        backgroundColor: '#FFFFFF',
+        padding: isSvg ? '0.5rem' : '0',
+        margin: '1.2rem auto',
+        display: 'block',
+      };
+      return <img {...props} style={finalStyle} alt={props.alt || 'illustration'} />;
+    },
+  };
+
+  return (
+    <Box>
+      <div className="print-toolbar no-print">
+        <Group justify="space-between" align="center" style={{ width: '100%', maxWidth: '210mm' }}>
+          <Text size="sm" fw={600} c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>
+            Cram Sheet · {examName}
+          </Text>
+          <Button
+            leftSection={<IconPrinter size={16} />}
+            onClick={handlePrint}
+            color="dark"
+            radius="md"
+            size="sm"
+            style={{ backgroundColor: '#111827', color: '#ffffff' }}
+          >
+            {isMobile ? 'Print / Save PDF' : 'Print Cram Sheet'}
+          </Button>
+        </Group>
+      </div>
+
+      <div className="paper-sheet">
+        <div className="printable-content">
+          <Title order={2} className="print-title">Cram Sheet</Title>
+          <Title order={1} className="print-subtitle">{examName}</Title>
+
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeRaw, rehypeKatex]}
+            components={customRenderers}
+          >
+            {sheet.markdown_content}
+          </ReactMarkdown>
+
+          <hr className="print-section-divider" />
+          <Text component="p" className="print-footer">
+            KalPad High-Yield Cram Summary · Designed for rapid pre-exam recall
+          </Text>
+        </div>
+      </div>
+    </Box>
+  );
 }

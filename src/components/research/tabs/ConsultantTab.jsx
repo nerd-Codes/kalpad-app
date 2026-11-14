@@ -9,6 +9,7 @@ import { IconSend, IconMessageChatbot } from '@tabler/icons-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import linkifyRegex from 'remark-linkify-regex';
+import { askResearchConsultantBYOK } from '@/lib/byok/pipelines/researchAssistant';
 import markdownStyles from '@/styles/MarkdownStyles.module.css';
 
 // --- VISUAL CONSTANTS ---
@@ -82,19 +83,20 @@ export default function ConsultantTab({ projectId, onCiteClick }) {
         setIsThinking(true);
 
         try {
-            const response = await fetch('/api/research/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: input, projectId })
+            const data = await askResearchConsultantBYOK({
+                query: userMessage.content,
+                projectId,
             });
 
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error);
-            
             setMessages(prev => [...prev, { role: 'ai', content: data.response }]);
-            
+
         } catch (err) {
-            setMessages(prev => [...prev, { role: 'error', content: err.message }]);
+            if (err?.code === 'BYOK_NOT_CONNECTED' && typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('open-byok-chat'));
+                setMessages(prev => [...prev, { role: 'error', content: 'Connect your ChatGPT account in the opened panel to ask the Research Consultant.' }]);
+            } else {
+                setMessages(prev => [...prev, { role: 'error', content: err?.message || 'Unable to reach Research Consultant.' }]);
+            }
         } finally {
             setIsThinking(false);
         }

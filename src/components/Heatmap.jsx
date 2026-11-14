@@ -4,28 +4,28 @@
 import { Group, Tooltip, Box } from '@mantine/core';
 import { eachDayOfInterval, subDays, format } from 'date-fns';
 
-export function Heatmap({ data }) {
+export function Heatmap({ data = {} }) {
   const today = new Date();
-  // --- FIX: Display 77 days (11 columns) instead of 90 ---
+  // Display 77 days (11 columns x 7 days)
   const days = eachDayOfInterval({ start: subDays(today, 76), end: today });
 
   const getColor = (count) => {
-    if (count === 0) return 'var(--mantine-color-dark-6)';
-    if (count <= 2) return 'var(--mantine-color-brandGreen-8)';
-    if (count <= 4) return 'var(--mantine-color-brandGreen-6)';
-    if (count <= 6) return 'var(--mantine-color-brandGreen-4)';
-    return 'var(--mantine-color-brandGreen-2)';
+    if (count === 0) return 'var(--apple-gray-2, #232325)';
+    if (count <= 2) return 'rgba(217, 119, 6, 0.25)';
+    if (count <= 4) return 'rgba(217, 119, 6, 0.50)';
+    if (count <= 6) return 'rgba(217, 119, 6, 0.75)';
+    return 'var(--accent-amber, #D97706)';
   };
 
   return (
-    // --- FIX: The title is removed, and the root is just the Group ---
     <Group 
         gap={3} 
         style={{ 
             display: 'grid', 
             gridTemplateRows: 'repeat(7, 1fr)', 
             gridAutoFlow: 'column',
-            justifyContent: 'center' // Ensures it looks centered if space allows
+            justifyContent: 'flex-start',
+            width: 'fit-content'
         }}
     >
       {days.map((day, index) => {
@@ -35,15 +35,28 @@ export function Heatmap({ data }) {
         return (
           <Tooltip 
             key={index} 
-            label={count > 0 ? `${count} topics on ${format(day, 'MMM d')}` : `No activity`} 
+            label={count > 0 ? `${count} ${count === 1 ? 'topic' : 'topics'} on ${format(day, 'MMM d')}` : `No topics on ${format(day, 'MMM d')}`} 
             withArrow
             position="top"
+            styles={{
+              tooltip: {
+                backgroundColor: 'var(--apple-gray-2, #232325)',
+                color: 'var(--apple-text-primary, #ededed)',
+                border: '1px solid var(--glass-border, rgba(237, 237, 237, 0.08))',
+                fontSize: 11,
+                borderRadius: 6
+              }
+            }}
           >
             <Box
-              w={14}
-              h={14}
+              w={13}
+              h={13}
               bg={getColor(count)}
-              style={{ borderRadius: '2px' }}
+              style={{ 
+                borderRadius: 2,
+                transition: 'background-color 150ms ease',
+                outline: count > 0 ? '1px solid rgba(217, 119, 6, 0.2)' : 'none'
+              }}
             />
           </Tooltip>
         );

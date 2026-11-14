@@ -1,0 +1,46 @@
+/* src/components/settings/Settings.module.css */
+
+.settingsPage {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settingsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.colStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (min-width: 960px) {
+  .settingsGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+    gap: 22px;
+    align-items: start;
+  }
+}
+
+.interactiveRow {
+  transition:
+    transform 180ms var(--kp-ease-spring),
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.interactiveRow:hover {
+  transform: translateY(-1px);
+  border-color: var(--kp-border-strong);
+}
+
+.interactiveRow:active {
+  transform: scale(0.985);
+}

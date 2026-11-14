@@ -41,14 +41,19 @@ export default async function RootLayout({ children }) {
   const pathname = heads.get('next-url') || '';
   
   // Determine the variant and color scheme based on the URL path.
-  const isPrintPath = pathname.startsWith('/print');
+  const isPrintPath = pathname.startsWith('/print') || pathname.startsWith('/print-cram-sheet');
   const layoutVariant = isPrintPath ? 'print' : 'app';
   const colorScheme = isPrintPath ? 'light' : 'dark';
 
   return (
-    <html lang="en" className={`${inter.variable} ${lexend.variable}`}>
+    <html lang="en" data-kalpad-theme="light" suppressHydrationWarning className={`${inter.variable} ${lexend.variable}`}>
       <head>
         <ColorSchemeScript defaultColorScheme={colorScheme} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{if(window.location.pathname==='/'){document.documentElement.setAttribute('data-kalpad-theme','light');return;}var m=localStorage.getItem('kalpad_theme_mode');var d=m==='dark'||(m==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-kalpad-theme',d?'dark':'light');}catch(e){}})();`,
+          }}
+        />
          {/* Google tag (gtag.js) */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=AW-17875257691"

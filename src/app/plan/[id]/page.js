@@ -1,629 +1,1187 @@
 // src/app/plan/[id]/page.js
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import supabase from '@/lib/supabaseClient';
-import AppLayout from '@/components/AppLayout';
-import { GlassCard } from '@/components/GlassCard';
-import { Interactive } from '@/components/Interactive';
-import { ShimmerButton } from '@/components/landing/ShimmerButton';
-import { notifications } from '@mantine/notifications';
-import { isSameDay, parseISO, format, isToday } from 'date-fns';
-import { 
-    IconFlame, IconShare3, IconVideo, IconRefresh, IconPlayerPlay, IconChevronRight, IconChevronLeft, IconBrain, IconTrash, IconDownload
+import {
+  IconArchive,
+  IconBrain,
+  IconChartLine,
+  IconCheck,
+  IconChevronLeft,
+  IconCopy,
+  IconDownload,
+  IconFlame,
+  IconRefresh,
+  IconShare3,
+  IconX,
 } from '@tabler/icons-react';
-import { 
-    Container, Title, Text, Loader, Alert, Group, Button, Box, 
-    Stack, Modal, Checkbox, TextInput, ScrollArea, Paper, Grid, CopyButton, ThemeIcon
-} from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import { useLoading } from '@/context/LoadingContext';
-import { motion, AnimatePresence } from 'framer-motion';
-
-// --- SUB-COMPONENTS ---
+import { notifications } from '@mantine/notifications';
+import { differenceInCalendarDays, format, isToday, parseISO } from 'date-fns';
+import { AnimatePresence, motion } from 'framer-motion';
+import supabase from '@/lib/supabaseClient';
+import { getDayNoteSections } from '@/lib/dayNotes';
+import { wittyFacts as cramSheetFacts } from '@/lib/newplanFacts';
+import KalPadShell from '@/components/kalpad/KalPadShell';
+import { KalPadProgress } from '@/components/kalpad/KalPadProgress';
 import { TimelineDayCard } from '@/components/TimelineDayCard';
 import { RegeneratePlanModal } from '@/components/RegeneratePlanModal';
-import { wittyFacts as cramSheetFacts } from '@/lib/newplanFacts';
-
 import { QuizOrchestratorModal } from '@/components/QuizOrchestratorModal';
-import { getDayNoteSections } from '@/lib/dayNotes';
+import { forgeCramSheetBYOK } from '@/lib/byok/pipelines/cramSheetForger';
+import classes from '@/components/plans/PlanDetail.module.css';
 
-import Link from 'next/link';
+function formatSafeDate(dateStr, pattern = 'd MMM yyyy') {
+  try {
+    return format(parseISO(dateStr), pattern);
+  } catch {
+    return dateStr || '';
+  }
+}
 
-// --- VISUAL CONSTANTS ---
-const MOBILE_DAY_WIDTH = 70;
-const DESKTOP_DAY_WIDTH = 50;
+function DayPill({ topic, selected, compact, onClick }) {
+  let isCurrent = false;
+  try {
+    isCurrent = Boolean(topic.date && isToday(parseISO(topic.date)));
+  } catch {
+    isCurrent = false;
+  }
 
-// --- SHARED MODAL STYLES ---
-const glassModalStyles = {
-    content: { 
-        backgroundColor: '#1C1C1E', 
-        border: '1px solid rgba(255, 255, 255, 0.1)', 
-        borderRadius: '24px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-    },
-    header: { backgroundColor: 'transparent', paddingBottom: 0 },
-    body: { padding: '20px' },
-    title: { fontFamily: 'var(--font-lexend)', fontWeight: 600, color: 'white', fontSize: '1.25rem' },
-    close: { color: 'gray', transition: 'all 0.2s', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' } }
-};
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={compact ? classes.dayPillCompact : classes.dayPill}
+      style={{
+        backgroundColor: selected
+          ? 'var(--kp-apricot)'
+          : isCurrent
+            ? 'var(--kp-butter)'
+            : 'var(--kp-canvas)',
+        border: selected
+          ? '1.5px solid var(--kp-orange)'
+          : isCurrent
+            ? '1px solid var(--kp-border-strong)'
+            : '1px solid var(--kp-border)',
+        transform: selected ? 'scale(1)' : 'scale(0.96)',
+      }}
+    >
+      <span
+        style={{
+          fontSize: '9px',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color: selected ? 'var(--kp-accent-ink)' : 'var(--kp-muted)',
+        }}
+      >
+        Day
+      </span>
+      <span
+        style={{
+          fontFamily: 'var(--font-kp-mono)',
+          fontSize: compact ? '15px' : '18px',
+          fontWeight: 700,
+          lineHeight: 1.1,
+          color: selected || isCurrent ? 'var(--kp-accent-ink)' : 'var(--kp-ink)',
+        }}
+      >
+        {topic.day}
+      </span>
+      {isCurrent && !selected && (
+        <span
+          style={{
+            width: '4px',
+            height: '4px',
+            borderRadius: '999px',
+            backgroundColor: 'var(--kp-orange)',
+          }}
+        />
+      )}
+    </button>
+  );
+}
+
+function OverviewCard({ dayTopic, completedTasks, totalTasks, progressPercent }) {
+  return (
+    <section
+      style={{
+        borderRadius: '20px',
+        backgroundColor: 'var(--kp-mint)',
+        border: '1px solid var(--kp-border)',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <IconChartLine size={17} stroke={1.9} color="var(--kp-ink)" />
+          <span
+            style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--kp-ink)',
+            }}
+          >
+            STUDY PATH
+          </span>
+        </div>
+        <span
+          style={{
+            fontFamily: 'var(--font-kp-mono)',
+            fontSize: '13px',
+            fontWeight: 700,
+            color: 'var(--kp-ink)',
+          }}
+        >
+          {progressPercent}%
+        </span>
+      </div>
+
+      <div
+        style={{
+          fontSize: '15px',
+          fontWeight: 700,
+          color: 'var(--kp-ink)',
+        }}
+      >
+        {completedTasks} of {totalTasks} topics complete
+      </div>
+
+      <KalPadProgress value={progressPercent} height={5} color="var(--kp-primary)" />
+
+      {dayTopic && (
+        <div style={{ fontSize: '12px', color: 'var(--kp-secondary)' }}>
+          Day {dayTopic.day} · {formatSafeDate(dayTopic.date)} ·{' '}
+          {(dayTopic.sub_topics || []).length} tasks
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function PlanDetailPage() {
-    const params = useParams();
-    const router = useRouter();
-    const { setIsLoading } = useLoading();
-    const { id: planId } = params;
+  const params = useParams();
+  const router = useRouter();
+  const planId = params?.id;
 
-    // --- STATE MANAGEMENT ---
-    const [session, setSession] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [plan, setPlan] = useState(null);
-    
-    // Timeline State (Dual Refs for dual layouts)
-    const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-    const mobileScrubberRef = useRef(null);
-    const desktopScrubberRef = useRef(null);
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [plan, setPlan] = useState(null);
 
-    const [quizOpened, { open: openQuiz, close: closeQuiz }] = useDisclosure(false);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [slideDirection, setSlideDirection] = useState(1);
+  const mobileScrubberRef = useRef(null);
+  const desktopScrubberRef = useRef(null);
 
+  const [quizOpened, setQuizOpened] = useState(false);
+  const [regenerateModalOpened, setRegenerateModalOpened] = useState(false);
+  const [shareModalOpened, setShareModalOpened] = useState(false);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
 
-    // Modals & Jobs
-    const [regenerateModalOpened, { open: openRegenerateModal, close: closeRegenerateModal }] = useDisclosure(false);
-    const [lectureModalOpened, { open: openLectureModal, close: closeLectureModal }] = useDisclosure(false);
-    const [shareModalOpened, { open: openShareModal, close: closeShareModal }] = useDisclosure(false);
-    
-    const [isCurating, setIsCurating] = useState(false);
-    const [isForging, setIsForging] = useState(false);
-    const [isSharing, setIsSharing] = useState(false);
-    
-    const [cramSheet, setCramSheet] = useState(null);
-    const [todaysTopics, setTodaysTopics] = useState([]);
-    const [selectedTopics, setSelectedTopics] = useState([]);
-    const [shareableLink, setShareableLink] = useState('');
-    const [isInApp, setIsInApp] = useState(false);
+  const [isForging, setIsForging] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [cramSheet, setCramSheet] = useState(null);
+  const [shareableLink, setShareableLink] = useState('');
 
-    // --- WITTY MESSAGES ---
-    const wittyStatusMessages = [
-        "Scanning for content that wasn't written on a typewriter...",
-        "My rival's job is to write a eulogy for your free time. Mine is to resurrect it.",
-        "Sifting through the web for a cure to 'death by bullet points'.",
-        "The other guy gives you notes. I give you a pulse.",
-    ];
+  const scrollToDay = useCallback(
+    (index) => {
+      setSlideDirection(index >= selectedDayIndex ? 1 : -1);
+      setSelectedDayIndex(index);
 
-    // --- INITIALIZATION ---
-    useEffect(() => {
-        if (navigator.userAgent.includes('KalPad-Android-App')) setIsInApp(true);
-        const getSessionAndFetch = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            setSession(session);
-            if(session && planId) fetchPlanData(session);
-        };
-        getSessionAndFetch();
-    }, [planId]);
+      if (mobileScrubberRef.current) {
+        const scrollPos = index * 62 - mobileScrubberRef.current.clientWidth / 2 + 27;
+        mobileScrubberRef.current.scrollTo({
+          left: Math.max(0, scrollPos),
+          behavior: 'smooth',
+        });
+      }
+      if (desktopScrubberRef.current) {
+        const scrollPos = index * 72 - desktopScrubberRef.current.clientWidth / 2 + 32;
+        desktopScrubberRef.current.scrollTo({
+          left: Math.max(0, scrollPos),
+          behavior: 'smooth',
+        });
+      }
+    },
+    [selectedDayIndex]
+  );
 
-    // --- DATA FETCHING ---
-    const fetchPlanData = async (session) => {
-        if (!session || !planId) { setError(planId ? "Authentication error." : "Plan ID not found."); setLoading(false); return; }
-        try {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from('study_plans')
-                .select(`
-                    id, exam_name, exam_date, syllabus, generation_context, is_active,
-                    plan_topics ( 
-                        *, curated_lectures ( plan_topic_id, sub_topic_text, video_url ), 
-                        topic_confidence ( score, activity_type ),
-                        new_notes:generated_notes ( * )
-                    ),
-                    generated_cram_sheets ( id, status ) 
-                `)
-                .eq('id', planId).eq('user_id', session.user.id).single();
+  const fetchPlanData = useCallback(
+    async (activeSession) => {
+      if (!activeSession || !planId) {
+        setError(planId ? 'Please sign in to open this plan.' : 'Plan ID not found.');
+        setLoading(false);
+        return;
+      }
 
-            if (error) throw error;
-            if (!data) throw new Error("Plan not found or permission denied.");
-            
-            data.plan_topics.sort((a, b) => a.day - b.day);
-            setPlan(data);
-            setCramSheet(data.generated_cram_sheets?.[0] || null);
+      try {
+        setLoading(true);
+        const { data, error: fetchError } = await supabase
+          .from('study_plans')
+          .select(
+            `
+            id, exam_name, exam_date, syllabus, generation_context, is_active,
+            plan_topics (
+              *,
+              curated_lectures ( plan_topic_id, sub_topic_text, video_url ),
+              topic_confidence ( score, activity_type ),
+              new_notes:generated_notes ( * )
+            ),
+            generated_cram_sheets ( id, status )
+          `
+          )
+          .eq('id', planId)
+          .eq('user_id', activeSession.user.id)
+          .single();
 
-            // Auto-select "Today" or default to first day
-            let initialDayIndex = data.plan_topics.findIndex(t => isToday(parseISO(t.date)));
-            // If no "Today" is found (e.g., past plan), default to Day 1 (index 0)
-            if (initialDayIndex === -1) {
-                initialDayIndex = 0; 
-            }
-            setSelectedDayIndex(initialDayIndex);
-            setTimeout(() => scrollToDay(initialDayIndex), 500);
+        if (fetchError) throw fetchError;
+        if (!data) throw new Error('Plan not found or permission denied.');
 
-            if (window.Android?.cachePlanForOffline) window.Android.cachePlanForOffline(JSON.stringify(data));
-        } catch (err) { setError(err.message); } finally { setLoading(false); }
-    };
+        data.plan_topics = [...(data.plan_topics || [])].sort((a, b) => a.day - b.day);
+        setPlan(data);
+        setCramSheet(data.generated_cram_sheets?.[0] || null);
 
-    // --- HANDLERS ---
-    const handleUpdateTopic = (planTopicId, updates) => {
-        setPlan(currentPlan => ({
-            ...currentPlan,
-            plan_topics: currentPlan.plan_topics.map(topic => topic.id === planTopicId ? { ...topic, ...updates } : topic)
-        }));
-        supabase.from('plan_topics').update(updates).eq('id', planTopicId).then(({ error }) => { if (error) console.error(error); });
-    };
+        let initialDayIndex = data.plan_topics.findIndex((t) => {
+          try {
+            return Boolean(t.date && isToday(parseISO(t.date)));
+          } catch {
+            return false;
+          }
+        });
+        if (initialDayIndex === -1) initialDayIndex = 0;
 
-    const handleSharePlan = async () => {
-        if (!plan) return;
-        setIsSharing(true); setError(''); setShareableLink('');
-        try {
-            const response = await fetch('/api/share-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan_id: plan.id }) });
-            if (!response.ok) throw new Error((await response.json()).error);
-            const { public_id } = await response.json();
-            setShareableLink(`${window.location.origin}/shared/${public_id}`);
-            openShareModal();
-        } catch (err) { notifications.show({ title: 'Error', message: err.message, color: 'red' }); } 
-        finally { setIsSharing(false); }
-    };
+        setSelectedDayIndex(initialDayIndex);
+        setTimeout(() => {
+          if (mobileScrubberRef.current) {
+            const pos = initialDayIndex * 62 - mobileScrubberRef.current.clientWidth / 2 + 27;
+            mobileScrubberRef.current.scrollTo({ left: Math.max(0, pos), behavior: 'smooth' });
+          }
+          if (desktopScrubberRef.current) {
+            const pos = initialDayIndex * 72 - desktopScrubberRef.current.clientWidth / 2 + 32;
+            desktopScrubberRef.current.scrollTo({ left: Math.max(0, pos), behavior: 'smooth' });
+          }
+        }, 250);
 
-    const handleStartCuration = async () => {
-        const today = new Date();
-        const topicsForToday = plan.plan_topics.filter(t => isSameDay(parseISO(t.date), today));
-        const allSubTopicsForToday = topicsForToday.flatMap(t => t.sub_topics.map(st => ({ text: st.text, plan_topic_id: t.id, day_topic: t.topic_name, exam_name: plan.exam_name })));
-        
-        if (allSubTopicsForToday.length === 0) {
-            notifications.show({ color: 'blue', title: 'All Set!', message: 'No topics scheduled for today.' });
-            return;
+        if (typeof window !== 'undefined' && window.Android?.cachePlanForOffline) {
+          window.Android.cachePlanForOffline(JSON.stringify(data));
         }
-        setTodaysTopics(allSubTopicsForToday); setSelectedTopics([]); openLectureModal();
-    };
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [planId]
+  );
 
-    const confirmAndStartCuration = async () => {
-        closeLectureModal();
-        if (selectedTopics.length === 0) return;
-        setIsCurating(true);
-        let wittyMessageIndex = 0;
-        const notificationId = notifications.show({ loading: true, title: 'Initializing Lecture Scout...', message: wittyStatusMessages[0], autoClose: false, withCloseButton: false });
-        const wittyInterval = setInterval(() => {
-            wittyMessageIndex = (wittyMessageIndex + 1) % wittyStatusMessages.length;
-            notifications.update({ id: notificationId, message: wittyStatusMessages[wittyMessageIndex] });
-        }, 7000);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const currentSession = data?.session || null;
+      setSession(currentSession);
+      if (currentSession && planId) {
+        fetchPlanData(currentSession);
+      } else {
+        setLoading(false);
+      }
+    });
+  }, [planId, fetchPlanData]);
 
-        try {
-            const topicsToCurate = selectedTopics.map(topicString => JSON.parse(topicString));
-            const payload = { plan_id: planId, topics_to_curate: topicsToCurate, all_todays_topics: todaysTopics.map(t => t.text), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
-            const response = await fetch('/api/start-lecture-curation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (!response.ok) throw new Error((await response.json()).error);
-            const { job_id } = await response.json();
-            
-            const poll = setInterval(async () => {
-                try {
-                    const statusRes = await fetch(`/api/curation-status?job_id=${job_id}`);
-                    if (!statusRes.ok) throw new Error("Status fetch failed");
-                    const statusData = await statusRes.json();
-                    notifications.update({ id: notificationId, loading: statusData.status === 'in_progress', title: `Finding Lectures (${statusData.completed_topics}/${statusData.total_topics})` });
-                    if (statusData.status === 'complete' || statusData.status === 'error') {
-                        clearInterval(poll); clearInterval(wittyInterval);
-                        notifications.update({ id: notificationId, color: statusData.status === 'complete' ? 'teal' : 'red', title: statusData.status === 'complete' ? 'Lectures Found!' : 'Curation Failed', message: statusData.status === 'complete' ? 'Timeline updated. Refreshing...' : 'Try again later.', autoClose: 7000 });
-                        if (statusData.status === 'complete') fetchPlanData(session);
-                        setIsCurating(false);
-                    }
-                } catch (pollError) { clearInterval(poll); clearInterval(wittyInterval); setIsCurating(false); }
-            }, 7000);
-        } catch (err) { clearInterval(wittyInterval); notifications.update({ id: notificationId, color: 'red', title: 'Error', message: err.message, autoClose: 5000 }); setIsCurating(false); }
-    };
+  const handleUpdateTopic = (planTopicId, updates) => {
+    setPlan((currentPlan) => {
+      if (!currentPlan) return currentPlan;
+      return {
+        ...currentPlan,
+        plan_topics: currentPlan.plan_topics.map((topic) =>
+          topic.id === planTopicId ? { ...topic, ...updates } : topic
+        ),
+      };
+    });
 
-    const handleForgeCramSheet = async () => {
-        if (!plan) return;
-        setIsForging(true);
-        let wittyMessageIndex = 0;
-        const notificationId = notifications.show({ loading: true, title: 'Initializing Forge...', message: cramSheetFacts[0], autoClose: false, withCloseButton: false });
-        const wittyInterval = setInterval(() => { wittyMessageIndex = (wittyMessageIndex + 1) % cramSheetFacts.length; notifications.update({ id: notificationId, message: cramSheetFacts[wittyMessageIndex] }); }, 5000);
+    supabase
+      .from('plan_topics')
+      .update(updates)
+      .eq('id', planTopicId)
+      .then(({ error: updateError }) => {
+        if (updateError) console.error(updateError);
+      });
+  };
 
-        try {
-            const response = await fetch('/api/forge-cram-sheet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan_id: plan.id }) });
-            if (!response.body) throw new Error("Streaming failed");
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const parts = buffer.split('\n---\n');
-                buffer = parts.pop() || ''; 
-                for (const part of parts) {
-                    if (!part.trim()) continue;
-                    try {
-                        const message = JSON.parse(part);
-                        if (message.type === 'status') notifications.update({ id: notificationId, title: message.data.title });
-                        else if (message.type === 'complete') {
-                            clearInterval(wittyInterval);
-                            notifications.update({ id: notificationId, loading: false, title: 'Forge Complete!', message: 'Cram Sheet ready.', color: 'teal', autoClose: 5000 });
-                            await fetchPlanData(session); 
-                            router.push(`/cram-sheet/${message.data.cramSheetId}`);
-                            break; 
-                        } else if (message.type === 'error') throw new Error(message.data.message);
-                    } catch (e) { console.warn(e); }
-                }
-            }
-        } catch (err) { clearInterval(wittyInterval); notifications.update({ id: notificationId, loading: false, title: 'Forge Failed', message: err.message, color: 'red', autoClose: 7000 }); } 
-        finally { setIsForging(false); }
-    };
+  const handleSharePlan = async () => {
+    if (!plan) return;
+    setIsSharing(true);
+    setShareableLink('');
+    setCopiedShareLink(false);
+    try {
+      const response = await fetch('/api/share-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_id: plan.id }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error || 'Share failed.');
+      const { public_id } = await response.json();
+      setShareableLink(`${window.location.origin}/shared/${public_id}`);
+      setShareModalOpened(true);
+    } catch (err) {
+      notifications.show({ title: 'Error', message: err.message, color: 'red' });
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
-    const handleDownloadDayNotes = () => {
-        const selectedDayTopic = plan?.plan_topics?.[selectedDayIndex];
-        if (!selectedDayTopic) return;
+  const handleForgeCramSheet = async () => {
+    if (!plan) return;
+    setIsForging(true);
+    let wittyMessageIndex = 0;
+    const notificationId = notifications.show({
+      loading: true,
+      title: 'Building cram sheet...',
+      message: cramSheetFacts[0],
+      autoClose: false,
+      withCloseButton: false,
+    });
+    const wittyInterval = setInterval(() => {
+      wittyMessageIndex = (wittyMessageIndex + 1) % cramSheetFacts.length;
+      notifications.update({ id: notificationId, message: cramSheetFacts[wittyMessageIndex] });
+    }, 5000);
 
-        const printableSections = getDayNoteSections(selectedDayTopic);
-        if (printableSections.length === 0) {
-            notifications.show({
-                title: 'No Notes Yet',
-                message: 'Generate at least one note for this day before exporting.',
-                color: 'yellow',
+    try {
+      await forgeCramSheetBYOK({
+        planId: plan.id,
+        onEvent: async (message) => {
+          if (message.type === 'status') {
+            notifications.update({
+              id: notificationId,
+              title: message.data?.title || 'Building cram sheet...',
             });
-            return;
-        }
-
-        const printWindow = window.open(`/print/day/${selectedDayTopic.id}`, '_blank');
-        if (!printWindow) {
-            notifications.show({
-                title: 'Popup Blocked',
-                message: 'Please allow popups to export the day notes.',
-                color: 'yellow',
+          } else if (message.type === 'complete') {
+            clearInterval(wittyInterval);
+            notifications.update({
+              id: notificationId,
+              loading: false,
+              title: 'Cram sheet ready',
+              message: 'Opening your revision summary.',
+              color: 'teal',
+              autoClose: 4500,
             });
-            return;
-        }
+            await fetchPlanData(session);
+            router.push(`/cram-sheet/${message.data.cramSheetId}`);
+          } else if (message.type === 'error') {
+            throw new Error(message.data?.message || 'Cram sheet failed');
+          }
+        },
+      });
+    } catch (err) {
+      clearInterval(wittyInterval);
+      if (err?.code === 'BYOK_NOT_CONNECTED' && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('open-byok-chat'));
+      }
+      notifications.update({
+        id: notificationId,
+        loading: false,
+        title: 'Cram sheet failed',
+        message:
+          err?.code === 'BYOK_NOT_CONNECTED'
+            ? 'Connect your ChatGPT account in the opened panel to forge your cram sheet.'
+            : err?.message || 'Could not forge cram sheet.',
+        color: 'red',
+        autoClose: 6000,
+      });
+    } finally {
+      setIsForging(false);
+    }
+  };
 
-        const handleMessage = (event) => {
-            if (event.source === printWindow && event.data === 'KALPAD_PRINT_READY') {
-                printWindow.print();
-                window.removeEventListener('message', handleMessage);
-            }
-        };
+  const handleDownloadDayNotes = () => {
+    const selectedDayTopic = plan?.plan_topics?.[selectedDayIndex];
+    if (!selectedDayTopic) return;
 
-        const handleAfterPrint = () => {
-            printWindow.close();
-            printWindow.removeEventListener('afterprint', handleAfterPrint);
-            window.removeEventListener('message', handleMessage);
-        };
+    const printableSections = getDayNoteSections(selectedDayTopic);
+    if (printableSections.length === 0) {
+      notifications.show({
+        title: 'No notes yet',
+        message: 'Create at least one note for this day before exporting.',
+        color: 'yellow',
+      });
+      return;
+    }
 
-        window.addEventListener('message', handleMessage);
-        printWindow.addEventListener('afterprint', handleAfterPrint, { once: true });
+    const printWindow = window.open(`/print/day/${selectedDayTopic.id}`, '_blank');
+    if (!printWindow) {
+      notifications.show({
+        title: 'Popup blocked',
+        message: 'Please allow popups to export the day notes.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    const handleMessage = (event) => {
+      if (event.source === printWindow && event.data === 'KALPAD_PRINT_READY') {
+        printWindow.print();
+        window.removeEventListener('message', handleMessage);
+      }
     };
 
-    const handleConfirmBulkGenerate = async () => {
-        if (bulkNoteSelection.length === 0) return;
-        setIsBulkGenerating(true); closeBulkNoteModal();
-        let completedCount = 0;
-        const notificationId = `bulk-notes-${dayTopic.id}`;
-        
-        notifications.show({ id: notificationId, loading: true, title: `Forging Notes... (0/${bulkNoteSelection.length})`, message: 'Starting...', autoClose: false, withCloseButton: false });
-
-        // --- THE FIX: We collect the new notes first ---
-        let newlyGeneratedNotes = [];
-
-        for (const subTopicText of bulkNoteSelection) {
-            try {
-                const response = await fetch('/api/generate-notes', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plan_topic_id: dayTopic.id, sub_topic_text: subTopicText, exam_name: plan.exam_name, day_topic: dayTopic.topic_name }),
-                });
-
-                if (response.ok) {
-                    const { note } = await response.json();
-                    newlyGeneratedNotes.push(note); // Collect the note object
-                    completedCount++;
-                    notifications.update({ id: notificationId, title: `Forging... (${completedCount}/${bulkNoteSelection.length})`, message: `Done: ${subTopicText}` });
-                }
-                
-                // We add a small delay to avoid overwhelming the API
-                await new Promise(resolve => setTimeout(resolve, 1500));
-
-            } catch (err) { console.error(err); }
-        }
-
-        // --- The Fix: Perform ONE state update at the end ---
-        if (setPlan && newlyGeneratedNotes.length > 0) {
-            setPlan(currentPlan => {
-                const newPlanTopics = currentPlan.plan_topics.map(topic => {
-                    if (topic.id === dayTopic.id) {
-                        // Merge the newly generated notes with any existing ones
-                        const existingNotes = new Map(topic.new_notes.map(n => [n.sub_topic_text, n]));
-                        newlyGeneratedNotes.forEach(n => existingNotes.set(n.sub_topic_text, n));
-                        return { ...topic, new_notes: Array.from(existingNotes.values()) };
-                    }
-                    return topic;
-                });
-                return { ...currentPlan, plan_topics: newPlanTopics };
-            });
-        }
-
-        notifications.update({ id: notificationId, loading: false, color: 'teal', title: 'Bulk Forge Complete', message: `Forged ${completedCount} notes.`, autoClose: 5000 });
-        setIsBulkGenerating(false);
-        setBulkNoteSelection([]);
+    const handleAfterPrint = () => {
+      printWindow.close();
+      printWindow.removeEventListener('afterprint', handleAfterPrint);
+      window.removeEventListener('message', handleMessage);
     };
 
-    // --- TIMELINE NAVIGATION HELPER (Dual Ref Support) ---
-    const scrollToDay = (index) => {
-        setSelectedDayIndex(index);
-        
-        // Scroll Mobile Scrubber
-        if (mobileScrubberRef.current) {
-            const scrollPos = (index * MOBILE_DAY_WIDTH) - (mobileScrubberRef.current.clientWidth / 2) + (MOBILE_DAY_WIDTH / 2);
-            mobileScrubberRef.current.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
-        }
+    window.addEventListener('message', handleMessage);
+    printWindow.addEventListener('afterprint', handleAfterPrint, { once: true });
+  };
 
-        // Scroll Desktop Scrubber
-        if (desktopScrubberRef.current) {
-            const scrollPos = (index * DESKTOP_DAY_WIDTH)  + (DESKTOP_DAY_WIDTH / 2);
-            desktopScrubberRef.current.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
-        }
-    };
+  const topics = useMemo(() => plan?.plan_topics || [], [plan]);
+  const selectedDayTopic = topics[selectedDayIndex] || null;
+  const selectedDayNoteCount = selectedDayTopic ? getDayNoteSections(selectedDayTopic).length : 0;
+  const canDownloadSelectedDayNotes = selectedDayNoteCount > 0;
 
-    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
-    const selectedDayTopic = plan?.plan_topics?.[selectedDayIndex] || null;
-    const selectedDayNoteCount = selectedDayTopic ? getDayNoteSections(selectedDayTopic).length : 0;
-    const canDownloadSelectedDayNotes = selectedDayNoteCount > 0;
+  const { totalTasks, completedTasks, planProgress, daysLeft } = useMemo(() => {
+    const total = topics.reduce((acc, t) => acc + (t.sub_topics || []).length, 0);
+    const done = topics.reduce(
+      (acc, t) => acc + (t.sub_topics || []).filter((s) => s.completed).length,
+      0
+    );
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    let remaining = null;
+    if (plan?.exam_date) {
+      try {
+        remaining = differenceInCalendarDays(parseISO(plan.exam_date), new Date());
+      } catch {
+        remaining = null;
+      }
+    }
+    return { totalTasks: total, completedTasks: done, planProgress: pct, daysLeft: remaining };
+  }, [topics, plan]);
 
-    return (
-    <AppLayout session={session}>
-        <Container size="xl" pt="sm" pb={120} style={{
-    maxWidth: isDesktop ? '76vw' : '93vw',
-  }}> 
-            {loading ? (
-                <Group justify="center"><Loader color="white" /></Group>
-            ) : !plan?.is_active ? (
-                // --- DELETED STATE ---
-                <Container size="sm" pt={100}>
-                    <GlassCard p="xl" style={{ textAlign: 'center', border: '1px solid rgba(255, 59, 48, 0.2)' }}>
-                        <Stack align="center" gap="lg">
-                            <ThemeIcon size={80} radius="100%" color="red" variant="light" style={{ backgroundColor: 'rgba(255, 59, 48, 0.1)' }}>
-                                <IconTrash size={40} />
-                            </ThemeIcon>
-                            <Box>
-                                <Title order={2} className="apple-text-gradient">Mission Archived</Title>
-                                <Text c="dimmed" mt="sm">This plan was deleted or archived by you. It is no longer active.</Text>
-                            </Box>
-                            <Button component={Link} href="/plans" variant="default" radius="xl" size="md">
-                                Return to Base
-                            </Button>
-                        </Stack>
-                    </GlassCard>
-                </Container>
-            ) : (
-                // --- ACTIVE STATE ---
-                <>
-                        {/* --- TITLE --- */}
-                        <Box mb="md" px={{ base: 'md', md: 0 }}>
-                            <Text size="sm" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: '0.1em' }}>Active Mission</Text>
-                            <Title 
-                                order={1} 
-                                className="apple-text-gradient" 
-                                style={{ 
-                                    fontSize: 'clamp(1.8rem, 5vw, 3rem)', 
-                                    letterSpacing: '-0.03em', lineHeight: 1.1, wordBreak: 'break-word'
-                                }}
-                            >
-                                {plan.exam_name}
-                            </Title>
-                        </Box>
+  const cramSheetLabel = isForging
+    ? 'Forging...'
+    : cramSheet?.status === 'complete'
+      ? 'View sheet'
+      : 'Cram sheet';
 
-                        {/* --- MOBILE: ACTION RIBBON --- */}
-                        <Box hiddenFrom="md" mb="lg" px="md">
-                            <ScrollArea type="never" scrollbars="x" offsetScrollbars>
-                            <Group gap="2px" wrap="nowrap" style={{ width: 'max-content' }}>
-                                <Button 
-                                    variant="light" color="teal" radius="xl" size="xs"
-                                    leftSection={<IconBrain size={16}/>} 
-                                    onClick={openQuiz} 
-                                >
-                                    Start Quiz
-                                </Button>
-                                <Button 
-                                    variant="light" color="orange" radius="xl" size="xs" 
-                                    leftSection={<IconFlame size={16}/>} 
-                                    loading={isForging}
-                                    onClick={() => cramSheet?.status === 'complete' ? router.push(`/cram-sheet/${cramSheet.id}`) : handleForgeCramSheet()}
-                                >
-                                    {cramSheet?.status === 'complete' ? 'View Sheet' : 'Cram Sheet'}
-                                </Button>
-                                <Button
-                                    variant="light"
-                                    color="blue"
-                                    radius="xl"
-                                    size="xs"
-                                    leftSection={<IconDownload size={16} />}
-                                    onClick={handleDownloadDayNotes}
-                                    disabled={!canDownloadSelectedDayNotes}
-                                >
-                                    Day Notes File
-                                </Button>
-                                <Button variant="light" color="violet" radius="xl" size="xs" leftSection={<IconRefresh size={16}/>} onClick={openRegenerateModal}>Refine Plan</Button>
-                                <Button variant="default" radius="xl" size="xs" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan}>Share</Button>
-                            </Group>
-                            </ScrollArea>
-                        </Box>
+  const handleCramSheetAction = () => {
+    if (cramSheet?.status === 'complete') {
+      router.push(`/cram-sheet/${cramSheet.id}`);
+    } else {
+      handleForgeCramSheet();
+    }
+  };
 
-                        {/* --- MOBILE: TIMELINE SCRUBBER (Edge-to-Edge) --- */}
-                        <Box hiddenFrom="md" mb="lg" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)', position: 'relative' }}>
-                            <Box style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)' }}>
-                                <Box ref={mobileScrubberRef} style={{ display: 'flex', overflowX: 'auto', padding: '12px 16px', gap: '8px', scrollBehavior: 'smooth', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                    {plan.plan_topics.map((topic, index) => {
-                                        const isSelected = index === selectedDayIndex;
-                                        const isCurrent = isToday(parseISO(topic.date));
-                                        return (
-                                            <Interactive key={topic.id} onClick={() => scrollToDay(index)}>
-                                                <Box style={{ minWidth: '60px', height: '60px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: isSelected ? 'rgba(191, 90, 242, 0.2)' : isCurrent ? 'rgba(52, 199, 89, 0.1)' : 'transparent', border: isSelected ? '1px solid #BF5AF2' : isCurrent ? '1px solid #34C759' : '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', scrollSnapAlign: 'center', transition: 'all 0.2s ease' }}>
-                                                    <Text size="10px" c="dimmed" tt="uppercase" fw={700}>Day</Text>
-                                                    <Text size="md" fw={700} c={isSelected ? 'white' : isCurrent ? '#34C759' : 'dimmed'}>{topic.day}</Text>
-                                                    {isCurrent && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#34C759', marginTop: 2 }} />}
-                                                </Box>
-                                            </Interactive>
-                                        );
-                                    })}
-                                </Box>
-                            </Box>
-                        </Box>
-                        
-                        {/* --- DESKTOP: TIMELINE SCRUBBER (GlassCard Container) --- */}
-<Box visibleFrom="md" mb="xl">
-    <GlassCard p={0} style={{ overflow: 'hidden' }}>
-        <Box style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '8px 16px', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-            <Group justify="space-between">
-                <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Timeline</Text>
-                <Button size="xs" variant="subtle" color="teal" onClick={() => { const todayIdx = plan.plan_topics.findIndex(t => isToday(parseISO(t.date))); if(todayIdx !== -1) scrollToDay(todayIdx); }}>
-                    Jump to Today
-                </Button>
-            </Group>
-        </Box>
-        {/* Adjusted padding: reduced from 24px to 16px */}
-        <Box ref={desktopScrubberRef} style={{ display: 'flex', overflowX: 'auto', padding: '16px', gap: '10px', scrollBehavior: 'smooth', scrollbarWidth: 'none' }}>
-            {plan.plan_topics.map((topic, index) => {
-                const isSelected = index === selectedDayIndex;
-                const isCurrent = isToday(parseISO(topic.date));
-                
-                const cardBg = isSelected ? '#BF5AF2' : isCurrent ? 'rgba(52, 199, 89, 0.15)' : 'rgba(255,255,255,0.03)';
-                const cardBorder = isSelected ? 'none' : isCurrent ? '1px solid #34C759' : '1px solid rgba(255,255,255,0.05)';
-                const shadow = isSelected ? '0 4px 12px rgba(191, 90, 242, 0.35)' : 'none';
-                
-                return (
-                    <Interactive key={topic.id} onClick={() => scrollToDay(index)}>
-                        <Box
-                            style={{
-                                // Reduced dimensions from 100x90 to 70x70
-                                minWidth: '70px', height: '70px',
-                                borderRadius: '14px', // Slightly tighter radius
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                backgroundColor: cardBg,
-                                border: cardBorder,
-                                boxShadow: shadow,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)'
-                            }}
-                        >
-                            <Text size="10px" c={isSelected ? 'white' : 'dimmed'} tt="uppercase" fw={700} style={{ opacity: isSelected ? 0.8 : 1 }}>Day</Text>
-                            {/* Reduced font size from 1.75rem to 1.4rem */}
-                            <Text size="1.4rem" fw={800} c={isSelected ? 'white' : isCurrent ? '#34C759' : 'dimmed'} style={{ fontFamily: 'var(--font-lexend)', lineHeight: 1 }}>
-                                {topic.day}
-                            </Text>
-                            {isCurrent && !isSelected && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#34C759', marginTop: 4 }} />}
-                        </Box>
-                    </Interactive>
-                );
-            })}
-        </Box>
-    </GlassCard>
-</Box>
+  const handleJumpToday = () => {
+    const todayIdx = topics.findIndex((t) => {
+      try {
+        return Boolean(t.date && isToday(parseISO(t.date)));
+      } catch {
+        return false;
+      }
+    });
+    if (todayIdx !== -1) scrollToDay(todayIdx);
+  };
 
-                        {/* --- MAIN DECK (SPLIT VIEW) --- */}
-                        <Grid gutter={{ base: 0, md: 'xl' }} px={{ base: 'md', md: 0 }}>
-                            {/* --- LEFT: ACTIVE CARD --- */}
-                            <Grid.Col span={{ base: 12, md: 8 }}>
-                                <AnimatePresence mode="wait">
-                                    {/* --- FIX: GUARD AGAINST UNDEFINED --- */}
-                                    {plan.plan_topics && plan.plan_topics[selectedDayIndex] ? (
-                                        <motion.div
-                                            key={selectedDayIndex}
-                                            initial={{ opacity: 0, x: 20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: -20 }}
-                                            transition={{ duration: 0.2 }}
-                                        >
-                                            <TimelineDayCard 
-                                                plan={plan}
-                                                dayTopic={plan.plan_topics[selectedDayIndex]}
-                                                onUpdate={handleUpdateTopic}
-                                                setPlan={setPlan} 
-                                                isInitiallyCollapsed={false}
-                                                onConfirmBulkGenerate={handleConfirmBulkGenerate} 
-                                            />
-                                        </motion.div>
-                                    ) : (
-                                        <GlassCard><Text c="dimmed">No topics found for this day.</Text></GlassCard>
-                                    )}
-                                </AnimatePresence>
-                            </Grid.Col>
+  const handleCopyShareLink = async () => {
+    if (!shareableLink) return;
+    try {
+      await navigator.clipboard.writeText(shareableLink);
+      setCopiedShareLink(true);
+      setTimeout(() => setCopiedShareLink(false), 2000);
+    } catch {
+      notifications.show({ title: 'Copy failed', message: 'Select and copy the link manually.' });
+    }
+  };
 
-                            {/* --- RIGHT: CONTEXT RAIL (DESKTOP ONLY) --- */}
-                            <Grid.Col span={{ base: 12, md: 4 }} visibleFrom="md">
-                                <Stack>
-                                    {/* Action Card */}
-                                    <GlassCard p="lg">
-                                        <Stack gap="md">
-                                            <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Actions</Text>
-                                            <Button 
-                                                fullWidth
-                                                variant="light" color="teal" radius="xl"
-                                                leftSection={<IconBrain size={16}/>} 
-                                                onClick={openQuiz} 
-                                            >
-                                                Start Quiz
-                                            </Button>
-                                            <Button fullWidth variant="light" color="yellow" leftSection={<IconFlame size={16} color="orange"/>} loading={isForging} onClick={() => cramSheet?.status === 'complete' ? router.push(`/cram-sheet/${cramSheet.id}`) : handleForgeCramSheet()}>
-                                                {cramSheet?.status === 'complete' ? 'View Cram Sheet' : 'Forge Cram Sheet'}
-                                            </Button>
-                                            <Button
-                                                fullWidth
-                                                variant="light"
-                                                color="blue"
-                                                leftSection={<IconDownload size={16} />}
-                                                onClick={handleDownloadDayNotes}
-                                                disabled={!canDownloadSelectedDayNotes}
-                                            >
-                                                Download Day Notes
-                                            </Button>
-                                            <Button fullWidth variant="light" leftSection={<IconShare3 size={16}/>} onClick={handleSharePlan} loading={isSharing}>Share</Button>
-                                            <Button fullWidth variant="light" color="violet" onClick={openRegenerateModal} leftSection={<IconRefresh size={16} />}>Refine Plan</Button>
-                                        </Stack>
-                                    </GlassCard>
+  return (
+    <KalPadShell session={session} maxWidth="1320px">
+      {loading ? (
+        <div
+          style={{
+            borderRadius: '20px',
+            backgroundColor: 'var(--kp-surface)',
+            border: '1px solid var(--kp-border)',
+            padding: '28px',
+            color: 'var(--kp-secondary)',
+            fontSize: '14px',
+          }}
+        >
+          Opening study plan...
+        </div>
+      ) : !plan || !plan.is_active ? (
+        <section
+          style={{
+            maxWidth: '520px',
+            margin: '48px auto 0',
+            borderRadius: '20px',
+            backgroundColor: 'var(--kp-surface)',
+            border: '1px solid var(--kp-border)',
+            padding: '28px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <span
+            style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '999px',
+              backgroundColor: 'var(--kp-error-subtle)',
+              color: 'var(--kp-error-ink)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <IconArchive size={26} stroke={1.8} />
+          </span>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: 'var(--font-kp-mono)',
+              fontSize: '22px',
+              fontWeight: 700,
+              color: 'var(--kp-ink)',
+            }}
+          >
+            Plan archived
+          </h1>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '14px',
+              lineHeight: 1.5,
+              color: 'var(--kp-secondary)',
+            }}
+          >
+            {error || 'This plan was archived or deleted. It is no longer active.'}
+          </p>
+          <Link
+            href="/plans"
+            style={{
+              marginTop: '6px',
+              height: '44px',
+              padding: '0 18px',
+              borderRadius: '14px',
+              backgroundColor: 'var(--kp-raised)',
+              border: '1px solid var(--kp-border)',
+              color: 'var(--kp-ink)',
+              fontSize: '13px',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              textDecoration: 'none',
+            }}
+          >
+            Return to plans
+          </Link>
+        </section>
+      ) : (
+        <div className={classes.page}>
+          {/* Header */}
+          <header style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <Link
+                href="/plans"
+                aria-label="Back to plans"
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '16px',
+                  backgroundColor: 'var(--kp-raised)',
+                  border: '1px solid var(--kp-border)',
+                  color: 'var(--kp-ink)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  textDecoration: 'none',
+                }}
+              >
+                <IconChevronLeft size={20} stroke={1.9} />
+              </Link>
 
-                                    {/* Details Card */}
-                                    <GlassCard p="lg">
-                                        <Stack gap="xs">
-                                            <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Details</Text>
-                                            {/* --- FIX: GUARD AGAINST UNDEFINED --- */}
-                                            {plan.plan_topics && plan.plan_topics[selectedDayIndex] && (
-                                                <>
-                                                    <Group justify="space-between">
-                                                        <Text size="sm" c="dimmed">Date</Text>
-                                                        <Text size="sm" fw={500}>{format(parseISO(plan.plan_topics[selectedDayIndex].date), 'MMM do, yyyy')}</Text>
-                                                    </Group>
-                                                    <Group justify="space-between">
-                                                        <Text size="sm" c="dimmed">Tasks</Text>
-                                                        <Text size="sm" fw={500}>{plan.plan_topics[selectedDayIndex].sub_topics.length} items</Text>
-                                                    </Group>
-                                                </>
-                                            )}
-                                        </Stack>
-                                    </GlassCard>
-                                </Stack>
-                            </Grid.Col>
-                        </Grid>
-                    </>
-                )}
-            </Container>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--kp-secondary)',
+                  }}
+                >
+                  ACTIVE STUDY PLAN
+                </div>
+                <h1
+                  style={{
+                    margin: '2px 0 0 0',
+                    fontFamily: 'var(--font-kp-mono)',
+                    fontSize: 'clamp(1.45rem, 3vw, 2rem)',
+                    lineHeight: 1.18,
+                    fontWeight: 700,
+                    letterSpacing: '-0.02em',
+                    color: 'var(--kp-ink)',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {plan.exam_name}
+                </h1>
 
-            {/* --- MODALS --- */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginTop: '10px',
+                  }}
+                >
+                  {daysLeft !== null && (
+                    <span
+                      style={{
+                        borderRadius: '8px',
+                        backgroundColor:
+                          daysLeft <= 7 ? 'var(--kp-error-subtle)' : 'var(--kp-apricot)',
+                        color: daysLeft <= 7 ? 'var(--kp-error-ink)' : 'var(--kp-primary)',
+                        padding: '4px 9px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {daysLeft <= 0 ? 'Exam today' : `${daysLeft} days left`}
+                    </span>
+                  )}
+                  <span
+                    style={{
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--kp-raised)',
+                      color: 'var(--kp-secondary)',
+                      padding: '4px 9px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {topics.length} study days
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-kp-mono)',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: planProgress === 100 ? 'var(--kp-success-ink)' : 'var(--kp-primary)',
+                      marginLeft: 'auto',
+                    }}
+                  >
+                    {completedTasks}/{totalTasks} tasks ({planProgress}%)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </header>
 
-            {/* UNIFIED QUIZ ORCHESTRATOR */}
-            <QuizOrchestratorModal 
-                opened={quizOpened} 
-                onClose={closeQuiz} 
-                planTopicId={plan?.plan_topics[selectedDayIndex]?.id} 
+          {/* Mobile Day Scrubber */}
+          <div className={classes.mobileOnly}>
+            <div ref={mobileScrubberRef} className={classes.scrubberStrip}>
+              {topics.map((topic, index) => (
+                <DayPill
+                  key={topic.id}
+                  topic={topic}
+                  selected={index === selectedDayIndex}
+                  compact={true}
+                  onClick={() => scrollToDay(index)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop Timeline Scrubber Card */}
+          <div className={classes.desktopOnly}>
+            <section
+              style={{
+                borderRadius: '20px',
+                backgroundColor: 'var(--kp-surface)',
+                border: '1px solid var(--kp-border)',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: 'var(--kp-raised)',
+                  borderBottom: '1px solid var(--kp-border)',
+                  padding: '8px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--kp-secondary)',
+                  }}
+                >
+                  Timeline
+                </span>
+                <button
+                  type="button"
+                  onClick={handleJumpToday}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--kp-primary)',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                  }}
+                >
+                  Jump to today
+                </button>
+              </div>
+              <div
+                ref={desktopScrubberRef}
+                className={classes.scrubberStrip}
+                style={{ padding: '14px 16px' }}
+              >
+                {topics.map((topic, index) => (
+                  <DayPill
+                    key={topic.id}
+                    topic={topic}
+                    selected={index === selectedDayIndex}
+                    compact={false}
+                    onClick={() => scrollToDay(index)}
+                  />
+                ))}
+              </div>
+            </section>
+          </div>
+
+          {/* Mobile Overview Card & Action Ribbon */}
+          <div className={classes.mobileStack}>
+            <OverviewCard
+              dayTopic={selectedDayTopic}
+              completedTasks={completedTasks}
+              totalTasks={totalTasks}
+              progressPercent={planProgress}
             />
 
-            <RegeneratePlanModal opened={regenerateModalOpened} onClose={closeRegenerateModal} plan={plan} />
-            
-            <Modal opened={shareModalOpened} onClose={closeShareModal} title={<Title order={3}>Share Plan</Title>} centered styles={glassModalStyles} overlayProps={{ blur: 4 }}>
-                <GlassCard>
-                    <Stack>
-                        <Text c="dimmed" size="sm">Share a read-only link to your plan.</Text>
-                        <TextInput value={shareableLink} readOnly variant="filled" styles={{ input: { backgroundColor: 'rgba(0,0,0,0.3)', color: '#fff' } }} />
-                        <CopyButton value={shareableLink}>
-                            {({ copied, copy }) => <ShimmerButton fullWidth color={copied ? 'teal' : 'brandPurple'} onClick={copy} radius="xl">{copied ? 'Copied!' : 'Copy Link'}</ShimmerButton>}
-                        </CopyButton>
-                    </Stack>
-                </GlassCard>
-            </Modal>
-        </AppLayout>
-    );
+            <div className={classes.ribbonRow}>
+              <button
+                type="button"
+                onClick={() => setQuizOpened(true)}
+                className={classes.ribbonPill}
+                style={{
+                  backgroundColor: 'var(--kp-apricot)',
+                  border: '1px solid var(--kp-border-strong)',
+                  color: 'var(--kp-primary)',
+                }}
+              >
+                <IconBrain size={15} stroke={1.9} />
+                <span>Start quiz</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isForging}
+                onClick={handleCramSheetAction}
+                className={classes.ribbonPill}
+                style={{
+                  backgroundColor: 'var(--kp-raised)',
+                  border: '1px solid var(--kp-border)',
+                  color: 'var(--kp-ink)',
+                }}
+              >
+                <IconFlame size={15} stroke={1.9} />
+                <span>{cramSheetLabel}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={!canDownloadSelectedDayNotes}
+                onClick={handleDownloadDayNotes}
+                className={classes.ribbonPill}
+                style={{
+                  backgroundColor: 'var(--kp-raised)',
+                  border: '1px solid var(--kp-border)',
+                  color: 'var(--kp-ink)',
+                }}
+              >
+                <IconDownload size={15} stroke={1.9} />
+                <span>Day notes PDF</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setRegenerateModalOpened(true)}
+                className={classes.ribbonPill}
+                style={{
+                  backgroundColor: 'var(--kp-raised)',
+                  border: '1px solid var(--kp-border)',
+                  color: 'var(--kp-ink)',
+                }}
+              >
+                <IconRefresh size={15} stroke={1.9} />
+                <span>Refine plan</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isSharing}
+                onClick={handleSharePlan}
+                className={classes.ribbonPill}
+                style={{
+                  backgroundColor: 'var(--kp-raised)',
+                  border: '1px solid var(--kp-border)',
+                  color: 'var(--kp-ink)',
+                }}
+              >
+                <IconShare3 size={15} stroke={1.9} />
+                <span>{isSharing ? 'Sharing...' : 'Share'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Main Desktop Two-Column Split (Left Day Card / Right Context Rail) */}
+          <div className={classes.desktopSplit}>
+            <div style={{ minWidth: 0 }}>
+              {selectedDayTopic ? (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={selectedDayTopic.id}
+                    initial={{ opacity: 0, x: slideDirection * 18 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: slideDirection * -18 }}
+                    transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
+                  >
+                    <TimelineDayCard
+                      plan={plan}
+                      dayTopic={selectedDayTopic}
+                      onUpdate={handleUpdateTopic}
+                      setPlan={setPlan}
+                      isInitiallyCollapsed={false}
+                    />
+                  </motion.div>
+                </AnimatePresence>
+              ) : (
+                <div
+                  style={{
+                    borderRadius: '20px',
+                    backgroundColor: 'var(--kp-surface)',
+                    border: '1px solid var(--kp-border)',
+                    padding: '24px',
+                    color: 'var(--kp-secondary)',
+                    fontSize: '14px',
+                  }}
+                >
+                  No topics found for this day.
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Context Rail */}
+            <aside className={classes.desktopStack}>
+              <OverviewCard
+                dayTopic={selectedDayTopic}
+                completedTasks={completedTasks}
+                totalTasks={totalTasks}
+                progressPercent={planProgress}
+              />
+
+              <section
+                style={{
+                  borderRadius: '20px',
+                  backgroundColor: 'var(--kp-surface)',
+                  border: '1px solid var(--kp-border)',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--kp-secondary)',
+                    marginBottom: '2px',
+                  }}
+                >
+                  Actions
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setQuizOpened(true)}
+                  className={`${classes.railActionBtn} kp-tactile`}
+                  style={{
+                    backgroundColor: 'var(--kp-apricot)',
+                    border: '1px solid var(--kp-border-strong)',
+                    color: 'var(--kp-primary)',
+                  }}
+                >
+                  <IconBrain size={16} stroke={1.9} />
+                  <span>Start Quiz</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isForging}
+                  onClick={handleCramSheetAction}
+                  className={`${classes.railActionBtn} kp-tactile`}
+                  style={{
+                    backgroundColor: 'var(--kp-raised)',
+                    border: '1px solid var(--kp-border)',
+                    color: 'var(--kp-ink)',
+                  }}
+                >
+                  <IconFlame size={16} stroke={1.9} />
+                  <span>
+                    {cramSheet?.status === 'complete' ? 'View Cram Sheet' : 'Forge Cram Sheet'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!canDownloadSelectedDayNotes}
+                  onClick={handleDownloadDayNotes}
+                  className={classes.railActionBtn}
+                  style={{
+                    backgroundColor: 'var(--kp-raised)',
+                    border: '1px solid var(--kp-border)',
+                    color: 'var(--kp-ink)',
+                  }}
+                >
+                  <IconDownload size={16} stroke={1.9} />
+                  <span>Download Day Notes</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSharing}
+                  onClick={handleSharePlan}
+                  className={classes.railActionBtn}
+                  style={{
+                    backgroundColor: 'var(--kp-raised)',
+                    border: '1px solid var(--kp-border)',
+                    color: 'var(--kp-ink)',
+                  }}
+                >
+                  <IconShare3 size={16} stroke={1.9} />
+                  <span>{isSharing ? 'Sharing...' : 'Share'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRegenerateModalOpened(true)}
+                  className={classes.railActionBtn}
+                  style={{
+                    backgroundColor: 'var(--kp-raised)',
+                    border: '1px solid var(--kp-border)',
+                    color: 'var(--kp-ink)',
+                  }}
+                >
+                  <IconRefresh size={16} stroke={1.9} />
+                  <span>Refine Plan</span>
+                </button>
+              </section>
+
+              {selectedDayTopic && (
+                <section
+                  style={{
+                    borderRadius: '20px',
+                    backgroundColor: 'var(--kp-surface)',
+                    border: '1px solid var(--kp-border)',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: 'var(--kp-secondary)',
+                    }}
+                  >
+                    Details
+                  </div>
+                  <div style={{ height: '1px', backgroundColor: 'var(--kp-border)' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                    <span style={{ color: 'var(--kp-secondary)' }}>Date</span>
+                    <span style={{ fontWeight: 600, color: 'var(--kp-ink)' }}>
+                      {formatSafeDate(selectedDayTopic.date)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                    <span style={{ color: 'var(--kp-secondary)' }}>Tasks</span>
+                    <span style={{ fontWeight: 600, color: 'var(--kp-ink)' }}>
+                      {(selectedDayTopic.sub_topics || []).length} items
+                    </span>
+                  </div>
+                  {plan.exam_date && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: 'var(--kp-secondary)' }}>Exam date</span>
+                      <span style={{ fontWeight: 600, color: 'var(--kp-ink)' }}>
+                        {formatSafeDate(plan.exam_date)}
+                      </span>
+                    </div>
+                  )}
+                </section>
+              )}
+            </aside>
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      <QuizOrchestratorModal
+        opened={quizOpened}
+        onClose={() => setQuizOpened(false)}
+        planTopicId={selectedDayTopic?.id}
+      />
+
+      <RegeneratePlanModal
+        opened={regenerateModalOpened}
+        onClose={() => setRegenerateModalOpened(false)}
+        plan={plan}
+      />
+
+      {shareModalOpened && (
+        <div
+          onClick={() => setShareModalOpened(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Share plan"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 3500,
+            backgroundColor: 'rgba(17, 19, 23, 0.54)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '440px',
+              borderRadius: '20px',
+              backgroundColor: 'var(--kp-surface)',
+              border: '1px solid var(--kp-border-strong)',
+              color: 'var(--kp-ink)',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              boxShadow: '0 24px 60px rgba(0, 0, 0, 0.3)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2
+                style={{
+                  margin: 0,
+                  fontFamily: 'var(--font-kp-mono)',
+                  fontSize: '18px',
+                  fontWeight: 700,
+                  color: 'var(--kp-ink)',
+                }}
+              >
+                Share plan
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShareModalOpened(false)}
+                aria-label="Close share dialog"
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--kp-border)',
+                  backgroundColor: 'var(--kp-raised)',
+                  color: 'var(--kp-ink)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <IconX size={16} />
+              </button>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--kp-secondary)' }}>
+              Anyone with this link can view a read-only copy of this study plan.
+            </p>
+
+            <input
+              type="text"
+              readOnly
+              value={shareableLink}
+              onClick={(e) => e.currentTarget.select()}
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 12px',
+                borderRadius: '12px',
+                border: '1px solid var(--kp-border)',
+                backgroundColor: 'var(--kp-raised)',
+                color: 'var(--kp-ink)',
+                fontFamily: 'var(--font-kp-mono)',
+                fontSize: '12px',
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={handleCopyShareLink}
+              className="kp-tactile"
+              style={{
+                height: '46px',
+                borderRadius: '14px',
+                border: 'none',
+                backgroundColor: copiedShareLink ? 'var(--kp-mint)' : 'var(--kp-primary)',
+                color: copiedShareLink ? 'var(--kp-success-ink)' : 'var(--kp-on-primary)',
+                fontSize: '14px',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '7px',
+                cursor: 'pointer',
+              }}
+            >
+              {copiedShareLink ? <IconCheck size={16} /> : <IconCopy size={16} />}
+              <span>{copiedShareLink ? 'Copied!' : 'Copy link'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </KalPadShell>
+  );
 }

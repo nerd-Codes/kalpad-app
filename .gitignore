@@ -15,10 +15,12 @@
 
 # next.js
 /.next/
+**/.next/
 /out/
 
-# production
-/build
+# IDE & Editor files
+.vs/
+.vscode/
 
 # misc
 .DS_Store
@@ -44,6 +46,7 @@ next-env.d.ts
 **/public/sw.js
 **/public/workbox-*.js
 **/public/worker-*.js
+**/public/fallback-*.js
 **/public/sw.js.map
 **/public/workbox-*.js.map
 **/public/worker-*.js.map

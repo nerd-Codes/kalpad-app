@@ -5,6 +5,20 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const GuestContext = createContext();
 
+export function saveGuestArtifactDirect(data) {
+  const artifact = {
+    ...data,
+    generatedNotes: data.generatedNotes || [],
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('kalpad_guest_artifact', JSON.stringify(artifact));
+      window.dispatchEvent(new CustomEvent('kalpad_guest_artifact_updated'));
+    } catch (_) {}
+  }
+  return artifact;
+}
+
 export const GuestProvider = ({ children }) => {
   const [guestArtifact, setGuestArtifact] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false); // To prevent hydration mismatch

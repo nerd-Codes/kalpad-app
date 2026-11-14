@@ -115,60 +115,46 @@ function FloatingSidebar({ user, tier, onNavigate, onSignOut }) {
             className="fixed left-4 top-4 bottom-4 w-64 flex flex-col z-50 hidden md:flex"
             style={{ 
                 position: 'fixed', left: '16px', top: '16px', bottom: '16px', width: '260px',
-                display: 'flex', flexDirection: 'column', padding: '24px', zIndex: 50 
+                display: 'flex', flexDirection: 'column', padding: '20px 16px', zIndex: 50,
+                backgroundColor: 'var(--apple-deepest, #0f0f10)',
+                borderRadius: 14
             }}
             animate={false} 
         >
             {/* Logo & Tier Badge */}
-            {/* Logo & Tier Badge */}
-            <Box mb={40} px={8} pt={8}>
-                {/* Dynamic Wordmark */}
+            <Box mb={28} px={8} pt={4}>
                 <Title 
                     order={2} 
                     style={{ 
-                        letterSpacing: '-0.03em', 
-                        fontSize: '1.75rem',
-                        // If free, use white. If paid, use the Tier Color with a slight gradient effect.
-                        color: tier === 'free' ? 'white' : 'transparent',
-                        backgroundImage: tier !== 'free' ? `linear-gradient(135deg, white 20%, ${config.color} 100%)` : 'none',
-                        backgroundClip: tier !== 'free' ? 'text' : 'border-box',
-                        WebkitBackgroundClip: tier !== 'free' ? 'text' : 'border-box'
+                        letterSpacing: '-0.02em', 
+                        fontSize: '1.25rem',
+                        fontWeight: 500,
+                        color: 'var(--apple-text-primary, #ededed)'
                     }}
                 >
                     KalPad
                 </Title>
                 
-                {/* Flashy Tier Badge */}
                 <Box mt={6}>
-                     {config.isSpecial ? (
-                        <Box 
-                            style={{
-                                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                                padding: '4px 10px', borderRadius: '99px',
-                                background: `linear-gradient(90deg, ${config.color}20, ${config.color}40)`,
-                                border: `1px solid ${config.color}`,
-                                boxShadow: `0 0 15px ${config.color}40`
-                            }}
-                        >
-                            <TierIcon size={12} color={config.color} fill={config.color} />
-                            <Text size="10px" fw={800} c={config.color} tt="uppercase" style={{ letterSpacing: '0.1em' }}>
-                                {config.label}
-                            </Text>
-                        </Box>
-                     ) : (
-                        <Group gap={6}>
-                            <TierIcon size={14} color={tier === 'free' ? 'gray' : config.color} />
-                            <Text size="xs" c={tier === 'free' ? 'dimmed' : 'white'} fw={700} tt="uppercase" style={{ letterSpacing: '0.1em' }}>
-                                {config.label}
-                            </Text>
-                        </Group>
-                     )}
+                    <Box 
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '6px',
+                            padding: '2px 8px', borderRadius: 4,
+                            backgroundColor: 'var(--apple-gray-2, #232325)',
+                            border: '1px solid var(--glass-border, rgba(237, 237, 237, 0.08))'
+                        }}
+                    >
+                        <TierIcon size={12} color="var(--apple-text-muted, #85858b)" />
+                        <Text size="11px" fw={500} c="var(--apple-text-secondary, #a1a1a6)">
+                            {config.label}
+                        </Text>
+                    </Box>
                 </Box>
             </Box>
 
             {/* Navigation Links */}
-            <Stack gap="xs" style={{ flex: 1 }}>
-                <Text size="xs" fw={600} c="dimmed" px={12} mb={4} tt="uppercase" style={{ letterSpacing: '0.05em' }}>Menu</Text>
+            <Stack gap={4} style={{ flex: 1 }}>
+                <Text size="xs" fw={500} c="dimmed" px={10} mb={4}>Navigation</Text>
                 {navLinks.map((link) => {
                     const isActive = pathname === link.href;
                     return (
@@ -182,18 +168,19 @@ function FloatingSidebar({ user, tier, onNavigate, onSignOut }) {
                         }}>
                             <Box
                                 id={link.id}
-                                py={10} px={12}
+                                py={8} px={10}
                                 style={{
-                                    borderRadius: '12px',
-                                    backgroundColor: isActive ? 'rgba(191, 90, 242, 0.15)' : 'transparent',
-                                    color: isActive ? '#BF5AF2' : link.color || 'var(--apple-text-secondary)', 
-                                    display: 'flex', alignItems: 'center', gap: '12px',
-                                    transition: 'color 0.2s ease',
+                                    borderRadius: 8,
+                                    backgroundColor: isActive ? 'var(--apple-gray-2, #232325)' : 'transparent',
+                                    border: isActive ? '1px solid var(--glass-border, rgba(237, 237, 237, 0.08))' : '1px solid transparent',
+                                    color: isActive ? 'var(--apple-text-primary, #ededed)' : 'var(--apple-text-secondary, #a1a1a6)', 
+                                    display: 'flex', alignItems: 'center', gap: 10,
+                                    transition: 'all 150ms ease',
                                     cursor: 'pointer'
                                 }}
                             >
-                                <link.icon size={20} stroke={isActive ? 2 : 1.5} />
-                                <Text size="sm" fw={isActive || link.action === 'upgrade' ? 600 : 500}>{link.label}</Text>
+                                <link.icon size={18} stroke={isActive ? 1.75 : 1.5} />
+                                <Text size="sm" fw={isActive ? 500 : 400}>{link.label}</Text>
                             </Box>
                         </Interactive>
                     );
@@ -201,46 +188,31 @@ function FloatingSidebar({ user, tier, onNavigate, onSignOut }) {
             </Stack>
 
             {/* User Profile */}
-            <Group justify="center" mb="md">
-                    <Tooltip label="Reduce animations for slower devices" withArrow position="right">
-                        <Button 
-                            variant="subtle" 
-                            size="xs" 
-                            color="gray" 
-                            radius="xl"
-                            onClick={() => window.dispatchEvent(new CustomEvent('toggle-lite-mode'))}
-                            leftSection={<IconBolt size={14} />}
-                        >
-                            Toggle Lite Mode
-                        </Button>
-                    </Tooltip>
-                </Group>
             <Menu shadow="md" width={220} position="top-start" withArrow>
                 <Menu.Target>
-                    <Box pt={16} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <Box pt={14} style={{ borderTop: '1px solid var(--glass-border, rgba(237, 237, 237, 0.08))' }}>
                         <Interactive>
-                            <Group style={{ cursor: 'pointer', padding: '8px', borderRadius: '12px' }}>
+                            <Group style={{ cursor: 'pointer', padding: '6px 8px', borderRadius: 8 }}>
                                 <Avatar 
-                                    color="violet" radius="xl" size="md"
-                                    style={{ border: `2px solid ${config.ring}` }}
+                                    color="gray" radius="xl" size="sm"
+                                    style={{ border: '1px solid rgba(237, 237, 237, 0.1)', backgroundColor: 'var(--apple-gray-2, #232325)' }}
                                 >
-                                    {user?.email?.substring(0, 2).toUpperCase()}
+                                    {user?.email ? user.email.substring(0, 2).toUpperCase() : 'G'}
                                 </Avatar>
-                                <div style={{ flex: 1 }}>
-                                    <Text size="sm" fw={600} c="var(--apple-text-primary)" truncate>
-                                    {user?.email ? `${user.email.split('@')[0].slice(0, 8)}...` : ''}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <Text size="xs" fw={500} c="var(--apple-text-primary, #ededed)" truncate>
+                                        {user?.email ? user.email.split('@')[0] : 'Guest'}
                                     </Text>
-
-                                    <Text size="xs" c="dimmed">Student</Text>
+                                    <Text size="11px" c="dimmed">{user?.email ? 'Student' : 'Not signed in'}</Text>
                                 </div>
-                                <IconSettings size={16} color="var(--apple-text-secondary)" />
+                                <IconSettings size={15} color="var(--apple-text-muted, #85858b)" />
                             </Group>
                         </Interactive>
                     </Box>
                 </Menu.Target>
-                <Menu.Dropdown style={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E' }}>
+                <Menu.Dropdown style={{ backgroundColor: 'var(--apple-gray-1, #19191b)', borderColor: 'var(--glass-border, rgba(237, 237, 237, 0.08))' }}>
                     <Menu.Item leftSection={<IconUser size={14} />} disabled>Profile</Menu.Item>
-                    <Menu.Divider color="#2C2C2E" />
+                    <Menu.Divider color="var(--glass-border, rgba(237, 237, 237, 0.08))" />
                     <Menu.Item color="red" leftSection={<IconLogout size={14} />} onClick={onSignOut}>Sign Out</Menu.Item>
                 </Menu.Dropdown>
             </Menu>
@@ -325,10 +297,10 @@ function MobileNavbar({ user, tier, onNavigate, onSignOut, isLiteMode }) {
                             <Stack align="center" gap={4} style={{ padding: '8px' }}>
                                 <Box style={{ padding: '6px 20px' }}>
                                     <Avatar 
-                                        color="violet" radius="xl" size={26} 
-                                        style={{ border: `2px solid ${config.ring}` }} // Tier-colored ring
+                                        color="gray" radius="xl" size={26} 
+                                        style={{ border: `1px solid rgba(237, 237, 237, 0.1)`, backgroundColor: 'var(--apple-gray-2, #232325)' }}
                                     >
-                                        {user?.email?.substring(0, 2).toUpperCase()}
+                                        {user?.email ? user.email.substring(0, 2).toUpperCase() : 'G'}
                                     </Avatar>
                                 </Box>
                                 <Text size="10px" fw={600} c="dimmed">Profile</Text>
@@ -466,12 +438,8 @@ export default function AppLayout({ children, session, isGuest }) {
         );
     }
 
-    if (!session) return <Box p="md">{children}</Box>;
-
     return (
-
-        
-        <div style={{ minHeight: '100vh', display: 'flex' }}>
+        <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: 'var(--apple-bg, #141415)' }}>
             {/* FAILED PAYMENT RESOLUTION MODAL */}
             {failedTransaction && (
                 <TransactionStatusModal 
@@ -481,7 +449,7 @@ export default function AppLayout({ children, session, isGuest }) {
             )}
 
             {isDesktop && (
-                 <FloatingSidebar user={session.user} tier={tier} onNavigate={handleNavigation} onSignOut={handleSignOut} />
+                 <FloatingSidebar user={session?.user || null} tier={tier} onNavigate={handleNavigation} onSignOut={handleSignOut} />
             )}
 
             <OnboardingTour />
@@ -546,7 +514,7 @@ export default function AppLayout({ children, session, isGuest }) {
             </main>
 
             {!isDesktop && (
-                <MobileNavbar user={session.user} tier={tier} onNavigate={handleNavigation} onSignOut={handleSignOut} isLiteMode={isLiteMode} />
+                <MobileNavbar user={session?.user || null} tier={tier} onNavigate={handleNavigation} onSignOut={handleSignOut} isLiteMode={isLiteMode} />
             )}
         </div>
     );

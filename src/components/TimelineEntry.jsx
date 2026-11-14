@@ -8,6 +8,7 @@ import { IconPencilPlus, IconBrain, IconPlayerPlay, IconMessageCircle, IconEye }
 import Link from 'next/link';
 import { useLoading } from '@/context/LoadingContext';
 import { notifications } from '@mantine/notifications';
+import { generateNoteBYOK } from '@/lib/byok/pipelines/notesGenerator';
 import { FullscreenNoteViewer } from './FullscreenNoteViewer';
 import { QuizModal } from './QuizModal';
 import { SummaryModal } from './SummaryModal';
@@ -81,18 +82,25 @@ export function TimelineEntry({ taskGroup, onUpdate, onNoteGenerated }) {
         setGeneratingNotesFor(subTopicText);
         setNoteError('');
         try {
-            const response = await fetch('/api/generate-notes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    plan_topic_id: dailyTopic.id,
-                    sub_topic_text: subTopicText,
-                    exam_name: examName,
-                    day_topic: dailyTopic.topic_name
-                }),
+            const { note: newNote } = await generateNoteBYOK({
+                planTopicId: dailyTopic.id,
+                subTopicText,
+                examName,
+                dayTopic: dailyTopic.topic_name,
+                isGuest: false,
             });
-            if (!response.ok) throw new Error((await response.json()).error || 'Failed to generate notes.');
-            
+            if (newNote) {
+                setLocalNotes((current) => {
+                    const idx = current.findIndex((n) => n.sub_topic_text === subTopicText);
+                    if (idx > -1) {
+                        const copy = [...current];
+                        copy[idx] = newNote;
+                        return copy;
+                    }
+                    return [...current, newNote];
+                });
+            }
+
             if (onNoteGenerated) {
                 await onNoteGenerated();
             }
@@ -104,8 +112,14 @@ export function TimelineEntry({ taskGroup, onUpdate, onNoteGenerated }) {
             });
 
         } catch (err) {
-            notifications.show({ title: 'Note Generation Failed', message: err.message, color: 'red' });
-            setNoteError(err.message);
+            if (err?.code === 'BYOK_NOT_CONNECTED' && typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('open-byok-chat'));
+            }
+            const msg = err?.code === 'BYOK_NOT_CONNECTED'
+                ? 'Connect your ChatGPT account in the opened panel to generate study notes.'
+                : (err?.message || 'Failed to generate notes.');
+            notifications.show({ title: 'Note Generation Failed', message: msg, color: 'red' });
+            setNoteError(msg);
         } finally {
             setIsLoading(false);
             setGeneratingNotesFor(null);

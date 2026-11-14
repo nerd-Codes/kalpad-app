@@ -20,7 +20,7 @@ export function Community() {
                         backgroundColor: 'rgba(15, 15, 20, 0.6)',
                         backdropFilter: 'blur(30px) saturate(150%)',
                         border: '1px solid rgba(255, 255, 255, 0.08)',
-                        boxShadow: '0 0 100px -20px rgba(124, 58, 237, 0.2)', // Purple glow
+                        boxShadow: 'none',
                         textAlign: 'center'
                     }}
                 >
@@ -81,7 +81,7 @@ export function Community() {
                                     style={{
                                         backgroundColor: '#5865F2',
                                         color: 'white',
-                                        boxShadow: '0 10px 30px rgba(88, 101, 242, 0.4)',
+                                        boxShadow: 'none',
                                         border: 'none',
                                         fontSize: '1.1rem'
                                     }}

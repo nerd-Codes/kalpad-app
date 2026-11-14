@@ -7,7 +7,7 @@ import { GlassCard } from '../../GlassCard';
 import { Interactive } from '@/components/Interactive';
 
 // --- VISUAL CONSTANTS ---
-const NEON_PURPLE = '#BF5AF2';
+const ACCENT_AMBER = '#D97706';
 const CHAOS_RED = '#FF3B30';
 
 // --- COMPONENT: THE GRAVEYARD (The Old Way) ---
@@ -30,14 +30,14 @@ function FragmentedTools() {
                     }}
                     transition={{ 
                         duration: 3 + i, 
-                        repeat: Infinity, 
+                        repeat: 0, 
                         ease: "linear" 
                     }}
                 >
                     <GlassCard p="md" style={{ border: '1px solid rgba(255, 59, 48, 0.2)', background: 'rgba(255, 59, 48, 0.05)' }}>
                         <Stack gap="xs" align="center" ta="center">
                             <IconBolt size={20} color={CHAOS_RED} style={{ opacity: 0.5 }} />
-                            <Text size="xs" fw={700} c="red.3" tt="uppercase">{tool.label}</Text>
+                            <Text size="xs" fw={700} c="red.3">{tool.label}</Text>
                             <Text size="10px" c="dimmed" lh={1.2}>{tool.desc}</Text>
                         </Stack>
                     </GlassCard>
@@ -61,20 +61,20 @@ function UnifiedCore() {
                 h="100%"
                 style={{ 
                     // Massive, thick glass aesthetic
-                    background: 'rgba(20, 20, 25, 0.8)',
-                    border: `1px solid ${NEON_PURPLE}`,
-                    boxShadow: `0 0 60px -20px ${NEON_PURPLE}40`,
+                    background: '#19191b',
+                    border: '1px solid rgba(237, 237, 237, 0.08)',
+                    boxShadow: 'none',
                     display: 'flex', flexDirection: 'column', justifyContent: 'center',
                     position: 'relative', overflow: 'hidden'
                 }}
             >
-                {/* Background Reactor Core */}
-                <div style={{ position: 'absolute', top: '-50%', right: '-50%', width: '100%', height: '100%', background: 'radial-gradient(circle, rgba(191,90,242,0.2) 0%, transparent 70%)', filter: 'blur(60px)' }} />
+                {/* Background Accent Subtle */}
+                <div style={{ position: 'absolute', top: '-50%', right: '-50%', width: '100%', height: '100%', background: 'radial-gradient(circle, rgba(217, 119, 6, 0.1) 0%, transparent 70%)', filter: 'blur(60px)' }} />
 
                 <Stack gap="xl" style={{ position: 'relative', zIndex: 10 }}>
                     <Group justify="space-between" align="start">
-                        <Badge variant="gradient" gradient={{ from: '#BF5AF2', to: '#5E5CE6' }} size="xl" radius="sm">
-                            THE SINGULARITY
+                        <Badge size="xl" radius="sm" style={{ backgroundColor: '#D97706', color: '#0f0f10' }}>
+                            The Singularity
                         </Badge>
                         <IconInfinity size={40} color="white" />
                     </Group>
@@ -96,7 +96,7 @@ function UnifiedCore() {
                             <Group>
                                 <ThemeIcon color="green" variant="light" size="lg" radius="md"><IconBrandAndroid size={20}/></ThemeIcon>
                                 <Box>
-                                    <Text size="xs" c="green.4" fw={700} tt="uppercase">SYSTEM UPDATE</Text>
+                                    <Text size="xs" c="green.4" fw={700}>System Update</Text>
                                     <Text size="sm" c="white" fw={600}>Native Android App is LIVE.</Text>
                                 </Box>
                             </Group>
@@ -110,7 +110,7 @@ function UnifiedCore() {
 
 export function TheShift() {
     return (
-        <Box py={{ base: 100, md: 160 }} style={{ position: 'relative', zIndex: 10 }}>
+        <Box py={{ base: 64, md: 96 }} style={{ position: 'relative', zIndex: 10 }}>
             <Container size="lg">
                 <Stack align="center" ta="center" gap="md" mb={80}>
                     <Title 
@@ -135,8 +135,8 @@ export function TheShift() {
                     
                     {/* LEFT: THE PROBLEM */}
                     <Box style={{ position: 'relative' }}>
-                        <Text size="xs" fw={700} c="red.4" tt="uppercase" ta="center" mb="lg" style={{ letterSpacing: '0.2em' }}>
-                            // THE CURRENT MESS
+                        <Text size="xs" fw={700} c="red.4" ta="center" mb="lg">
+                            // The Current Mess
                         </Text>
                         <FragmentedTools />
                         
@@ -154,8 +154,8 @@ export function TheShift() {
 
                     {/* RIGHT: THE SOLUTION */}
                     <Box>
-                        <Text size="xs" fw={700} c="#BF5AF2" tt="uppercase" ta="center" mb="lg" style={{ letterSpacing: '0.2em' }}>
-                            // THE KALPAD ENGINE
+                        <Text size="xs" fw={700} c="#D97706" ta="center" mb="lg">
+                            // The KalPad Engine
                         </Text>
                         <UnifiedCore />
                     </Box>
@@ -163,7 +163,7 @@ export function TheShift() {
 
                 {/* THE "JUST STARTED" FOOTER */}
                 <Stack align="center" mt={100}>
-                    <Text fw={700} size="sm" c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>
+                    <Text fw={700} size="sm" c="dimmed">
                         And we are just getting started
                     </Text>
                     <Box style={{ height: '40px', width: '1px', background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.2))' }} />

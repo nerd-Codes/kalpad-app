@@ -7,8 +7,8 @@ import { IconChartBar, IconBulb, IconBook, IconCircleX, IconCircleCheck, IconSpa
 import { GlassCard } from '@/components/GlassCard';
 
 // --- VISUAL CONSTANTS ---
-const NEON_PURPLE = '#BF5AF2';
-const NEON_BLUE = '#5E5CE6';
+const ACCENT_AMBER = '#D97706';
+const ACCENT_MUTED = '#a1a1a6';
 const NEON_GREEN = '#34C759';
 const NEON_RED = '#FF3B30';
 
@@ -49,7 +49,7 @@ function NoteGenMockup() {
                                         transition={{ delay: 0.2 + (i * 0.1), type: "spring" }}
                                         style={{ 
                                             flex: 1, 
-                                            background: i === 3 ? NEON_PURPLE : 'rgba(255,255,255,0.1)', 
+                                            background: i === 3 ? ACCENT_AMBER : 'rgba(255,255,255,0.1)', 
                                             borderRadius: '4px 4px 0 0' 
                                         }}
                                     />
@@ -89,7 +89,7 @@ function DoubtSolverMockup() {
                             The rate of change of flux is directly proportional to <br/>
                             <motion.span 
                                 animate={{ 
-                                    backgroundColor: step >= 1 ? 'rgba(191, 90, 242, 0.3)' : 'transparent',
+                                    backgroundColor: step >= 1 ? 'rgba(217, 119, 6, 0.3)' : 'transparent',
                                     color: step >= 1 ? '#fff' : 'inherit'
                                 }}
                                 style={{ borderRadius: '4px', padding: '2px 4px', position: 'relative' }}
@@ -108,7 +108,7 @@ function DoubtSolverMockup() {
                                         }}
                                     >
                                         <IconBook size={16} color="gray" />
-                                        <IconBulb size={16} color={NEON_PURPLE} />
+                                        <IconBulb size={16} color={ACCENT_AMBER} />
                                     </motion.div>
                                 )}
                             </motion.span>
@@ -122,10 +122,10 @@ function DoubtSolverMockup() {
                         animate={{ opacity: 1, y: 0 }}
                         style={{ width: '100%' }}
                     >
-                        <GlassCard p="md" style={{ borderLeft: `4px solid ${NEON_PURPLE}` }}>
+                        <GlassCard p="md" style={{ borderLeft: `4px solid ${ACCENT_AMBER}` }}>
                             <Group mb="xs">
-                                <IconSparkles size={16} color={NEON_PURPLE} />
-                                <Text size="xs" fw={700} c="#BF5AF2" tt="uppercase">Analogy</Text>
+                                <IconSparkles size={16} color={ACCENT_AMBER} />
+                                <Text size="xs" fw={700} c="#D97706">Analogy</Text>
                             </Group>
                             <Text size="sm" c="white" lh={1.5}>
                                 Think of it like a water pump. The faster you push the handle (flux change), the higher the water pressure (EMF) shoots out.
@@ -203,9 +203,9 @@ export function TheToolkit() {
                         color="dark" 
                         size="lg" 
                         radius="sm"
-                        style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', letterSpacing: '0.1em' }}
+                        style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' }}
                     >
-                        COMPLETE ARSENAL
+                        Complete Arsenal
                     </Badge>
                     <Title 
                         order={2} 

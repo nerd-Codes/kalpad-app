@@ -7,12 +7,14 @@ import '@mantine/notifications/styles.css';
 import '@mantine/core/styles.css'; // Ensure base styles are always included
 import { OnboardingProvider } from '@/context/OnboardingContext';
 import { GuestProvider } from '@/context/GuestContext'; // --- NEW IMPORT ---
-import {PerformanceProvider } from '@/context/PerformanceContext';
+import { PerformanceProvider } from '@/context/PerformanceContext';
+import { KalPadThemeProvider } from '@/context/KalPadThemeContext';
 
 import { BackgroundBlobs } from "@/components/BackgroundBlobs";
 import { PageLoader } from "@/components/PageLoader";
 import { LoadingProvider, useLoading } from "@/context/LoadingContext";
 import { PostHogProvider } from './PostHogProvider';
+import ServiceWorkerRegistry from './ServiceWorkerRegistry';
 
 // The theme definition is unchanged
 const theme = createTheme({
@@ -69,6 +71,7 @@ export function Providers({ children, variant = 'app', colorScheme = 'dark' }) {
   // For the default 'app' variant, we render the full application chrome.
   return (
     <LoadingProvider>
+      <KalPadThemeProvider>
       <MantineProvider theme={theme} defaultColorScheme={colorScheme}>
         <PerformanceProvider>
         {/* --- WRAP APP WITH GUEST PROVIDER --- */}
@@ -86,6 +89,7 @@ export function Providers({ children, variant = 'app', colorScheme = 'dark' }) {
                     }
                 `}</style>
                 <Notifications zIndex={2000} />
+                <ServiceWorkerRegistry />
                 <BackgroundBlobs />
                 <AppContent>{children}</AppContent>
                 </PostHogProvider>
@@ -93,6 +97,7 @@ export function Providers({ children, variant = 'app', colorScheme = 'dark' }) {
         </GuestProvider>
         </PerformanceProvider>
       </MantineProvider>
+      </KalPadThemeProvider>
     </LoadingProvider>
   );
 }

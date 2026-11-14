@@ -3,40 +3,31 @@
 
 import { Container, Title, Text, Box, Stack, Badge, Group, ThemeIcon, SimpleGrid, RingProgress } from '@mantine/core';
 import { motion } from 'framer-motion';
-import { IconHierarchy, IconTarget, IconDatabase, IconArrowDown, IconAlertTriangle, IconSparkles, IconHistory } from '@tabler/icons-react';
-import { GlassCard } from '@/components/GlassCard';
-
-// --- EDITORIAL FONT STYLE ---
-const serifItalic = {
-    fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
-    fontStyle: 'italic',
-    fontWeight: 400,
-    color: '#BF5AF2',
-    textTransform: 'lowercase'
-};
+import { IconGitBranch, IconTarget, IconRefresh, IconArrowDown, IconCheck } from '@tabler/icons-react';
 
 const FEATURES = [
     {
         id: "01",
         title: "Prerequisite Check",
-        subtitle: "KNOW WHAT TO STUDY FIRST",
-        icon: IconHierarchy,
-        color: "#BF5AF2", // Purple
-        desc: "Some chapters only make sense after you finish the basics.",
-        detail: "KalPad checks your syllabus order and places foundation topics before advanced ones so you do not get stuck halfway.",
+        subtitle: "Foundation and prerequisite ordering",
+        icon: IconGitBranch,
+        desc: "Advanced chapters only make sense after core fundamentals are secured.",
+        detail: "KalPad maps your syllabus dependency tree and schedules foundation topics first so you never encounter conceptual roadblocks during late-night revision.",
         visual: (
-            <Box p="md" style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(191, 90, 242, 0.2)' }}>
+            <Box p="md" style={{ backgroundColor: '#232325', borderRadius: '8px', border: '1px solid rgba(237, 237, 237, 0.08)' }}>
                 <Group justify="space-between" mb="xs">
-                    <Badge variant="filled" color="dark" size="xs">Study Order</Badge>
-                    <IconAlertTriangle size={14} color="#BF5AF2" />
+                    <Badge variant="filled" size="xs" radius="sm" style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', color: '#a1a1a6', fontWeight: 500 }}>
+                        Study order
+                    </Badge>
+                    <IconGitBranch size={14} color="#85858b" />
                 </Group>
                 <Stack gap="xs" align="center">
-                    <Box style={{ padding: '4px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', width: '100%', textAlign: 'center' }}>
-                        <Text size="10px" c="dimmed">Advanced Calculus (Target)</Text>
+                    <Box style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(237, 237, 237, 0.08)', backgroundColor: 'rgba(255, 255, 255, 0.02)', width: '100%', textAlign: 'center' }}>
+                        <Text size="11px" c="#85858b">Target module: Advanced Differential Equations</Text>
                     </Box>
-                    <IconArrowDown size={12} color="gray" />
-                    <Box style={{ padding: '4px 12px', borderRadius: '4px', border: '1px solid #BF5AF2', background: 'rgba(191, 90, 242, 0.1)', width: '100%', textAlign: 'center' }}>
-                        <Text size="10px" c="violet.2" fw={700}>Missing: Limits & Continuity</Text>
+                    <IconArrowDown size={14} color="#85858b" />
+                    <Box style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(217, 119, 6, 0.3)', backgroundColor: 'rgba(217, 119, 6, 0.08)', width: '100%', textAlign: 'center' }}>
+                        <Text size="11px" c="#D97706" fw={500}>Required foundation: Limits, Continuity & Series</Text>
                     </Box>
                 </Stack>
             </Box>
@@ -45,24 +36,34 @@ const FEATURES = [
     {
         id: "02",
         title: "Important Question Practice",
-        subtitle: "PRACTICE WHAT REPEATS",
+        subtitle: "Practice repeated exam questions",
         icon: IconTarget,
-        color: "#FFD700", // Gold
-        desc: "Every exam has patterns, and students should not have to find them manually.",
-        detail: "KalPad adds high-yield questions into your daily work so you learn the theory and the common ways it gets asked.",
+        desc: "Every exam follows recurring question patterns. High-yield problems shouldn't be a mystery.",
+        detail: "KalPad analyzes past year papers to flag high-yield questions with verified repetition history, integrating targeted problem-solving into your daily schedule.",
         visual: (
-            <Box p="md" style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(255, 215, 0, 0.2)' }}>
+            <Box p="md" style={{ backgroundColor: '#232325', borderRadius: '8px', border: '1px solid rgba(237, 237, 237, 0.08)' }}>
                 <Group justify="space-between" mb="xs">
-                    <Badge variant="gradient" gradient={{ from: 'yellow', to: 'orange' }} size="xs">High Yield</Badge>
-                    <IconSparkles size={14} color="#FFD700" />
+                    <Badge size="xs" radius="sm" style={{ backgroundColor: 'rgba(217, 119, 6, 0.14)', color: '#D97706', border: '1px solid rgba(217, 119, 6, 0.25)', fontWeight: 500 }}>
+                        High yield
+                    </Badge>
+                    <IconTarget size={14} color="#D97706" />
                 </Group>
-                <Text size="10px" c="white" lh={1.4} fw={500}>
-                    "Derive the expression for electric field on the equatorial line of a dipole."
+                <Text size="12px" c="#ededed" lh={1.4} fw={400} mb="xs">
+                    "Derive the expression for electric field on the equatorial line of an electric dipole."
                 </Text>
                 <Group gap="xs" mt="xs">
-                    <Badge variant="outline" color="gray" size="xs" style={{ fontSize: '8px', height: '16px' }}>2018</Badge>
-                    <Badge variant="outline" color="gray" size="xs" style={{ fontSize: '8px', height: '16px' }}>2020</Badge>
-                    <Badge variant="outline" color="gray" size="xs" style={{ fontSize: '8px', height: '16px' }}>2022</Badge>
+                    <Badge variant="outline" size="xs" radius="sm" style={{ borderColor: 'rgba(237, 237, 237, 0.1)', color: '#a1a1a6', fontFamily: 'var(--font-lexend), monospace', fontVariantNumeric: 'tabular-nums' }}>
+                        2018
+                    </Badge>
+                    <Badge variant="outline" size="xs" radius="sm" style={{ borderColor: 'rgba(237, 237, 237, 0.1)', color: '#a1a1a6', fontFamily: 'var(--font-lexend), monospace', fontVariantNumeric: 'tabular-nums' }}>
+                        2020
+                    </Badge>
+                    <Badge variant="outline" size="xs" radius="sm" style={{ borderColor: 'rgba(237, 237, 237, 0.1)', color: '#a1a1a6', fontFamily: 'var(--font-lexend), monospace', fontVariantNumeric: 'tabular-nums' }}>
+                        2022
+                    </Badge>
+                    <Badge variant="outline" size="xs" radius="sm" style={{ borderColor: 'rgba(217, 119, 6, 0.3)', color: '#D97706', fontFamily: 'var(--font-lexend), monospace', fontVariantNumeric: 'tabular-nums' }}>
+                        2024
+                    </Badge>
                 </Group>
             </Box>
         )
@@ -70,26 +71,33 @@ const FEATURES = [
     {
         id: "03",
         title: "Weak Topics Tracker",
-        subtitle: "REVISE WHAT NEEDS WORK",
-        icon: IconDatabase,
-        color: "#22d3ee", // Cyan
-        desc: "A normal timetable does not know which topic confused you yesterday. KalPad does.",
-        detail: "When you miss a question, KalPad remembers the topic and schedules extra revision until it feels solid.",
+        subtitle: "Active recall and diagnostic reviews",
+        icon: IconRefresh,
+        desc: "A rigid calendar doesn't know where you struggled yesterday. KalPad adapts dynamically.",
+        detail: "When active recall quizzes detect low retention on a chapter, KalPad schedules focused diagnostic revision sessions until your recall confidence is verified.",
         visual: (
-            <Box p="md" style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(34, 211, 238, 0.2)' }}>
+            <Box p="md" style={{ backgroundColor: '#232325', borderRadius: '8px', border: '1px solid rgba(237, 237, 237, 0.08)' }}>
                 <Group justify="space-between" align="center">
-                    <Stack gap={0}>
-                        <Text size="10px" c="dimmed" tt="uppercase" fw={700}>Retention Score</Text>
-                        <Text size="lg" c="white" fw={700}>64%</Text>
+                    <Stack gap={2}>
+                        <Text size="11px" c="#85858b" fw={500}>Retention score</Text>
+                        <Text size="lg" c="#ededed" fw={500} style={{ fontFamily: 'var(--font-lexend), monospace', fontVariantNumeric: 'tabular-nums' }}>
+                            64%
+                        </Text>
                     </Stack>
                     <RingProgress 
-                        size={50} thickness={4} roundCaps
-                        sections={[{ value: 64, color: 'cyan' }]}
-                        label={<IconHistory size={16} style={{ display: 'block', margin: '0 auto' }} />}
+                        size={48} 
+                        thickness={4} 
+                        roundCaps
+                        sections={[{ value: 64, color: '#D97706' }]}
+                        label={
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <IconRefresh size={14} color="#85858b" />
+                            </div>
+                        }
                     />
                 </Group>
-                <Text size="10px" c="cyan.3" mt="xs">
-                    +2 Revision sessions added for "Optics"
+                <Text size="11px" c="#a1a1a6" mt="xs" lh={1.4}>
+                    +2 revision sessions scheduled for Wave Optics
                 </Text>
             </Box>
         )
@@ -98,106 +106,110 @@ const FEATURES = [
 
 export function TheBlueprint() {
     return (
-        <Box py={{ base: 100, md: 160 }} style={{ position: 'relative', zIndex: 10, backgroundColor: '#05050500' }}>
+        <Box py={{ base: 64, md: 96 }} style={{ position: 'relative', backgroundColor: 'transparent' }}>
             <Container size="lg">
                 
                 {/* --- HEADER --- */}
-                <Stack align="center" ta="center" gap="lg" mb={100}>
+                <Stack align="center" ta="center" gap="md" mb={{ base: 48, md: 64 }}>
                     <Badge 
-                        variant="filled" size="md" radius="xl" color="dark"
-                        style={{ border: '1px solid rgba(255,255,255,0.1)', letterSpacing: '0.1em' }}
+                        variant="filled" 
+                        size="md" 
+                        radius="sm"
+                        style={{ 
+                            backgroundColor: 'rgba(255, 255, 255, 0.04)', 
+                            border: '1px solid rgba(237, 237, 237, 0.08)',
+                            color: '#a1a1a6',
+                            fontWeight: 500
+                        }}
                     >
-                        WHAT IT HELPS WITH
+                        Study blueprint
                     </Badge>
                     <Title 
                         order={2} 
                         style={{ 
-                            fontFamily: 'var(--font-lexend)', 
-                            fontSize: 'clamp(2.5rem, 5vw, 4rem)', 
-                            letterSpacing: '-0.03em',
-                            lineHeight: 1.1,
-                            color: 'white',
-                            maxWidth: '900px'
+                            fontFamily: 'var(--font-inter), sans-serif', 
+                            fontSize: 'clamp(1.75rem, 3.5vw, 2.5rem)', 
+                            letterSpacing: '-0.02em',
+                            lineHeight: 1.2,
+                            fontWeight: 500,
+                            color: '#ededed',
+                            maxWidth: '720px'
                         }}
                     >
-                        A smarter way to <span style={{ ...serifItalic, textShadow: '0 5px 20px rgba(191, 90, 242, 0.25)' }}>study</span><br/>
-                        when time is short.
+                        A methodical way to study when time is short
                     </Title>
+                    <Text 
+                        size="md" 
+                        c="#a1a1a6" 
+                        maw={620} 
+                        lh={1.6}
+                    >
+                        Three targeted capabilities designed to maximize retention and exam confidence before test day.
+                    </Text>
                 </Stack>
 
                 {/* --- THE FEATURE STACK --- */}
                 <Box style={{ position: 'relative' }}>
-                    
-                    {/* The Connecting Line (Vertical) */}
-                    <div style={{ 
-                        position: 'absolute', left: '50%', top: 0, bottom: 0, width: '1px', 
-                        background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.2) 80%, transparent)',
-                        transform: 'translateX(-50%)', zIndex: 0
-                    }} className="hidden md:block" />
-
-                    <Stack gap={80}>
+                    <Stack gap={{ base: 32, md: 40 }}>
                         {FEATURES.map((feat, index) => (
-                            <Box key={feat.id} style={{ position: 'relative' }}>
-                                
-                                {/* The Central Node Dot */}
-                                <Box 
-                                    className="hidden md:flex"
-                                    style={{ 
-                                        position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
-                                        width: '12px', height: '12px', borderRadius: '50%', 
-                                        backgroundColor: '#050505', border: `2px solid ${feat.color}`, zIndex: 10
-                                    }} 
-                                />
-
-                                <SimpleGrid cols={{ base: 1, md: 2 }} spacing={60} style={{ alignItems: 'center' }}>
+                            <Box 
+                                key={feat.id} 
+                                p={{ base: 20, md: 28 }}
+                                style={{ 
+                                    backgroundColor: '#19191b',
+                                    borderRadius: '12px',
+                                    border: '1px solid rgba(237, 237, 237, 0.08)',
+                                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)'
+                                }}
+                            >
+                                <SimpleGrid cols={{ base: 1, md: 2 }} spacing={{ base: 24, md: 40 }} style={{ alignItems: 'center' }}>
                                     
-                                    {/* CONTENT SIDE (Alternates) */}
+                                    {/* CONTENT SIDE */}
                                     <Box style={{ order: index % 2 === 0 ? 1 : 2 }}>
                                         <motion.div
-                                            initial={{ opacity: 0, y: 20 }}
+                                            initial={{ opacity: 0, y: 8 }}
                                             whileInView={{ opacity: 1, y: 0 }}
-                                            viewport={{ once: true, margin: "-100px" }}
-                                            transition={{ duration: 0.6 }}
+                                            viewport={{ once: true }}
+                                            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                                         >
-                                            <Group gap="sm" mb="md">
-                                                <ThemeIcon variant="light" size="lg" radius="md" color={feat.color} style={{ backgroundColor: `${feat.color}15` }}>
-                                                    <feat.icon size={20} />
+                                            <Group gap="xs" mb="xs">
+                                                <ThemeIcon 
+                                                    variant="light" 
+                                                    size={32} 
+                                                    radius="sm" 
+                                                    style={{ 
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.04)', 
+                                                        color: '#a1a1a6',
+                                                        border: '1px solid rgba(237, 237, 237, 0.08)'
+                                                    }}
+                                                >
+                                                    <feat.icon size={16} stroke={1.5} />
                                                 </ThemeIcon>
-                                                <Text size="xs" fw={700} c={feat.color} tt="uppercase" style={{ letterSpacing: '0.1em' }}>
+                                                <Text size="xs" fw={500} c="#85858b">
                                                     {feat.subtitle}
                                                 </Text>
                                             </Group>
-                                            <Title order={3} c="white" mb="sm" style={{ fontFamily: 'var(--font-lexend)' }}>
+                                            <Title order={3} c="#ededed" mb="xs" style={{ fontSize: '20px', fontWeight: 500, lineHeight: 1.3 }}>
                                                 {feat.title}
                                             </Title>
-                                            <Text size="lg" c="white" lh={1.5} mb="md">
+                                            <Text size="sm" c="#ededed" lh={1.5} mb="sm" fw={400}>
                                                 {feat.desc}
                                             </Text>
-                                            <Text size="sm" c="gray.5" lh={1.6}>
+                                            <Text size="xs" c="#a1a1a6" lh={1.6}>
                                                 {feat.detail}
                                             </Text>
                                         </motion.div>
                                     </Box>
 
-                                    {/* VISUAL SIDE (Alternates) */}
-                                    <Box style={{ order: index % 2 === 0 ? 2 : 1, display: 'flex', justifyContent: index % 2 === 0 ? 'flex-start' : 'flex-end' }}>
+                                    {/* VISUAL SIDE */}
+                                    <Box style={{ order: index % 2 === 0 ? 2 : 1 }}>
                                         <motion.div
-                                            initial={{ opacity: 0, scale: 0.9 }}
-                                            whileInView={{ opacity: 1, scale: 1 }}
-                                            viewport={{ once: true, margin: "-100px" }}
-                                            transition={{ duration: 0.6, delay: 0.2 }}
-                                            style={{ width: '100%', maxWidth: '400px' }}
+                                            initial={{ opacity: 0, y: 8 }}
+                                            whileInView={{ opacity: 1, y: 0 }}
+                                            viewport={{ once: true }}
+                                            transition={{ duration: 0.35, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
                                         >
-                                            <GlassCard 
-                                                p="xl" 
-                                                style={{ 
-                                                    background: 'rgba(20, 20, 25, 0.6)',
-                                                    border: `1px solid ${feat.color}30`,
-                                                    boxShadow: `0 0 60px -30px ${feat.color}20`
-                                                }}
-                                            >
-                                                {feat.visual}
-                                            </GlassCard>
+                                            {feat.visual}
                                         </motion.div>
                                     </Box>
 

@@ -1,92 +1,122 @@
 // src/app/page.js
 "use client";
 
-import { Navbar } from "@/components/landing/Navbar";
-import { Footer } from "@/components/landing/Footer";
-import { motion } from 'framer-motion';
-
-// --- SECTIONS ---
-import { Hero } from "@/components/landing/personality/Hero";
-import { TheRealityCheck } from '@/components/landing/personality/TheRealityCheck';
-import { TheMethodology } from '@/components/landing/personality/TheMethodology';
-import { TheBlueprint } from '@/components/landing/personality/TheBlueprint';
-import { TheEngineRoom } from '@/components/landing/personality/TheEngineRoom';
-import { TheGodMode } from '@/components/landing/personality/TheGodMode';
-
-import { Manifesto } from "@/components/landing/personality/Manifesto";
-
-import { Arsenal } from "@/components/landing/personality/Arsenal"; 
-import { Playground } from "@/components/landing/personality/Playground"; 
-import { Devlog } from "@/components/landing/personality/Devlog"; 
-import { Community } from "@/components/landing/personality/Community"; 
-import { RealQuestion } from "@/components/landing/personality/RealQuestion"; 
-import { GoldPass } from "@/components/landing/personality/GoldPass";
-import { CookieConsent } from "@/components/landing/CookieConsent";
-import { TheBrain } from "@/components/landing/personality/TheBrain";
-import { TheToolkit } from '@/components/landing/personality/TheToolkit';
-import { GuestCTA } from '@/components/landing/personality/GuestCTA';
-import { TheShift } from '@/components/landing/personality/TheShift';
-import { ThePledge } from '@/components/landing/personality/ThePledge';
-
-
-// --- GLOBAL BACKGROUND: THE INFINITE VOID (FIXED) ---
-function InfiniteVoid() {
-    // REMOVED: useScroll and useTransform. The background is now static relative to viewport.
-    
-    return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: -1, overflow: 'hidden', backgroundColor: '#000' }}>
-            {/* Deep Space Gradient */}
-            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 0%, #0a0a0f 0%, #000000 70%)' }} />
-
-            {/* The Aurora (Living Color - Still animates locally, but fixed position) */}
-            <motion.div
-                animate={{
-                    opacity: [0.3, 0.5, 0.3],
-                    scale: [1, 1.1, 1],
-                    background: [
-                        'radial-gradient(circle at 50% 50%, rgba(124, 58, 237, 0.2), transparent 70%)', // Purple
-                        'radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.2), transparent 70%)', // Blue
-                        'radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.2), transparent 70%)'   // Green
-                    ]
-                }}
-                transition={{ duration: 15, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
-                style={{ position: 'absolute', inset: '-50%', filter: 'blur(100px)', zIndex: 0 }}
-            />
-
-            {/* Starfield (Fixed - No Parallax) */}
-            <div style={{ 
-                position: 'absolute', inset: 0, zIndex: 1, opacity: 0.5,
-                width: '100%', height: '100%',
-                backgroundImage: 'radial-gradient(white 1px, transparent 1px)',
-                backgroundSize: '50px 50px',
-                maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)'
-            }} />
-        </div>
-    );
-}
+import { useEffect } from 'react';
+import { MantineProvider } from '@mantine/core';
+import { MotionConfig, motion, useScroll, useSpring } from 'framer-motion';
+import { Navbar } from '@/components/landing/Navbar';
+import { Footer } from '@/components/landing/Footer';
+import { CookieConsent } from '@/components/landing/CookieConsent';
+import { NewHero } from '@/components/landing/home/NewHero';
+import { MetricsRibbon } from '@/components/landing/home/MetricsRibbon';
+import { SmartPrecisionSection } from '@/components/landing/home/SmartPrecisionSection';
+import { ProductShowcaseSection } from '@/components/landing/home/ProductShowcaseSection';
+import { HowItWorksSection } from '@/components/landing/home/HowItWorksSection';
+import { GetStartedBanner } from '@/components/landing/home/GetStartedBanner';
+import { MobileShowcaseSection } from '@/components/landing/home/MobileShowcaseSection';
+import { FaqSection } from '@/components/landing/home/FaqSection';
+import styles from '@/components/landing/home/LandingVibe.module.css';
 
 export default function LandingPage() {
-    return (
-        <>
-            <InfiniteVoid />
-            
-            {/* Navbar is rendered here, but its styling handles the positioning */}
-            <Navbar />
-            
-            <main style={{ position: 'relative', zIndex: 1 }}>
-                 {/* 1. THE HOOK */}
-                <Hero />
-                <TheRealityCheck />
-                <TheMethodology />
-                <TheBlueprint />
-                <TheEngineRoom />
-                <TheGodMode />
-                <ThePledge />
-            </main>
-            
-            <Footer />
-            
-            <CookieConsent />
-        </>
-    );
+  const { scrollYProgress } = useScroll();
+  const spineScaleX = useSpring(scrollYProgress, {
+    stiffness: 240,
+    damping: 32,
+    restDelta: 0.001,
+  });
+
+  // Strict landing page isolation: Force light theme and warm paper background
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const prevTheme = document.documentElement.getAttribute('data-kalpad-theme');
+    const prevMantineScheme = document.documentElement.getAttribute('data-mantine-color-scheme');
+    const prevBodyBg = document.body.style.backgroundColor;
+    const prevBodyColor = document.body.style.color;
+
+    document.documentElement.setAttribute('data-kalpad-theme', 'light');
+    document.documentElement.setAttribute('data-mantine-color-scheme', 'light');
+    document.body.style.backgroundColor = '#F7F3E8';
+    document.body.style.color = '#111317';
+
+    return () => {
+      try {
+        const saved = window.localStorage.getItem('kalpad_theme_mode');
+        if (saved) {
+          document.documentElement.setAttribute('data-kalpad-theme', saved);
+          document.documentElement.setAttribute('data-mantine-color-scheme', saved === 'dark' ? 'dark' : 'light');
+        }
+      } catch (_) {}
+      document.body.style.backgroundColor = prevBodyBg;
+      document.body.style.color = prevBodyColor;
+    };
+  }, []);
+
+  return (
+    <MantineProvider defaultColorScheme="light" forceColorScheme="light">
+      <MotionConfig reducedMotion="user">
+        <div
+          className={`kp-app-shell ${styles.pageWrapper}`}
+          data-kalpad-landing="true"
+          data-kalpad-theme="light"
+          data-mantine-color-scheme="light"
+        >
+          {/* Subtle reading progress spine at top */}
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '3px',
+              backgroundColor: 'rgba(17, 19, 23, 0.06)',
+              zIndex: 101,
+              pointerEvents: 'none',
+            }}
+            aria-hidden="true"
+          >
+            <motion.div
+              style={{
+                height: '100%',
+                backgroundColor: '#111317',
+                transformOrigin: '0%',
+                scaleX: spineScaleX,
+              }}
+            />
+          </div>
+
+          <Navbar />
+
+          <main id="main-content">
+            {/* 1. Hero with warm honey palette and scene illustration */}
+            <NewHero />
+
+            {/* 2. Key Metrics & Social Proof Ribbon */}
+            <MetricsRibbon />
+
+            {/* 3. We Provide Smart Study Precision (Split Layout) */}
+            <SmartPrecisionSection />
+
+            {/* 4. What KalPad Builds For You (Showcase of Real Outputs on Black Background) */}
+            <ProductShowcaseSection />
+
+            {/* 5. It's Easy to Start Studying (3-Step Journey) */}
+            <HowItWorksSection />
+
+            {/* 7. Ready to Replace Cram Panic Banner Card */}
+            <GetStartedBanner />
+
+            {/* 8. Study Anywhere on Mobile & Offline */}
+            <MobileShowcaseSection />
+
+            {/* 9. Clear & Transparent FAQ */}
+            <FaqSection />
+          </main>
+
+          <Footer />
+          <CookieConsent />
+        </div>
+      </MotionConfig>
+    </MantineProvider>
+  );
 }

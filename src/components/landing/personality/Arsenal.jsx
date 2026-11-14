@@ -60,8 +60,8 @@ function ModeSelector() {
     return (
         <Stack gap="xl" mt={100}>
             <Group justify="center">
-                <Badge variant="outline" color="gray" size="md" style={{ borderColor: 'rgba(255,255,255,0.1)', color: 'white', letterSpacing: '0.1em' }}>
-                    ADAPTIVE INTELLIGENCE
+                <Badge variant="outline" color="gray" size="md" style={{ borderColor: 'rgba(255,255,255,0.1)', color: 'white' }}>
+                    Adaptive Intelligence
                 </Badge>
             </Group>
             <Title order={3} className="apple-text-gradient" ta="center" style={{ fontFamily: 'var(--font-lexend)' }}>
@@ -164,11 +164,9 @@ function ModeSelector() {
                                             size={isExpanded ? "lg" : "xs"} 
                                             fw={700} 
                                             c={isActive ? "white" : "dimmed"}
-                                            tt="uppercase"
                                             style={{ 
                                                 writingMode: isExpanded ? 'horizontal-tb' : 'vertical-rl', 
-                                                textOrientation: 'mixed', 
-                                                letterSpacing: '0.1em' 
+                                                textOrientation: 'mixed' 
                                             }}
                                         >
                                             {mode.label}
@@ -226,7 +224,7 @@ function StrategistAnim() {
                         }}
                         transition={{ 
                             duration: 3, 
-                            repeat: Infinity, 
+                            repeat: 0, 
                             delay: i * 1, // Stagger the stream
                             times: [0, 0.4, 1],
                             ease: "easeInOut"
@@ -234,7 +232,7 @@ function StrategistAnim() {
                         style={{
                             position: 'absolute',
                             width: '80px', height: '8px', borderRadius: '4px',
-                            boxShadow: '0 0 10px rgba(0,0,0,0.5)',
+                            boxShadow: 'none',
                             display: 'flex', alignItems: 'center', justifyContent: isKeep ? 'flex-end' : 'flex-start',
                             padding: '0 4px'
                         }}
@@ -242,7 +240,7 @@ function StrategistAnim() {
                         {/* Icon Indicator */}
                         <motion.div 
                             animate={{ opacity: [0, 0, 1] }}
-                            transition={{ duration: 3, repeat: Infinity, delay: i * 1, times: [0, 0.4, 0.5] }}
+                            transition={{ duration: 3, repeat: 0, delay: i * 1, times: [0, 0.4, 0.5] }}
                         >
                             {isKeep ? <IconCheck size={6} color="black" /> : <IconX size={6} color="black" />}
                         </motion.div>
@@ -269,17 +267,16 @@ function RagAnim() {
             {[0, 1, 2].map(i => (
                 <motion.div
                     key={i}
-                    initial={{ x: -40, width: 20, height: 2, opacity: 0, borderRadius: 2 }}
+                    initial={{ x: -40, opacity: 0, borderRadius: 2 }}
                     animate={{ 
                         x: [ -40, 0, 40 ], // Move across
-                        width: [ 20, 20, 6 ], // Shrink from line to dot
-                        height: [ 2, 2, 6 ],  // Grow to dot
+                        scale: [ 1, 1, 0.4 ], // Shrink from line to dot
                         borderRadius: [ 2, 2, 50 ], // Rect to Circle
                         backgroundColor: [ '#fff', ACCENT_INDIGO, ACCENT_INDIGO ],
                         opacity: [ 0, 1, 0 ] // Fade into DB
                     }}
-                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.6, ease: "linear" }}
-                    style={{ position: 'absolute', left: '50%', marginLeft: -10 }} // Center anchor
+                    transition={{ duration: 2, repeat: 0, delay: i * 0.6, ease: "linear" }}
+                    style={{ position: 'absolute', left: '50%', marginLeft: -10, width: 20, height: 4 }} // Center anchor
                 />
             ))}
 
@@ -289,10 +286,11 @@ function RagAnim() {
                 <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '100%', border: `2px solid ${ACCENT_INDIGO}`, borderRadius: 4, opacity: 0.5 }} />
                 {/* Filling Effect */}
                 <motion.div 
-                    animate={{ height: ['0%', '100%', '0%'] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    animate={{ scaleY: [0, 1, 0] }}
+                    transition={{ duration: 4, repeat: 0, ease: "linear" }}
                     style={{ 
-                        position: 'absolute', bottom: 0, width: '100%', 
+                        position: 'absolute', bottom: 0, width: '100%', height: '100%',
+                        transformOrigin: 'bottom',
                         background: `linear-gradient(to top, ${ACCENT_INDIGO}40, ${ACCENT_INDIGO}90)`,
                         borderRadius: 4
                     }} 
@@ -313,7 +311,7 @@ function ScoutAnim() {
             <div style={{ 
                 position: 'absolute', width: 50, height: 50, 
                 border: `2px solid ${ACCENT_ORANGE}`, borderRadius: 8, zIndex: 10,
-                boxShadow: `0 0 20px ${ACCENT_ORANGE}40`,
+                boxShadow: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
                 <div style={{ width: 40, height: 1, background: ACCENT_ORANGE, opacity: 0.5 }} />
@@ -323,7 +321,7 @@ function ScoutAnim() {
             {/* The Video Stream */}
             <motion.div
                 animate={{ x: [80, -80] }} // Scroll left
-                transition={{ duration: 4, repeat: Infinity, ease: "linear", repeatDelay: 0.5 }}
+                transition={{ duration: 4, repeat: 0, ease: "linear", repeatDelay: 0.5 }}
                 style={{ display: 'flex', gap: '20px' }}
             >
                 {[0, 1, 2, 3].map(i => {
@@ -335,7 +333,7 @@ function ScoutAnim() {
                                 scale: [1, 1, 1.2, 1], // Pulse when hitting center (approx)
                                 borderColor: ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.1)', ACCENT_ORANGE, 'rgba(255,255,255,0.1)']
                             } : {}}
-                            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                            transition={{ duration: 4, repeat: 0, ease: "linear" }}
                             style={{ 
                                 width: 50, height: 40, 
                                 background: 'rgba(255,255,255,0.05)', 
@@ -350,8 +348,8 @@ function ScoutAnim() {
                 })}
             </motion.div>
             
-            <Text size="8px" c="orange.4" style={{ position: 'absolute', bottom: 10 }} fw={700} tt="uppercase">
-                SCANNING METADATA...
+            <Text size="8px" c="orange.4" style={{ position: 'absolute', bottom: 10 }} fw={700}>
+                Scanning metadata...
             </Text>
         </Box>
     );
@@ -367,7 +365,7 @@ function SystemCard({ label, title, description, accentColor, Animation, isBeta 
                 style={{ 
                     backgroundColor: 'rgba(15, 15, 20, 0.7)', 
                     border: `1px solid rgba(255,255,255,0.05)`,
-                    boxShadow: isBeta ? 'none' : `0 0 0 1px ${accentColor}10, inset 0 0 30px ${accentColor}05`,
+                    boxShadow: 'none',
                     display: 'flex',
                     flexDirection: 'column',
                     position: 'relative',
@@ -401,7 +399,7 @@ function SystemCard({ label, title, description, accentColor, Animation, isBeta 
                             CLOSED BETA
                         </Badge>
                     ) : (
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: accentColor, boxShadow: `0 0 10px ${accentColor}` }} />
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: accentColor, boxShadow: 'none' }} />
                     )}
                 </Group>
 
@@ -449,7 +447,7 @@ function SystemCard({ label, title, description, accentColor, Animation, isBeta 
 
 export function Arsenal() {
     return (
-        <Box py={{ base: 100, md: 160 }} style={{ position: 'relative', zIndex: 10 }}>
+        <Box py={{ base: 64, md: 96 }} style={{ position: 'relative', zIndex: 10 }}>
             
             <Container size="lg">
                 <Stack align="center" ta="center" gap="md" mb={80}>
@@ -458,9 +456,9 @@ export function Arsenal() {
                         color="dark" 
                         size="lg" 
                         radius="sm"
-                        style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', letterSpacing: '0.1em' }}
+                        style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' }}
                     >
-                        SYSTEM ARCHITECTURE
+                        System Architecture
                     </Badge>
                     <Title 
                         order={2} 

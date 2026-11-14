@@ -19,12 +19,11 @@ export function RealQuestion() {
                     <Text 
                         c="dimmed" 
                         size="sm" 
-                        tt="uppercase" 
                         fw={700} 
-                        style={{ letterSpacing: '0.2em', opacity: 0.5 }}
+                        style={{ opacity: 0.5 }}
                         mb="xl"
                     >
-                        End of Transmission
+                        End of transmission
                     </Text>
 
                     <Title

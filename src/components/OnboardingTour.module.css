@@ -1,19 +1,103 @@
-.overlay {
+.spotlight {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.7);
-  z-index: 3998; /* Just below the popover */
-  pointer-events: none; /* Allows clicks to pass through */
+  border-radius: 20px;
+  box-shadow:
+    0 0 0 9999px rgba(15, 13, 11, 0.52),
+    0 0 0 2px var(--kp-primary);
+  z-index: 3999;
+  pointer-events: none;
 }
 
-.spotlight {
-  position: absolute;
-  border-radius: var(--mantine-radius-md);
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
-  z-index: 3999;
-  transition: all 0.3s ease-in-out;
-  pointer-events: none;
+.popover {
+  position: fixed;
+  z-index: 4000;
+  width: min(336px, calc(100vw - 32px));
+  background: var(--kp-surface);
+  color: var(--kp-ink);
+  border: 1px solid var(--kp-border-strong);
+  border-radius: 20px;
+  padding: 18px 20px 16px;
+  box-shadow:
+    0 20px 44px rgba(15, 13, 11, 0.24),
+    0 4px 12px rgba(15, 13, 11, 0.1);
+  pointer-events: auto;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.stepTag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--kp-primary);
+}
+
+.title {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--kp-ink);
+}
+
+.body {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--kp-secondary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.skipBtn {
+  background: transparent;
+  border: 1px solid var(--kp-border);
+  border-radius: 9999px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--kp-secondary);
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.skipBtn:hover {
+  background: var(--kp-raised);
+  color: var(--kp-ink);
+  border-color: var(--kp-border-strong);
+}
+
+.nextBtn {
+  background: var(--kp-primary);
+  color: var(--kp-on-primary);
+  border: 1px solid var(--kp-primary);
+  border-radius: 9999px;
+  padding: 7px 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 140ms ease, opacity 140ms ease;
+}
+
+.nextBtn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.nextBtn:active {
+  transform: scale(0.97);
 }

@@ -17,6 +17,13 @@ export function BackgroundBlobs() {
   const isExcluded = 
     isLiteMode ||
     pathname === '/' || 
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/plans') ||
+    pathname.startsWith('/new-plan') ||
+    pathname.startsWith('/plan') ||
+    pathname.startsWith('/cram-sheet') ||
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/guest-plan') ||
     pathname.startsWith('/sign-') || 
     pathname.startsWith('/reset-password') ||
     pathname.startsWith('/print') ||

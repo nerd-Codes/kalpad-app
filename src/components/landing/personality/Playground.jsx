@@ -197,7 +197,7 @@ export function Playground() {
                                                 {activeScenario.input}
                                                 <motion.span 
                                                     animate={{ opacity: [0, 1, 0] }} 
-                                                    transition={{ duration: 0.8, repeat: Infinity }}
+                                                    transition={{ duration: 0.8, repeat: 0 }}
                                                     style={{ display: 'inline-block', width: '10px', height: '1.2em', backgroundColor: activeScenario.color, marginLeft: '8px', verticalAlign: 'text-bottom' }}
                                                 />
                                             </Text>

@@ -9,7 +9,7 @@ import { Interactive } from '@/components/Interactive';
 import { ShimmerButton } from '../ShimmerButton';
 
 // --- VISUAL CONSTANTS ---
-const ACCENT_COLOR = '#22d3ee'; // Electric Cyan
+const ACCENT_COLOR = '#D97706'; // Warm Amber
 
 // --- SUB-COMPONENT: FRICTION KILLER BADGE ---
 function FrictionBadge({ icon: Icon, text, delay }) {
@@ -23,14 +23,14 @@ function FrictionBadge({ icon: Icon, text, delay }) {
             <Box 
                 py={8} px={16} 
                 style={{ 
-                    borderRadius: '99px', 
-                    background: 'rgba(34, 211, 238, 0.05)', 
-                    border: '1px solid rgba(34, 211, 238, 0.2)',
+                    borderRadius: '8px', 
+                    background: 'rgba(217, 119, 6, 0.05)', 
+                    border: '1px solid rgba(217, 119, 6, 0.2)',
                     display: 'flex', alignItems: 'center', gap: '8px'
                 }}
             >
                 <Icon size={16} color={ACCENT_COLOR} />
-                <Text size="xs" fw={700} c="cyan.3" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+                <Text size="xs" fw={700} c="orange.3">
                     {text}
                 </Text>
             </Box>
@@ -41,7 +41,7 @@ function FrictionBadge({ icon: Icon, text, delay }) {
 export function GuestCTA() {
     return (
         <Box 
-            py={{ base: 100, md: 160 }} 
+            py={{ base: 64, md: 96 }} 
             style={{ position: 'relative', zIndex: 10, overflow: 'hidden' }}
         >
             {/* --- BACKGROUND WARP EFFECT --- */}
@@ -51,11 +51,11 @@ export function GuestCTA() {
                         scale: [1, 1.2, 1],
                         opacity: [0.1, 0.2, 0.1]
                     }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    transition={{ duration: 4, repeat: 0, ease: "easeInOut" }}
                     style={{
                         position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
                         width: '80vw', height: '80vw', borderRadius: '50%',
-                        background: 'radial-gradient(circle, rgba(34, 211, 238, 0.15) 0%, transparent 70%)',
+                        background: 'radial-gradient(circle, rgba(217, 119, 6, 0.1) 0%, transparent 70%)',
                         filter: 'blur(80px)'
                     }}
                 />
@@ -72,9 +72,9 @@ export function GuestCTA() {
                         p={{ base: 'xl', md: 80 }}
                         style={{
                             textAlign: 'center',
-                            background: 'rgba(10, 20, 25, 0.6)', // Darker, cooler tint
-                            border: `1px solid ${ACCENT_COLOR}30`,
-                            boxShadow: `0 0 100px -30px ${ACCENT_COLOR}20`
+                            background: '#19191b',
+                            border: '1px solid rgba(237, 237, 237, 0.08)',
+                            boxShadow: 'none'
                         }}
                     >
                         <Stack align="center" gap="xl">
@@ -112,19 +112,19 @@ export function GuestCTA() {
 
                             {/* 4. The God Button */}
                             <Box mt="md" style={{ position: 'relative', zIndex: 10 }}>
-                                <div style={{ position: 'absolute', inset: -20, background: ACCENT_COLOR, opacity: 0.15, filter: 'blur(20px)', borderRadius: '50%', zIndex: -1 }} />
                                 <Interactive>
                                     <ShimmerButton
                                         component={Link}
                                         href="/guest-plan"
                                         size="xl"
-                                        radius="xl"
+                                        radius="md"
                                         style={{ 
                                             fontSize: '1.25rem', 
-                                            padding: '20px 60px',
+                                            padding: '16px 40px',
                                             height: 'auto',
-                                            background: `linear-gradient(135deg, #0891b2 0%, #22d3ee 100%)`, // Cyan Gradient
-                                            boxShadow: `0 10px 40px -10px ${ACCENT_COLOR}60`
+                                            background: '#D97706',
+                                            color: '#0f0f10',
+                                            boxShadow: 'none'
                                         }}
                                     >
                                         Create My Free Guest Plan <IconRocket size={22} style={{ marginLeft: 10 }} />

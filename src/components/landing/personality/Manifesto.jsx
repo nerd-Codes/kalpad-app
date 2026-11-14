@@ -18,7 +18,7 @@ function Debris({ icon: Icon, label, x, y, rotate, delay }) {
             }}
             transition={{ 
                 duration: 10, 
-                repeat: Infinity, 
+                repeat: 0, 
                 delay: delay,
                 ease: "linear"
             }}
@@ -43,7 +43,7 @@ function Debris({ icon: Icon, label, x, y, rotate, delay }) {
             >
                 <Group gap="xs">
                     <Icon size={14} />
-                    <Text size="xs" fw={700} tt="uppercase">{label}</Text>
+                    <Text size="xs" fw={700}>{label}</Text>
                 </Group>
             </Box>
         </motion.div>
@@ -100,9 +100,9 @@ export function Manifesto() {
                                         color="gray" 
                                         size="md" 
                                         mb="md"
-                                        style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)', letterSpacing: '0.1em' }}
+                                        style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)' }}
                                     >
-                                        THE MANIFESTO
+                                        The Manifesto
                                     </Badge>
 
                                     <Title 
@@ -136,8 +136,8 @@ export function Manifesto() {
                                 <Box 
                                     p="lg" 
                                     style={{ 
-                                        borderLeft: '3px solid #BF5AF2', 
-                                        background: 'linear-gradient(90deg, rgba(191, 90, 242, 0.05) 0%, transparent 100%)',
+                                        borderLeft: '3px solid #D97706', 
+                                        background: 'linear-gradient(90deg, rgba(217, 119, 6, 0.05) 0%, transparent 100%)',
                                     }}
                                 >
                                     <Text size="md" fs="italic" c="rgba(255,255,255,0.9)" style={{ fontFamily: 'var(--font-lexend)', lineHeight: 1.6 }}>

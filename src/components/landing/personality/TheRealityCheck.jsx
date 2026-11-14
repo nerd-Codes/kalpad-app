@@ -1,250 +1,274 @@
 // src/components/landing/personality/TheRealityCheck.jsx
 "use client";
 
-import { useRef } from 'react';
 import Image from 'next/image';
-import { Container, Title, Text, Box, Group, Stack, Avatar, Grid } from '@mantine/core';
-import { motion, useScroll, useTransform } from 'framer-motion';
-import { IconBrandDiscordFilled, IconQuote, IconActivityHeartbeat } from '@tabler/icons-react';
-import { GlassCard } from '@/components/GlassCard';
+import { Container, Title, Text, Box, Group, Stack, Avatar, SimpleGrid, Badge } from '@mantine/core';
+import { IconActivityHeartbeat, IconSchool, IconCheck } from '@tabler/icons-react';
 
-// --- SUB-COMPONENT: PARALLAX CHAT WIDGET ---
-function MessageWidget({ avatar, name, handle, time, message, yOffset, rotate, color = "#BF5AF2" }) {
+// --- SUB-COMPONENT: MHCIIE HANSRAJ INCUBATION PROOF CARD ---
+export function InstitutionProofCard() {
     return (
-        <motion.div
-            style={{ y: yOffset, rotate: rotate, zIndex: 20 }}
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, margin: "-50px" }}
-            transition={{ type: "spring", stiffness: 100, damping: 20 }}
-        >
-            <GlassCard 
-                p="md" 
-                style={{ 
-                    backgroundColor: 'rgba(20, 20, 25, 0.7)', 
-                    border: `1px solid rgba(255,255,255,0.05)`,
-                    borderTop: `1px solid ${color}40`, 
-                    boxShadow: '0 20px 40px -10px rgba(0,0,0,0.5)',
-                    width: '100%',
-                    maxWidth: '360px', // Strictly bounded width
-                    backdropFilter: 'blur(24px)'
-                }}
-            >
-                <Group gap="sm" mb="xs" wrap="nowrap" align="flex-start">
-                    <Avatar color={color} radius="xl" size="md" style={{ border: `1px solid ${color}40` }}>{avatar}</Avatar>
-                    <Box style={{ flex: 1 }}>
-                        <Group justify="space-between" gap={0}>
-                            <Text size="sm" fw={700} c="white" style={{ fontFamily: 'var(--font-lexend)' }}>{name}</Text>
-                            <Text size="xs" c="dimmed" style={{ fontSize: '10px' }}>{time}</Text>
-                        </Group>
-                        <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace' }}>{handle}</Text>
-                    </Box>
-                </Group>
-                <Text size="sm" c="gray.3" lh={1.5} style={{ fontFamily: 'var(--font-inter)' }}>
-                    {message}
-                </Text>
-            </GlassCard>
-        </motion.div>
-    );
-}
-
-// --- SUB-COMPONENT: LIVE SERVER STATUS ---
-function ServerStatus() {
-    return (
-        <GlassCard p="sm" style={{ backgroundColor: 'rgba(0,0,0,0.6)', border: '1px solid rgba(52, 199, 89, 0.2)', width: 'fit-content' }}>
-            <Group gap="md">
-                <Group gap="xs">
-                    <motion.div 
-                        animate={{ opacity: [1, 0.4, 1] }} 
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                        style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#34C759', boxShadow: '0 0 10px #34C759' }} 
-                    />
-                    <Text size="xs" fw={700} c="green.4" tt="uppercase" style={{ letterSpacing: '0.1em' }}>Used by IITians, NITians & future doctors</Text>
-                </Group>
-                <Box style={{ width: 1, height: 16, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-                <Group gap="xs">
-                    <IconActivityHeartbeat size={16} color="#86868B" />
-                    <Text size="xs" c="dimmed" fw={600} style={{ fontFamily: 'monospace' }}>100+ STUDENTS ACTIVE</Text>
-                </Group>
-            </Group>
-        </GlassCard>
-    );
-}
-
-function InstitutionProofCard() {
-    return (
-        <GlassCard
-            p={{ base: 'lg', md: 'xl' }}
+        <Box
+            p={{ base: 'md', sm: 'xl' }}
             style={{
-                background: 'linear-gradient(135deg, rgba(21, 21, 26, 0.88) 0%, rgba(14, 14, 18, 0.96) 100%)',
-                border: '1px solid rgba(191, 90, 242, 0.22)',
-                boxShadow: '0 32px 70px -35px rgba(191, 90, 242, 0.55)',
+                backgroundColor: '#19191b',
+                border: '1px solid rgba(237, 237, 237, 0.08)',
+                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.04)',
+                borderRadius: '16px',
                 width: '100%',
-                backdropFilter: 'blur(24px)'
+                position: 'relative',
+                overflow: 'hidden'
             }}
         >
             <Group gap="xl" wrap="wrap" justify="space-between" align="center">
                 <Box
                     style={{
                         position: 'relative',
-                        width: 180,
-                        height: 96,
-                        borderRadius: 20,
+                        width: 140,
+                        height: 72,
+                        borderRadius: '10px',
                         overflow: 'hidden',
-                        backgroundColor: 'rgba(255,255,255,0.98)',
-                        border: '1px solid rgba(255,255,255,0.14)',
-                        flexShrink: 0
+                        backgroundColor: '#ffffff',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '8px'
                     }}
                 >
                     <Image
                         src="/mchiie.avif"
-                        alt="MHCIIE logo"
+                        alt="MHCIIE Hansraj College logo"
                         fill
-                        sizes="180px"
-                        style={{ objectFit: 'contain', padding: '12px' }}
+                        sizes="140px"
+                        style={{ objectFit: 'contain', padding: '6px' }}
                     />
                 </Box>
 
                 <Stack gap={6} style={{ flex: 1, minWidth: 260 }}>
-                    <Text size="11px" fw={800} c="violet.3" tt="uppercase" style={{ letterSpacing: '0.18em' }}>
-                        Officially Incubated
-                    </Text>
-                    <Title order={3} c="white" lh={1.2} style={{ fontFamily: 'var(--font-lexend)', maxWidth: '820px' }}>
-                        KalPad is officially incubated by MHCIIE at Hansraj College.
+                    <Group gap="xs" align="center">
+                        <Box
+                            style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                backgroundColor: '#4cc38a'
+                            }}
+                        />
+                        <Text
+                            size="xs"
+                            fw={500}
+                            style={{
+                                color: '#4cc38a',
+                                letterSpacing: '0.02em'
+                            }}
+                        >
+                            Officially incubated
+                        </Text>
+                        <Text size="xs" c="#85858b">·</Text>
+                        <Text size="xs" c="#a1a1a6">Hansraj College, University of Delhi</Text>
+                    </Group>
+                    <Title
+                        order={3}
+                        style={{
+                            fontFamily: 'var(--font-inter)',
+                            fontSize: 'clamp(1.1rem, 2vw, 1.35rem)',
+                            fontWeight: 500,
+                            lineHeight: 1.3,
+                            color: '#ededed',
+                            maxWidth: '780px'
+                        }}
+                    >
+                        KalPad is officially incubated by MHCIIE at Hansraj College, University of Delhi
                     </Title>
-                    <Text size="sm" c="gray.4" lh={1.65} maw={760}>
-                        Mahatma Hansraj Centre for Innovation, Incubation and Entrepreneurship
+                    <Text size="xs" c="#a1a1a6" lh={1.6} maw={760}>
+                        Mahatma Hansraj Centre for Innovation, Incubation and Entrepreneurship (MHCIIE) supports KalPad&apos;s academic study planning workflows and exam modeling.
                     </Text>
                 </Stack>
             </Group>
-        </GlassCard>
+        </Box>
+    );
+}
+
+// --- SUB-COMPONENT: STUDENT STATUS BAR ---
+function StudentStatusBar() {
+    return (
+        <Box
+            p="sm"
+            style={{
+                backgroundColor: '#19191b',
+                border: '1px solid rgba(237, 237, 237, 0.08)',
+                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.04)',
+                borderRadius: '8px',
+                width: 'fit-content'
+            }}
+        >
+            <Group gap="md" wrap="wrap">
+                <Group gap="xs">
+                    <Box
+                        style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            backgroundColor: '#4cc38a'
+                        }}
+                    />
+                    <Text size="xs" fw={500} c="#ededed">
+                        Used by IITians, NITians &amp; future doctors
+                    </Text>
+                </Group>
+                <Box style={{ width: 1, height: 14, backgroundColor: 'rgba(237, 237, 237, 0.08)' }} />
+                <Group gap="xs">
+                    <IconActivityHeartbeat size={14} color="#85858b" />
+                    <Text size="xs" c="#85858b" style={{ fontFamily: 'var(--font-lexend), monospace' }} className="tabular-nums">
+                        Active study schedules across engineering, medical &amp; board syllabi
+                    </Text>
+                </Group>
+            </Group>
+        </Box>
+    );
+}
+
+// --- SUB-COMPONENT: ALIGNED STUDENT CASE REVIEW CARD ---
+function StudentCaseCard({ avatar, name, handle, roleTag, topicTag, message }) {
+    return (
+        <Box
+            p="xl"
+            style={{
+                backgroundColor: '#19191b',
+                border: '1px solid rgba(237, 237, 237, 0.08)',
+                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.04)',
+                borderRadius: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                height: '100%'
+            }}
+        >
+            <Box mb="md">
+                <Group justify="space-between" align="flex-start" mb="sm" wrap="nowrap">
+                    <Group gap="sm" wrap="nowrap">
+                        <Avatar
+                            radius="md"
+                            size="md"
+                            style={{
+                                backgroundColor: '#232325',
+                                border: '1px solid rgba(237, 237, 237, 0.08)',
+                                color: '#ededed',
+                                fontWeight: 500
+                            }}
+                        >
+                            {avatar}
+                        </Avatar>
+                        <Box>
+                            <Text size="sm" fw={500} c="#ededed">{name}</Text>
+                            <Text size="xs" c="#85858b">{handle}</Text>
+                        </Box>
+                    </Group>
+                    <Badge
+                        variant="outline"
+                        size="xs"
+                        radius="sm"
+                        style={{
+                            borderColor: 'rgba(237, 237, 237, 0.08)',
+                            color: '#a1a1a6',
+                            backgroundColor: 'rgba(237, 237, 237, 0.02)'
+                        }}
+                    >
+                        {roleTag}
+                    </Badge>
+                </Group>
+                <Text size="sm" c="#a1a1a6" lh={1.6}>
+                    {message}
+                </Text>
+            </Box>
+
+            <Group gap="xs" mt="xs">
+                <IconCheck size={12} color="#4cc38a" />
+                <Text size="xs" c="#85858b" style={{ fontSize: '11px' }}>
+                    {topicTag}
+                </Text>
+            </Group>
+        </Box>
     );
 }
 
 export function TheRealityCheck() {
-    const sectionRef = useRef(null);
-    
-    const { scrollYProgress } = useScroll({
-        target: sectionRef,
-        offset: ["start end", "end start"]
-    });
-
-    // Recalibrated parallax arrays for smoother shear
-    const y1 = useTransform(scrollYProgress, [0, 1], [100, -80]);
-    const y2 = useTransform(scrollYProgress, [0, 1], [250, -150]);
-    const y3 = useTransform(scrollYProgress, [0, 1], [50, -100]);
-
     return (
         <Box
-            ref={sectionRef}
-            py={{ base: 120, md: 180 }}
+            py={{ base: 64, md: 96 }}
             style={{
                 position: 'relative',
-                backgroundColor: '#050505',
-                overflow: 'hidden',
-                borderTop: '1px solid rgba(255,255,255,0.02)'
+                backgroundColor: 'transparent',
+                overflow: 'hidden'
             }}
         >
-            {/* Ambient Background Gradient */}
-            <div style={{
-                position: 'absolute', top: '30%', left: '-10%',
-                width: '60vw', height: '60vw',
-                background: 'radial-gradient(circle, rgba(191, 90, 242, 0.05) 0%, transparent 60%)',
-                filter: 'blur(80px)', zIndex: 0, pointerEvents: 'none'
-            }} />
+            <Container size="xl">
+                <Stack gap={48}>
+                    {/* 1. MHCIIE HANSRAJ INCUBATION PROOF CARD */}
+                    <InstitutionProofCard />
 
-            <Container size="xl" style={{ position: 'relative', zIndex: 10 }}>
-                
-
-                {/* THE FIX: Native Mantine Grid for deterministic column rendering */}
-                <Grid gutter={{ base: 60, lg: 80 }} align="center">
-                    
-                    {/* --- LEFT: THE MANIFESTO --- */}
-                    <Grid.Col span={{ base: 12, lg: 6 }}>
-                        <Stack gap="xl" pr={{ base: 0, lg: 40 }}>
-                            <Group gap="sm">
-                                <IconQuote size={24} color="#BF5AF2" style={{ opacity: 0.5 }} />
-                                <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.2em' }}>STUDENT REALITY</Text>
-                            </Group>
-
-                            <Title 
-                                style={{ 
-                                    fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif', 
-                                    fontSize: 'clamp(2.5rem, 4vw, 3.8rem)', 
-                                    fontWeight: 400, 
-                                    lineHeight: 1.1,
-                                    color: '#F5F5F7',
-                                    letterSpacing: '-0.02em'
-                                }}
-                            >
-                                One app for the part of studying <span style={{ fontStyle: 'italic', color: '#BF5AF2' }}>no one teaches you.</span>
-                            </Title>
-
-                            <Text size="lg" c="gray.4" lh={1.7} style={{ fontFamily: 'var(--font-inter)' }}>
-                                Classes, coaching, internships, projects, family plans: students are juggling more than just a timetable. The hard part is not always studying. It is deciding what to study first.
-                                <br/><br/>
-                                KalPad reads the syllabus mess and turns it into small daily steps. <span style={{ color: 'white', fontWeight: 600 }}>You still learn the topic. We just make the starting point obvious.</span>
+                    {/* 2. SECTION HEADER & MANIFESTO */}
+                    <Stack gap="md" maw={820}>
+                        <Group gap="xs">
+                            <IconSchool size={16} color="#85858b" />
+                            <Text size="xs" fw={500} c="#85858b">
+                                Student reality
                             </Text>
+                        </Group>
 
-                            <Box mt="md">
-                                <ServerStatus />
-                            </Box>
-                        </Stack>
-                    </Grid.Col>
-
-                    {/* --- RIGHT: THE WAR ROOM (Parallax Wall) --- */}
-                    <Grid.Col span={{ base: 12, lg: 6 }}>
-                        <Box 
-                            style={{ 
-                                position: 'relative', 
-                                height: '650px', // Fixed height creates the bounding box for absolute children
-                                width: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
+                        <Title
+                            order={2}
+                            style={{
+                                fontFamily: 'var(--font-inter)',
+                                fontSize: 'clamp(1.85rem, 3.5vw, 2.5rem)',
+                                fontWeight: 500,
+                                lineHeight: 1.2,
+                                color: '#ededed',
+                                letterSpacing: '-0.02em'
                             }}
                         >
-                            {/* The "Gravity Well" Visual Anchor */}
-                            <motion.div 
-                                style={{ position: 'absolute', zIndex: 0, opacity: 0.15 }}
-                                animate={{ scale: [1, 1.05, 1], rotate: [0, 2, -2, 0] }}
-                                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                            >
-                                <IconBrandDiscordFilled size={280} color="#BF5AF2" />
-                            </motion.div>
+                            One app for the part of studying no one teaches you
+                        </Title>
 
-                            {/* THE FIX: Strict, opposing coordinate geometry */}
-                            {/* Widget 1: Anchored Top Left */}
-                            <Box style={{ position: 'absolute', top: '5%', left: 0, zIndex: 10 }}>
-                                <MessageWidget 
-                                    avatar="A" name="Aditya" handle="B.Tech student" time="Today at 2:14 AM"
-                                    message="KalPad noticed I kept missing Vector Calculus questions and moved revision earlier in the week. Saved me from guessing what to fix."
-                                    yOffset={y1} rotate={-3} color="#FF9500"
-                                />
-                            </Box>
+                        <Text size="sm" c="#a1a1a6" lh={1.7}>
+                            Classes, coaching, internships, and projects: students are juggling more than just a timetable. The hard part is not always studying—it is deciding what to study first. KalPad turns an overwhelming syllabus into realistic daily steps. You still master the material; we just make the starting point obvious.
+                        </Text>
 
-                            {/* Widget 2: Anchored Center Right */}
-                            <Box style={{ position: 'absolute', top: '35%', right: 0, zIndex: 12 }}>
-                                <MessageWidget 
-                                    avatar="P" name="Priya" handle="NIT student" time="Yesterday at 11:45 PM"
-                                    message="I had one week for OS internals. It turned my messy syllabus into a day-wise plan and gave notes I could actually read."
-                                    yOffset={y2} rotate={2} color="#BF5AF2"
-                                />
-                            </Box>
-
-                            {/* Widget 3: Anchored Bottom Left */}
-                            <Box style={{ position: 'absolute', bottom: '5%', left: '10%', zIndex: 14 }}>
-                                <MessageWidget 
-                                    avatar="K" name="Kabir" handle="NEET aspirant" time="Sunday at 4:20 PM"
-                                    message="The YouTube lecture suggestions saved me so much time. I got a short explanation instead of opening ten random tabs."
-                                    yOffset={y3} rotate={-1} color="#34C759"
-                                />
-                            </Box>
-
+                        <Box mt="xs">
+                            <StudentStatusBar />
                         </Box>
-                    </Grid.Col>
+                    </Stack>
 
-                </Grid>
+                    {/* 3. ALIGNED 3-COLUMN STUDENT CASE REVIEW GRID */}
+                    <SimpleGrid cols={{ base: 1, md: 3 }} spacing={20}>
+                        <StudentCaseCard
+                            avatar="A"
+                            name="Aditya"
+                            handle="B.Tech Engineering Student"
+                            roleTag="IIT/NIT track"
+                            topicTag="Engineering Mathematics & Vector Calculus"
+                            message="KalPad noticed I kept missing Vector Calculus questions and moved revision earlier in the week. Saved me from guessing what to fix before finals."
+                        />
+                        <StudentCaseCard
+                            avatar="P"
+                            name="Priya"
+                            handle="Computer Science Student"
+                            roleTag="NIT Durgapur"
+                            topicTag="Operating Systems & Concurrency"
+                            message="I had one week for OS internals. It turned my messy syllabus into a day-wise plan and gave concise notes I could actually finish in 30 minutes."
+                        />
+                        <StudentCaseCard
+                            avatar="K"
+                            name="Kabir"
+                            handle="Medical Aspirant"
+                            roleTag="NEET candidate"
+                            topicTag="Physics & Organic Chemistry"
+                            message="The curated lecture suggestions saved me hours of search. I got concise 14-minute conceptual breakdowns instead of opening ten random two-hour tabs."
+                        />
+                    </SimpleGrid>
+                </Stack>
             </Container>
         </Box>
     );

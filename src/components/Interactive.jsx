@@ -9,12 +9,12 @@ export function Interactive({ children, className, onClick, style, fullWidth = f
       onClick={onClick}
       {...props}
       whileHover={{ 
-        y: -2, 
-        transition: { duration: 0.2, ease: "easeOut" } 
+        y: -1, 
+        transition: { duration: 0.15, ease: [0.22, 1, 0.36, 1] } 
       }}
       whileTap={{ 
-        scale: 0.96, 
-        transition: { type: "spring", stiffness: 400, damping: 10 } 
+        scale: 0.98, 
+        transition: { duration: 0.1, ease: [0.22, 1, 0.36, 1] } 
       }}
       style={{
         cursor: 'pointer',

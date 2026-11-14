@@ -1,78 +1,99 @@
+// src/components/landing/CookieConsent.jsx
 "use client";
 
 import { useState, useEffect } from 'react';
 import { Group, Text, Button, Box } from '@mantine/core';
 import { IconCookie } from '@tabler/icons-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GlassCard } from '@/components/GlassCard';
 
 export function CookieConsent() {
-    const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(false);
 
-    useEffect(() => {
-        // Check if user has already decided
-        const hasConsent = localStorage.getItem('kalpad_cookie_consent');
-        if (!hasConsent) {
-            // Delay appearance for smoothness
-            setTimeout(() => setVisible(true), 1500);
-        }
-    }, []);
+  useEffect(() => {
+    const hasConsent = localStorage.getItem('kalpad_cookie_consent');
+    if (!hasConsent) {
+      const timer = setTimeout(() => setVisible(true), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
-    const handleDecision = (decision) => {
-        localStorage.setItem('kalpad_cookie_consent', decision);
-        setVisible(false);
-    };
+  const handleDecision = (decision) => {
+    localStorage.setItem('kalpad_cookie_consent', decision);
+    setVisible(false);
+  };
 
-    return (
-        <AnimatePresence>
-            {visible && (
-                <motion.div
-                    initial={{ y: 100, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: 100, opacity: 0 }}
-                    transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                    style={{
-                        position: 'fixed',
-                        bottom: '24px',
-                        left: '24px',
-                        zIndex: 9999,
-                        maxWidth: '400px',
-                        width: 'calc(100% - 48px)'
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ y: 40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 32, opacity: 0 }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '20px',
+            zIndex: 9999,
+            maxWidth: '390px',
+            width: 'calc(100% - 40px)',
+          }}
+        >
+          <Box
+            p="md"
+            style={{
+              backgroundColor: 'var(--kp-surface)',
+              border: '1px solid var(--kp-border-strong)',
+              borderRadius: '16px',
+              boxShadow: '0 14px 36px rgba(17, 19, 23, 0.16)',
+            }}
+          >
+            <Group align="flex-start" wrap="nowrap" gap="sm">
+              <IconCookie size={20} color="var(--kp-ink)" style={{ marginTop: 2, flexShrink: 0 }} />
+              <Box style={{ flex: 1 }}>
+                <Text size="sm" c="var(--kp-ink)" fw={700} mb={4}>
+                  Cookie preferences
+                </Text>
+                <Text size="xs" c="var(--kp-secondary)" lh={1.5} mb="md">
+                  We use essential functional cookies to keep your study sessions and guest previews active. Zero ad tracking.
+                </Text>
+                <Group gap="xs">
+                  <Button
+                    size="xs"
+                    radius={10}
+                    onClick={() => handleDecision('rejected')}
+                    styles={{
+                      root: {
+                        color: 'var(--kp-ink)',
+                        backgroundColor: 'var(--kp-raised)',
+                        border: '1px solid var(--kp-border)',
+                        fontWeight: 600,
+                      },
                     }}
-                >
-                    <GlassCard p="md" style={{ 
-                        backgroundColor: 'rgba(20, 20, 25, 0.8)', 
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)'
-                    }}>
-                        <Group align="flex-start" wrap="nowrap">
-                            <IconCookie size={24} color="#BF5AF2" style={{ marginTop: 2, flexShrink: 0 }} />
-                            <Box>
-                                <Text size="sm" c="white" fw={600} mb={4}>Cookie Policy</Text>
-                                <Text size="xs" c="dimmed" lh={1.5} mb="md">
-                                    We use cookies to ensure the "Brain" works smoothly. No tracking for ads, just pure functionality.
-                                </Text>
-                                <Group gap="xs">
-                                    <Button 
-                                        size="xs" variant="filled" color="gray" radius="xl" 
-                                        onClick={() => handleDecision('rejected')}
-                                        styles={{ root: { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                    >
-                                        Reject
-                                    </Button>
-                                    <Button 
-                                        size="xs" variant="gradient" gradient={{ from: '#BF5AF2', to: '#5E5CE6' }} radius="xl"
-                                        onClick={() => handleDecision('accepted')}
-                                    >
-                                        Accept All
-                                    </Button>
-                                </Group>
-                            </Box>
-                        </Group>
-                    </GlassCard>
-                </motion.div>
-            )}
-        </AnimatePresence>
-    );
+                  >
+                    Essential only
+                  </Button>
+                  <Button
+                    size="xs"
+                    radius={10}
+                    onClick={() => handleDecision('accepted')}
+                    styles={{
+                      root: {
+                        backgroundColor: '#D97706',
+                        color: '#111317',
+                        fontWeight: 700,
+                        border: 'none',
+                      },
+                    }}
+                  >
+                    Accept all
+                  </Button>
+                </Group>
+              </Box>
+            </Group>
+          </Box>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }

@@ -42,13 +42,14 @@ export function HighlightableMarkdown({
     const highlightSignature = JSON.stringify(highlights || []);
     const processedMarkdown = preprocessMathBlocks(markdown);
 
-    const pushRect = (targetRects, rootRect, rect, id, color, atomic = false) => {
+    const pushRect = (targetRects, rootRect, rect, id, highlightId, color, atomic = false) => {
         if (!rect || rect.width < 1 || rect.height < 1) return;
 
         const padding = atomic ? ATOMIC_RECT_PADDING : RECT_PADDING;
 
         targetRects.push({
             id,
+            highlightId,
             color,
             atomic,
             left: rect.left - rootRect.left - padding.x,
@@ -94,6 +95,7 @@ export function HighlightableMarkdown({
                         rootRect,
                         atomicSegment.element.getBoundingClientRect(),
                         highlight.id,
+                        highlight.id,
                         highlight.color || 'yellow',
                         true
                     );
@@ -109,6 +111,7 @@ export function HighlightableMarkdown({
                         rootRect,
                         rect,
                         `${highlight.id}-${index}`,
+                        highlight.id,
                         highlight.color || 'yellow'
                     );
                 });
@@ -155,6 +158,7 @@ export function HighlightableMarkdown({
                     <span
                         key={rect.id}
                         className={highlightStyles.rect}
+                        data-highlight-id={rect.highlightId}
                         data-atomic={rect.atomic ? 'true' : undefined}
                         style={{
                             left: `${rect.left}px`,

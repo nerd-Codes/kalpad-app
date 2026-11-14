@@ -1,6 +1,6 @@
 .root {
   color: inherit;
-  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-kp-sans), system-ui, -apple-system, sans-serif;
 }
 
 .root :where(p) {
@@ -29,16 +29,17 @@
 }
 
 .root :where(code) {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--kp-raised, rgba(0, 0, 0, 0.06));
+  border: 1px solid var(--kp-border, rgba(0, 0, 0, 0.08));
   border-radius: 6px;
   padding: 0.12em 0.38em;
-  font-family: "Fira Code", monospace;
-  font-size: 0.92em;
+  font-family: var(--font-kp-mono), monospace;
+  font-size: 0.9em;
 }
 
 .root :where(pre) {
-  background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--kp-raised, rgba(0, 0, 0, 0.08));
+  border: 1px solid var(--kp-border, rgba(0, 0, 0, 0.1));
   border-radius: 14px;
   overflow-x: auto;
   padding: 0.9em 1em;
@@ -46,6 +47,7 @@
 
 .root :where(pre code) {
   background: transparent;
+  border: none;
   padding: 0;
 }
 
@@ -62,35 +64,35 @@
 }
 
 .question {
-  color: #ffffff;
-  font-family: var(--font-lexend), sans-serif;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  color: var(--kp-ink, #111317);
+  font-family: var(--font-kp-sans), sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   line-height: 1.45;
 }
 
 .option {
   color: inherit;
-  font-size: 1rem;
+  font-size: 0.96rem;
   font-weight: 500;
   line-height: 1.5;
 }
 
 .summary {
-  color: #a1a1aa;
-  font-size: 1rem;
+  color: var(--kp-secondary, #5a5e6d);
+  font-size: 0.96rem;
   line-height: 1.65;
 }
 
 .answer {
-  color: #ffffff;
-  font-size: 0.95rem;
+  color: var(--kp-ink, #111317);
+  font-size: 0.94rem;
   line-height: 1.55;
 }
 
 .explanation {
-  color: #ffffff;
-  font-size: 0.95rem;
+  color: var(--kp-ink, #111317);
+  font-size: 0.94rem;
   line-height: 1.6;
 }
 

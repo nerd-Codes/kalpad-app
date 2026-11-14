@@ -7,7 +7,7 @@ import { IconBrain, IconAlertTriangle, IconRefresh, IconArrowRight, IconCheck, I
 import { GlassCard } from '@/components/GlassCard';
 
 // --- VISUAL ASSETS ---
-const NEON_PURPLE = '#BF5AF2';
+const ACCENT_AMBER = '#D97706';
 const NEON_RED = '#FF3B30';
 const NEON_GREEN = '#34C759';
 
@@ -46,13 +46,13 @@ function DependencyMockup() {
             style={{ 
                 padding: '16px', 
                 borderRadius: '16px', 
-                background: isHighlighted ? 'rgba(191, 90, 242, 0.1)' : 'rgba(255,255,255,0.03)', 
-                border: isHighlighted ? '1px solid rgba(191, 90, 242, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+                background: isHighlighted ? 'rgba(217, 119, 6, 0.1)' : 'rgba(255,255,255,0.03)', 
+                border: isHighlighted ? '1px solid rgba(217, 119, 6, 0.3)' : '1px solid rgba(255,255,255,0.05)',
                 display: 'flex', alignItems: 'center', gap: '12px',
                 zIndex: isHighlighted ? 10 : 0
             }}
         >
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: isHighlighted ? '#BF5AF2' : '#555' }} />
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: isHighlighted ? '#D97706' : '#555' }} />
             <Text size="sm" fw={isHighlighted ? 600 : 400} c={isHighlighted ? 'white' : 'dimmed'}>
                 {text}
             </Text>
@@ -90,18 +90,18 @@ function DependencyMockup() {
                         transition={{ type: "spring", stiffness: 150, damping: 20 }}
                         style={{ width: '100%' }}
                     >
-                        <GlassCard p="lg" style={{ borderLeft: `4px solid ${NEON_PURPLE}`, background: 'rgba(255,255,255,0.03)' }}>
+                        <GlassCard p="lg" style={{ borderLeft: `4px solid ${ACCENT_AMBER}`, background: 'rgba(255,255,255,0.03)' }}>
                             <Group justify="space-between" mb="md">
-                                <Badge color="violet" variant="light" size="lg">Smart Schedule: Day 4</Badge>
-                                <IconLink size={18} color="#BF5AF2" style={{ opacity: 0.8 }} />
+                                <Badge color="amber" variant="light" size="lg">Smart Schedule: Day 4</Badge>
+                                <IconLink size={18} color="#D97706" style={{ opacity: 0.8 }} />
                             </Group>
 
                             <Text size="lg" fw={600} c="white" mb="xs">Fluid Dynamics Mastery</Text>
                             
                             <Stack gap={8}>
-                                <Box p="sm" style={{ background: 'rgba(191, 90, 242, 0.1)', borderRadius: '10px', border: '1px solid rgba(191, 90, 242, 0.2)' }}>
+                                <Box p="sm" style={{ background: 'rgba(217, 119, 6, 0.1)', borderRadius: '10px', border: '1px solid rgba(217, 119, 6, 0.2)' }}>
                                     <Group gap="sm">
-                                        <IconCheck size={14} color="#BF5AF2" />
+                                        <IconCheck size={14} color="#D97706" />
                                         <Text size="sm" c="white" fw={500}>Prereq: Vector Calculus Refresh</Text>
                                     </Group>
                                 </Box>
@@ -154,7 +154,7 @@ function AdaptiveMockup() {
                             <Group justify="space-between" mb="md">
                                 <Group gap="xs">
                                     <IconAlertTriangle size={18} color={NEON_RED} />
-                                    <Text size="sm" fw={700} c="red.4" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Critical Failure</Text>
+                                    <Text size="sm" fw={700} c="red.4">Critical Failure</Text>
                                 </Group>
                                 <Badge color="red" variant="filled" size="sm">42%</Badge>
                             </Group>
@@ -191,10 +191,10 @@ function AdaptiveMockup() {
                                 style={{
                                     position: 'absolute', inset: 0,
                                     borderRadius: '50%',
-                                    border: `2px dashed rgba(191, 90, 242, 0.3)`,
+                                    border: `2px dashed rgba(217, 119, 6, 0.3)`,
                                 }}
                                 animate={{ rotate: -360 }}
-                                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                                transition={{ duration: 8, repeat: 0, ease: "linear" }}
                             />
 
                             {/* Middle Arc (Clockwise Fast) */}
@@ -202,25 +202,25 @@ function AdaptiveMockup() {
                                 style={{
                                     position: 'absolute', inset: 10,
                                     borderRadius: '50%',
-                                    borderTop: `3px solid ${NEON_PURPLE}`,
+                                    borderTop: `3px solid ${ACCENT_AMBER}`,
                                     borderRight: `3px solid transparent`, // Creates the gap
                                     borderBottom: `3px solid transparent`,
                                     borderLeft: `3px solid transparent`,
                                 }}
                                 animate={{ rotate: 360 }}
-                                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                transition={{ duration: 1.5, repeat: 0, ease: "linear" }}
                             />
 
                             {/* Inner Brain (Breathing) */}
                             <motion.div
                                 animate={{ scale: [1, 1.2, 1], filter: ['brightness(1)', 'brightness(1.5)', 'brightness(1)'] }}
-                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                transition={{ duration: 1.5, repeat: 0, ease: "easeInOut" }}
                             >
                                 <IconBrain size={32} color="white" />
                             </motion.div>
                         </Box>
 
-                        <Text size="xs" className="apple-text-gradient" fw={700} tt="uppercase" style={{ letterSpacing: '0.2em' }}>
+                        <Text size="xs" className="apple-text-gradient" fw={700}>
                             Recalibrating Strategy...
                         </Text>
                     </motion.div>
@@ -240,7 +240,7 @@ function AdaptiveMockup() {
                             <Group mb="md" justify="space-between">
                                 <Group gap="xs">
                                     <ThemeIcon size="sm" color="green" radius="xl" variant="light"><IconRefresh size={12} /></ThemeIcon>
-                                    <Text size="xs" fw={700} c="green.4" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Plan Updated</Text>
+                                    <Text size="xs" fw={700} c="green.4">Plan Updated</Text>
                                 </Group>
                                 <Text size="xs" c="dimmed">Confidence: 98%</Text>
                             </Group>
@@ -298,10 +298,10 @@ export function TheBrain() {
                         color="dark" 
                         size="lg" 
                         radius="sm"
-                        style={{ backgroundColor: 'rgba(191, 90, 242, 0.1)', color: '#BF5AF2', letterSpacing: '0.1em', border: '1px solid rgba(191, 90, 242, 0.2)' }}
+                        style={{ backgroundColor: 'rgba(217, 119, 6, 0.1)', color: '#D97706', border: '1px solid rgba(217, 119, 6, 0.2)' }}
                         leftSection={<IconBrain size={14} />}
                     >
-                        CORE INTELLIGENCE
+                        Core Intelligence
                     </Badge>
                     <Title 
                         order={2} 
