@@ -33,16 +33,25 @@ export const DEFAULT_RESOURCE = 'https://api.openai.com/v1';
 
 /**
  * Resolves the loopback 127.0.0.1 redirect URI matching the active browser port when available.
- * OpenAI SIWC requires an explicit 127.0.0.1 loopback callback ("Do not substitute with localhost").
+ * OpenAI SIWC requires an explicit 127.0.0.1 loopback callback with HTTP scheme and a valid port.
+ * When hosted on a public domain (e.g. Vercel), it defaults to port 3000 loopback for dynamic_agent_client.
  */
 export function resolveLoopbackRedirectUri() {
   if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_BYOK_REDIRECT_URI) {
     return process.env.NEXT_PUBLIC_BYOK_REDIRECT_URI;
   }
   if (typeof window !== 'undefined' && window.location) {
-    const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
-    const port = window.location.port ? `:${window.location.port}` : '';
-    return `${proto}//127.0.0.1${port}/auth/callback`;
+    // If a custom commercial client ID is registered, use the hosted origin
+    if (
+      process.env?.NEXT_PUBLIC_BYOK_CLIENT_ID &&
+      process.env.NEXT_PUBLIC_BYOK_CLIENT_ID !== 'dynamic_agent_client' &&
+      window.location.protocol === 'https:'
+    ) {
+      return `${window.location.origin}/auth/callback`;
+    }
+    // OpenAI dynamic_agent_client strictly requires http://127.0.0.1:<port>/auth/callback
+    const port = window.location.port || '3000';
+    return `http://127.0.0.1:${port}/auth/callback`;
   }
   return DEFAULT_REDIRECT_URI;
 }

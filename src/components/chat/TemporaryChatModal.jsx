@@ -205,7 +205,7 @@ export default function TemporaryChatModal({ opened, onClose }) {
                 {manualCodeOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
               </UnstyledButton>
 
-              <Collapse in={manualCodeOpen}>
+              <Collapse in={manualCodeOpen || chat.isAuthenticating}>
                 <Paper
                   p="sm"
                   mt="xs"
@@ -217,13 +217,16 @@ export default function TemporaryChatModal({ opened, onClose }) {
                 >
                   <form onSubmit={handleManualCodeSubmit}>
                     <Stack gap="xs">
+                      <Text size="xs" c="var(--kp-secondary, #4b5563)">
+                        <strong>Hosted / Vercel Note:</strong> OpenAI&apos;s open-source BYOK protocol strictly redirects to loopback (<code>127.0.0.1:3000</code>). If the popup shows a connection error after you authorize in OpenAI, simply copy the URL from the popup address bar and paste it below:
+                      </Text>
                       <TextInput
                         id="byok-manual-code-input"
-                        placeholder="Paste code=... or full loopback redirect URL"
+                        placeholder="Paste code=... or full http://127.0.0.1:3000/auth/callback?code=... URL"
                         size="xs"
                         value={manualCodeInput}
                         onChange={(e) => setManualCodeInput(e.target.value)}
-                        disabled={chat.isAuthenticating}
+                        disabled={false}
                         styles={{
                           input: {
                             backgroundColor: 'var(--kp-canvas)',
@@ -238,9 +241,9 @@ export default function TemporaryChatModal({ opened, onClose }) {
                           size="xs"
                           variant="light"
                           loading={chat.isAuthenticating}
-                          disabled={chat.isAuthenticating || !manualCodeInput.trim()}
+                          disabled={!manualCodeInput.trim()}
                         >
-                          Submit Code
+                          Complete Sign-In
                         </Button>
                       </Group>
                     </Stack>
