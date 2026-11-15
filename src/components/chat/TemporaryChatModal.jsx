@@ -32,6 +32,7 @@ import {
   IconKey,
   IconTrash,
   IconBrandOpenai,
+  IconRefresh,
 } from '@tabler/icons-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -338,6 +339,19 @@ export default function TemporaryChatModal({ opened, onClose }) {
                     }}
                   />
                 </Box>
+                <ActionIcon
+                  id="byok-refresh-models-button"
+                  variant="subtle"
+                  size="sm"
+                  title="Refresh models from ChatGPT"
+                  aria-label="Refresh models from ChatGPT"
+                  onClick={chat.refreshModels}
+                  loading={chat.isLoadingModels}
+                  disabled={chat.isGenerating || chat.isLoadingModels}
+                  style={{ color: 'var(--kp-secondary)', backgroundColor: 'transparent' }}
+                >
+                  <IconRefresh size={14} />
+                </ActionIcon>
               </Group>
             </Paper>
 

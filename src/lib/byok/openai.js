@@ -14,6 +14,28 @@ export const OPENAI_API_BASE_URL = 'https://api.openai.com';
 export const RESPONSES_ENDPOINT = `${OPENAI_API_BASE_URL}/v1/responses`;
 export const MODELS_ENDPOINT = `${OPENAI_API_BASE_URL}/v1/models`;
 
+/**
+ * Resolves the models endpoint. In the browser, uses the same-origin Next.js
+ * proxy route (/api/byok/models) to prevent browser CORS restrictions (net::ERR_FAILED / MissingAllowOriginHeader).
+ */
+export function resolveModelsEndpoint() {
+  if (typeof window !== 'undefined' && window.location) {
+    return `${window.location.origin}/api/byok/models`;
+  }
+  return MODELS_ENDPOINT;
+}
+
+/**
+ * Resolves the streaming responses endpoint. In the browser, uses the same-origin Next.js
+ * proxy route (/api/byok/responses) to eliminate browser CORS restrictions on hosted Vercel deployments.
+ */
+export function resolveResponsesEndpoint() {
+  if (typeof window !== 'undefined' && window.location) {
+    return `${window.location.origin}/api/byok/responses`;
+  }
+  return RESPONSES_ENDPOINT;
+}
+
 export const CHATGPT_USAGE_SETTINGS_URL = 'https://chatgpt.com/settings/usage';
 export const DEFAULT_FALLBACK_MODEL_SLUG = 'gpt-4o';
 export const DEFAULT_FALLBACK_MODEL_NAME = 'GPT-4o';
@@ -42,9 +64,11 @@ export const KNOWN_MODELS_CATALOG = [
  * and guaranteeing that gpt-6-luna is always present at the top.
  *
  * @param {Array<{ slug: string, displayName?: string }>} [discovered=[]]
+ * @param {Object} [options]
+ * @param {boolean} [options.strictLiveOnly=false] When true and live models were discovered, excludes obsolete catalog models.
  * @returns {Array<{ slug: string, displayName: string }>}
  */
-export function mergeWithKnownCatalog(discovered = []) {
+export function mergeWithKnownCatalog(discovered = [], { strictLiveOnly = false } = {}) {
   const seen = new Set();
   const merged = [];
 
@@ -67,10 +91,13 @@ export function mergeWithKnownCatalog(discovered = []) {
     }
   }
 
-  for (const km of KNOWN_MODELS_CATALOG) {
-    if (!seen.has(km.slug)) {
-      seen.add(km.slug);
-      merged.push(km);
+  // Only append static known catalog if not in strictLiveOnly mode or if no other models were discovered
+  if (!strictLiveOnly || merged.length <= 1) {
+    for (const km of KNOWN_MODELS_CATALOG) {
+      if (!seen.has(km.slug)) {
+        seen.add(km.slug);
+        merged.push(km);
+      }
     }
   }
 
@@ -341,27 +368,56 @@ export async function fetchAvailableModels(accessToken) {
       }
     }
 
-    const response = await fetch(MODELS_ENDPOINT, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    const endpoint = resolveModelsEndpoint();
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (fetchErr) {
+      if (endpoint !== MODELS_ENDPOINT) {
+        response = await fetch(MODELS_ENDPOINT, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      } else {
+        throw fetchErr;
+      }
+    }
 
     if (!response.ok) {
       if (response.status === 401) {
         try {
           const refreshed = await refreshTokens();
           if (refreshed?.accessToken) {
-            const retryRes = await fetch(MODELS_ENDPOINT, {
-              method: 'GET',
-              headers: {
-                Authorization: `Bearer ${refreshed.accessToken}`,
-                'Content-Type': 'application/json',
-              },
-            });
-            if (retryRes.ok) {
+            let retryRes;
+            try {
+              retryRes = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                  Authorization: `Bearer ${refreshed.accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+            } catch (_) {
+              if (endpoint !== MODELS_ENDPOINT) {
+                retryRes = await fetch(MODELS_ENDPOINT, {
+                  method: 'GET',
+                  headers: {
+                    Authorization: `Bearer ${refreshed.accessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                });
+              }
+            }
+            if (retryRes && retryRes.ok) {
               const retryData = await retryRes.json();
               const retryList = Array.isArray(retryData)
                 ? retryData
@@ -561,16 +617,35 @@ export async function streamResponsesChat({
   const bodyString = JSON.stringify(payload);
 
   const performFetch = async (token) => {
-    const response = await fetch(RESPONSES_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-      },
-      body: bodyString,
-      signal,
-    });
+    const endpoint = resolveResponsesEndpoint();
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+        body: bodyString,
+        signal,
+      });
+    } catch (fetchErr) {
+      if (endpoint !== RESPONSES_ENDPOINT) {
+        response = await fetch(RESPONSES_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream',
+          },
+          body: bodyString,
+          signal,
+        });
+      } else {
+        throw fetchErr;
+      }
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -790,7 +865,15 @@ export async function getCachedAvailableModels(accessToken, forceRefresh = false
   }
 
   const list = await fetchAvailableModels(token);
-  const finalCatalog = mergeWithKnownCatalog(list);
+  const isRealLiveDiscovery =
+    Array.isArray(list) &&
+    list.length > 0 &&
+    !list.every((m) => m.slug === DEFAULT_FALLBACK_MODEL_SLUG);
+
+  const finalCatalog = isRealLiveDiscovery
+    ? mergeWithKnownCatalog(list, { strictLiveOnly: true })
+    : mergeWithKnownCatalog(list);
+
   cachedModelsCatalog = finalCatalog;
   cachedModelsTimestamp = Date.now();
   cachedModelsTokenPrefix = prefix;

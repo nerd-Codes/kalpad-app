@@ -98,11 +98,19 @@ const abortControllerRef = useRef(null);
   }, []);
 
   const refreshModels = useCallback(async () => {
+    setIsLoadingModels(true);
     try {
       const token = await getValidAccessToken();
       await discoverModels(token, true);
     } catch (_) {
       await discoverModels(null, true);
+    } finally {
+      setIsLoadingModels(false);
+      if (typeof window !== 'undefined') {
+        try {
+          window.dispatchEvent(new CustomEvent('kalpad-byok-models-changed'));
+        } catch (_) {}
+      }
     }
   }, [discoverModels]);
 
@@ -289,7 +297,7 @@ const abortControllerRef = useRef(null);
         setIsAuthenticated(true);
         setUserEmail(session.email || null);
         setAuthError(null);
-        await discoverModels(session.accessToken);
+        await discoverModels(session.accessToken, true);
       } catch (err) {
         setAuthError(err?.message || 'Manual code verification failed');
       } finally {

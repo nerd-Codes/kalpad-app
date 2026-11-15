@@ -137,14 +137,16 @@ export default function ModelSelectorPage() {
       });
     }
 
-    // Baseline fallback: Ensure all known catalog models always exist
-    for (const km of KNOWN_MODELS_CATALOG) {
-      if (!seen.has(km.slug)) {
-        seen.add(km.slug);
-        base.push({
-          value: km.slug,
-          label: `${km.displayName} (${km.slug})`,
-        });
+    // Baseline fallback: Only append known catalog models if discovery yielded nothing
+    if (!availableModels || availableModels.length === 0) {
+      for (const km of KNOWN_MODELS_CATALOG) {
+        if (!seen.has(km.slug)) {
+          seen.add(km.slug);
+          base.push({
+            value: km.slug,
+            label: `${km.displayName} (${km.slug})`,
+          });
+        }
       }
     }
 
