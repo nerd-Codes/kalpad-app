@@ -2,6 +2,7 @@
 "use client";
 
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { IconArrowRight } from '@tabler/icons-react';
 import styles from './LandingVibe.module.css';
 
@@ -9,16 +10,28 @@ export function GetStartedBanner() {
   return (
     <section className={styles.sectionWrapper} style={{ paddingTop: '40px', paddingBottom: '70px' }}>
       <div className={styles.contentContainer}>
-        <div className={styles.getStartedBannerCard}>
+        <motion.div
+          className={styles.getStartedBannerCard}
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+        >
           {/* Left: Transparent Illustration sitting flush on bottom edge of banner */}
-          <div className={styles.bannerImageCol}>
+          <motion.div
+            className={styles.bannerImageCol}
+            initial={{ opacity: 0, scale: 0.96 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+          >
             <img
               src="/Warm Chalkboard Tutoring Scene.png"
               alt="Academic Mentorship and Concept Breakdown"
               className={styles.transparentBannerImg}
               loading="eager"
             />
-          </div>
+          </motion.div>
 
           {/* Right: Call to action content */}
           <div className={styles.bannerContentCol}>
@@ -51,7 +64,7 @@ export function GetStartedBanner() {
               </Link>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   );

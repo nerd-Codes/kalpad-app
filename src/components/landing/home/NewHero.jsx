@@ -2,6 +2,7 @@
 "use client";
 
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { IconArrowRight } from '@tabler/icons-react';
 import { HandwrittenHighlight } from './HandwrittenHighlight';
 import styles from './LandingVibe.module.css';
@@ -10,7 +11,7 @@ export function NewHero() {
   return (
     <section className={styles.heroSection}>
       {/* Decorative ambient scribbles */}
-      <svg
+      <motion.svg
         className={styles.ambientDoodleTopRight}
         width="120"
         height="80"
@@ -18,6 +19,9 @@ export function NewHero() {
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         aria-hidden="true"
+        initial={{ opacity: 0, rotate: -4 }}
+        animate={{ opacity: 1, rotate: 0 }}
+        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
       >
         <path
           d="M10 20C30 5 70 5 90 25C110 45 60 75 40 60C20 45 40 15 80 15C100 15 115 30 110 55"
@@ -25,19 +29,30 @@ export function NewHero() {
           strokeWidth="2.5"
           strokeLinecap="round"
         />
-      </svg>
+      </motion.svg>
 
       <div className={styles.heroContainer}>
         {/* Left Column: Headline & Action */}
-        <div className={styles.heroContent}>
+        <motion.div
+          className={styles.heroContent}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+        >
           {/* Sparkle doodle radiating above headline */}
-          <div className={styles.sparkleDoodle} aria-hidden="true">
+          <motion.div
+            className={styles.sparkleDoodle}
+            aria-hidden="true"
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
             <svg width="44" height="28" viewBox="0 0 44 28" fill="none">
               <path d="M22 2V12" stroke="#111317" strokeWidth="2.5" strokeLinecap="round" />
               <path d="M8 8L16 16" stroke="#111317" strokeWidth="2.5" strokeLinecap="round" />
               <path d="M36 8L28 16" stroke="#111317" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
-          </div>
+          </motion.div>
 
           <h1 className={styles.heroTitle}>
             Master your{' '}
@@ -77,17 +92,22 @@ export function NewHero() {
             <span>✓ No credit card required</span>
             <span>✓ Offline ready</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Right Column: Transparent Hero Scene Illustration sitting flush on bottom edge */}
-        <div className={styles.heroImageWrapper}>
+        <motion.div
+          className={styles.heroImageWrapper}
+          initial={{ opacity: 0, y: 22 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.75, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+        >
           <img
             src="/Multivariable Calculus Study Desk.png"
             alt="The Master Study Desk"
             className={styles.transparentHeroImg}
             loading="eager"
           />
-        </div>
+        </motion.div>
       </div>
     </section>
   );

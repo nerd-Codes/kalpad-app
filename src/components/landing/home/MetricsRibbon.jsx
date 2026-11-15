@@ -1,6 +1,7 @@
 // src/components/landing/home/MetricsRibbon.jsx
 "use client";
 
+import { motion } from 'framer-motion';
 import styles from './LandingVibe.module.css';
 
 const METRICS = [
@@ -31,13 +32,24 @@ export function MetricsRibbon() {
     <section className={styles.metricsRibbon} aria-label="Key Performance Metrics">
       <div className={styles.metricsContainer}>
         {METRICS.map((item, idx) => (
-          <div key={idx} className={styles.metricItem}>
+          <motion.div
+            key={idx}
+            className={styles.metricItem}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{
+              duration: 0.5,
+              delay: idx * 0.08,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+          >
             <div className={styles.metricValue}>{item.value}</div>
             <div className={styles.metricLabel}>{item.label}</div>
             <div style={{ fontSize: '11px', color: 'var(--kp-muted, #717684)', marginTop: '2px' }}>
               {item.sub}
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
     </section>

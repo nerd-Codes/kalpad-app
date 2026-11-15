@@ -2,6 +2,7 @@
 "use client";
 
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { Group, Text, Badge } from '@mantine/core';
 import {
   IconCalendarEvent,
@@ -19,7 +20,13 @@ export function ProductShowcaseSection() {
   return (
     <section className={styles.darkShowcaseSection} id="product-showcase">
       <div className={styles.contentContainer}>
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+        <motion.div
+          style={{ textAlign: 'center', marginBottom: '48px' }}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        >
           <h2 className={styles.darkShowcaseSectionTitle}>
             What KalPad{' '}
             <HandwrittenHighlight strokeColor="#F4B942">
@@ -32,12 +39,19 @@ export function ProductShowcaseSection() {
             Instead of a generic chatbot, KalPad builds three structured academic tools tailored
             to your exact syllabus.
           </p>
-        </div>
+        </motion.div>
 
         {/* 3 Showcase Cards on High-Contrast Black Canvas */}
         <div className={styles.showcaseCardsGrid}>
           {/* CARD 1: ADAPTIVE TIMELINE PLAN */}
-          <div className={styles.showcaseCard}>
+          <motion.div
+            className={styles.showcaseCard}
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.55, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
             <div className={styles.showcaseCardHeader}>
               <Group gap="xs">
                 <IconCalendarEvent size={18} color="#D97706" />
@@ -160,10 +174,17 @@ export function ProductShowcaseSection() {
                 <IconArrowRight size={15} />
               </Link>
             </div>
-          </div>
+          </motion.div>
 
           {/* CARD 2: DEEP TEXTBOOK NOTE (GENUINE KATEX MATH) */}
-          <div className={styles.showcaseCard}>
+          <motion.div
+            className={styles.showcaseCard}
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.55, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
             <div className={styles.showcaseCardHeader}>
               <Group gap="xs">
                 <IconBook2 size={18} color="#3A7BD5" />
@@ -252,10 +273,17 @@ export function ProductShowcaseSection() {
                 <IconArrowRight size={15} />
               </Link>
             </div>
-          </div>
+          </motion.div>
 
           {/* CARD 3: 1-PAGE PRINTABLE CRAM SHEET */}
-          <div className={styles.showcaseCard}>
+          <motion.div
+            className={styles.showcaseCard}
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.55, delay: 0.27, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
             <div className={styles.showcaseCardHeader}>
               <Group gap="xs">
                 <IconPrinter size={18} color="#176B45" />
@@ -348,7 +376,7 @@ export function ProductShowcaseSection() {
                 <IconArrowRight size={15} />
               </Link>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

@@ -1,6 +1,7 @@
 // src/components/landing/home/HowItWorksSection.jsx
 "use client";
 
+import { motion } from 'framer-motion';
 import { Text } from '@mantine/core';
 import { HandwrittenHighlight } from './HandwrittenHighlight';
 import styles from './LandingVibe.module.css';
@@ -29,7 +30,12 @@ export function HowItWorksSection() {
       <div className={styles.contentContainer}>
         <div className={styles.splitGrid}>
           {/* Left Column: Numbered Steps */}
-          <div>
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          >
             <h2 className={styles.sectionTitle}>
               It&apos;s easy to start{' '}
               <HandwrittenHighlight strokeColor="#D97706">
@@ -44,8 +50,27 @@ export function HowItWorksSection() {
 
             <div className={styles.journeyStepsList}>
               {STEPS.map((step, idx) => (
-                <div key={idx} className={styles.journeyStepItem}>
-                  <div className={styles.stepNumberCircle}>{step.num}</div>
+                <motion.div
+                  key={idx}
+                  className={styles.journeyStepItem}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{
+                    duration: 0.5,
+                    delay: idx * 0.12,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                >
+                  <motion.div
+                    className={styles.stepNumberCircle}
+                    initial={{ scale: 0.8 }}
+                    whileInView={{ scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: idx * 0.12 }}
+                  >
+                    {step.num}
+                  </motion.div>
                   <div>
                     <Text size="md" fw={800} c="#111317">
                       {step.title}
@@ -54,20 +79,26 @@ export function HowItWorksSection() {
                       {step.desc}
                     </Text>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
 
           {/* Right Column: Transparent Scene Illustration */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <motion.div
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            initial={{ opacity: 0, scale: 0.96 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: 0.65, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+          >
             <img
               src="/Hands Holding Educational Smartphone.png"
               alt="Effortless Mobile and Web Study"
               className={styles.transparentSceneImg}
               loading="eager"
             />
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

@@ -1,6 +1,7 @@
 // src/components/landing/home/FaqSection.jsx
 "use client";
 
+import { motion } from 'framer-motion';
 import { Accordion } from '@mantine/core';
 import styles from './LandingVibe.module.css';
 
@@ -31,14 +32,26 @@ export function FaqSection() {
   return (
     <section className={styles.sectionWrapper} id="faq" style={{ backgroundColor: '#FAF5EA' }}>
       <div className={styles.contentContainer}>
-        <div className={styles.sectionHeaderCenter}>
+        <motion.div
+          className={styles.sectionHeaderCenter}
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        >
           <h2 className={styles.sectionTitle}>Frequently Asked Questions</h2>
           <p className={styles.sectionSubtitle}>
             Everything you need to know about KalPad.
           </p>
-        </div>
+        </motion.div>
 
-        <div style={{ maxWidth: '780px', margin: '0 auto' }}>
+        <motion.div
+          style={{ maxWidth: '780px', margin: '0 auto' }}
+          initial={{ opacity: 0, y: 22 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.15 }}
+          transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+        >
           <Accordion
             variant="separated"
             radius="lg"
@@ -72,7 +85,7 @@ export function FaqSection() {
               </Accordion.Item>
             ))}
           </Accordion>
-        </div>
+        </motion.div>
       </div>
     </section>
   );
