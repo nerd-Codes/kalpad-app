@@ -9,32 +9,33 @@ import { getStorageBackend } from './storage.js';
 
 export const MODEL_PREFS_STORAGE_KEY = 'kalpad_byok_model_preferences';
 export const AUTO_MODEL_SLUG = 'auto';
+export const DEFAULT_TASK_MODEL_SLUG = 'gpt-6-luna';
 
 export const DEFAULT_MODEL_PREFERENCES = {
   // Study Plan Generator & Regenerate Plan
-  planModel: AUTO_MODEL_SLUG,
+  planModel: DEFAULT_TASK_MODEL_SLUG,
 
   // Notes Generation Pipeline (3 granular calls + legacy fallback)
-  notesPersonaModel: AUTO_MODEL_SLUG,
-  notesOutlineModel: AUTO_MODEL_SLUG,
-  notesAuthorModel: AUTO_MODEL_SLUG,
-  notesModel: AUTO_MODEL_SLUG,
+  notesPersonaModel: DEFAULT_TASK_MODEL_SLUG,
+  notesOutlineModel: DEFAULT_TASK_MODEL_SLUG,
+  notesAuthorModel: DEFAULT_TASK_MODEL_SLUG,
+  notesModel: DEFAULT_TASK_MODEL_SLUG,
 
   // Quiz & Assessment Pipeline (2 granular calls)
-  quizModel: AUTO_MODEL_SLUG,
-  quizEvaluationModel: AUTO_MODEL_SLUG,
+  quizModel: DEFAULT_TASK_MODEL_SLUG,
+  quizEvaluationModel: DEFAULT_TASK_MODEL_SLUG,
 
   // Doubt Solving / Inline Tutor
-  doubtModel: AUTO_MODEL_SLUG,
+  doubtModel: DEFAULT_TASK_MODEL_SLUG,
 
   // Cram Sheet / Revision Summary Forger
-  cramSheetModel: AUTO_MODEL_SLUG,
+  cramSheetModel: DEFAULT_TASK_MODEL_SLUG,
 
   // Interactive Chat (Temporary Chat & freeform assistant)
-  chatModel: AUTO_MODEL_SLUG,
+  chatModel: DEFAULT_TASK_MODEL_SLUG,
 
   // Academic Research Consultant
-  researchModel: AUTO_MODEL_SLUG,
+  researchModel: DEFAULT_TASK_MODEL_SLUG,
 };
 
 /**
@@ -233,13 +234,17 @@ export function applyModelPreset(presetId, availableModels = [], explicitStorage
     'gpt-4o-mini';
 
   const standardModel =
+    list.find((m) => m.slug === 'gpt-6-luna')?.slug ||
+    list.find((m) => m.slug?.includes('luna'))?.slug ||
     list.find((m) => m.slug === 'gpt-4o')?.slug ||
-    list.find((m) => m.slug?.includes('4.1') || m.slug?.includes('5'))?.slug ||
+    list.find((m) => m.slug?.includes('4o'))?.slug ||
     list[0]?.slug ||
-    'gpt-4o';
+    'gpt-6-luna';
 
   const deepModel =
-    list.find((m) => /^o\d|codex|pro|gpt-5/.test(m.slug || ''))?.slug || standardModel;
+    list.find((m) => m.slug === 'gpt-6-luna')?.slug ||
+    list.find((m) => /^o\d|codex|pro|gpt-5/.test(m.slug || ''))?.slug ||
+    standardModel;
 
   if (presetId === 'cost_saver') {
     return saveModelPreferences(
@@ -321,9 +326,11 @@ export function resolveEffectiveModelForTask(taskKey, availableModels = [], pref
   }
 
   return (
+    list.find((m) => m.slug === 'gpt-6-luna')?.slug ||
+    list.find((m) => m.slug?.includes('luna'))?.slug ||
     list.find((m) => m.slug === 'gpt-4o')?.slug ||
     list.find((m) => m.slug?.includes('4o'))?.slug ||
     list[0]?.slug ||
-    'gpt-4o'
+    'gpt-6-luna'
   );
 }

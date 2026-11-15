@@ -24,9 +24,11 @@ import {
 } from '@tabler/icons-react';
 import KalPadShell from '@/components/kalpad/KalPadShell';
 import { useChatGPTBYOK } from '@/hooks/useChatGPTBYOK';
+import { KNOWN_MODELS_CATALOG } from '@/lib/byok/openai';
 import {
   AUTO_MODEL_SLUG,
   DEFAULT_MODEL_PREFERENCES,
+  DEFAULT_TASK_MODEL_SLUG,
   GRANULAR_TASK_DEFINITIONS,
   MODEL_PRESETS,
   applyModelPreset,
@@ -114,10 +116,13 @@ export default function ModelSelectorPage() {
     const base = [
       {
         value: AUTO_MODEL_SLUG,
-        label: 'Auto (Recommended — Optimal speed & quality)',
+        label: 'Auto (Default: GPT-6 Luna)',
       },
     ];
-    const discovered = Array.isArray(availableModels) ? availableModels : [];
+    const discovered =
+      Array.isArray(availableModels) && availableModels.length > 0
+        ? availableModels
+        : KNOWN_MODELS_CATALOG;
     const seen = new Set([AUTO_MODEL_SLUG]);
 
     for (const m of discovered) {
@@ -125,20 +130,22 @@ export default function ModelSelectorPage() {
       seen.add(m.slug);
       base.push({
         value: m.slug,
-        label: m.displayName && m.displayName !== m.slug
-          ? `${m.displayName} (${m.slug})`
-          : m.slug,
+        label:
+          m.displayName && m.displayName !== m.slug
+            ? `${m.displayName} (${m.slug})`
+            : m.slug,
       });
     }
 
-    // Ensure fallback defaults exist so user can always choose mini vs 4o cleanly
-    if (!seen.has('gpt-4o')) {
-      seen.add('gpt-4o');
-      base.push({ value: 'gpt-4o', label: 'GPT-4o (gpt-4o)' });
-    }
-    if (!seen.has('gpt-4o-mini')) {
-      seen.add('gpt-4o-mini');
-      base.push({ value: 'gpt-4o-mini', label: 'GPT-4o mini (gpt-4o-mini)' });
+    // Baseline fallback: Ensure all known catalog models always exist
+    for (const km of KNOWN_MODELS_CATALOG) {
+      if (!seen.has(km.slug)) {
+        seen.add(km.slug);
+        base.push({
+          value: km.slug,
+          label: `${km.displayName} (${km.slug})`,
+        });
+      }
     }
 
     // Ensure any custom saved slug outside current catalog remains selectable
@@ -155,13 +162,16 @@ export default function ModelSelectorPage() {
   const customCount = useMemo(
     () =>
       GRANULAR_TASK_DEFINITIONS.filter(
-        (task) => prefs[task.key] && prefs[task.key] !== AUTO_MODEL_SLUG
+        (task) =>
+          prefs[task.key] &&
+          prefs[task.key] !== AUTO_MODEL_SLUG &&
+          prefs[task.key] !== DEFAULT_TASK_MODEL_SLUG
       ).length,
     [prefs]
   );
 
   const handleSelectModel = (taskKey, nextSlug) => {
-    const updated = setModelForTask(taskKey, nextSlug || AUTO_MODEL_SLUG);
+    const updated = setModelForTask(taskKey, nextSlug || DEFAULT_TASK_MODEL_SLUG);
     setPrefs(updated);
   };
 
@@ -179,8 +189,8 @@ export default function ModelSelectorPage() {
     const updated = resetAllModelsToAuto();
     setPrefs(updated);
     notifications.show({
-      title: 'Reset to Auto All',
-      message: 'Every AI stage now routes automatically.',
+      title: 'Reset to Default (GPT-6 Luna)',
+      message: 'Every AI task is set to GPT-6 Luna.',
       color: 'teal',
     });
   };
@@ -247,7 +257,7 @@ export default function ModelSelectorPage() {
                 fontWeight: 700,
               }}
             >
-              Auto All
+              Default All
             </Button>
           </Group>
         </Group>
@@ -299,7 +309,7 @@ export default function ModelSelectorPage() {
               {isAuthenticated ? (
                 <>
                   <Badge color="teal" variant="light" leftSection={<IconCheck size={12} />}>
-                    {customCount === 0 ? 'All Auto' : `${customCount} Custom`}
+                    {customCount === 0 ? 'All Default (GPT-6 Luna)' : `${customCount} Custom`}
                   </Badge>
                   <Button
                     size="xs"

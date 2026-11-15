@@ -117,8 +117,8 @@ test('Model Preferences - default schema matches Android 10-slot granular config
   for (const slot of requiredSlots) {
     assert.equal(
       DEFAULT_MODEL_PREFERENCES[slot],
-      'auto',
-      `Default slot ${slot} should be initialized to 'auto'`
+      'gpt-6-luna',
+      `Default slot ${slot} should be initialized to 'gpt-6-luna'`
     );
   }
 
@@ -133,12 +133,12 @@ test('Model Preferences - persistence, per-task override, and reset to auto', ()
   storage.clear();
 
   const initial = loadModelPreferences();
-  assert.equal(initial.notesAuthorModel, 'auto');
+  assert.equal(initial.notesAuthorModel, 'gpt-6-luna');
 
   setModelForTask('notesAuthorModel', 'gpt-4o');
   const afterSet = loadModelPreferences();
   assert.equal(afterSet.notesAuthorModel, 'gpt-4o');
-  assert.equal(afterSet.doubtModel, 'auto');
+  assert.equal(afterSet.doubtModel, 'gpt-6-luna');
 
   const rawSaved = JSON.parse(storage.getItem(MODEL_PREFS_STORAGE_KEY));
   assert.equal(rawSaved.notesAuthorModel, 'gpt-4o');
@@ -146,7 +146,7 @@ test('Model Preferences - persistence, per-task override, and reset to auto', ()
   resetAllModelsToAuto();
   const afterReset = loadModelPreferences();
   for (const [key, val] of Object.entries(afterReset)) {
-    assert.equal(val, 'auto', `Slot ${key} should be reset to 'auto'`);
+    assert.equal(val, 'gpt-6-luna', `Slot ${key} should be reset to 'gpt-6-luna'`);
   }
 });
 
@@ -162,14 +162,14 @@ test('Model Preferences - Presets application matches design definitions', () =>
 
   // Deep Quality Preset
   const deepQuality = applyModelPreset('deep_quality');
-  assert.equal(deepQuality.notesAuthorModel, 'gpt-4o');
-  assert.equal(deepQuality.planModel, 'gpt-4o');
-  assert.equal(deepQuality.doubtModel, 'gpt-4o');
+  assert.equal(deepQuality.notesAuthorModel, 'gpt-6-luna');
+  assert.equal(deepQuality.planModel, 'gpt-6-luna');
+  assert.equal(deepQuality.doubtModel, 'gpt-6-luna');
 
   // Balanced Preset
   const balanced = applyModelPreset('balanced');
   for (const val of Object.values(balanced)) {
-    assert.equal(val, 'auto');
+    assert.equal(val, 'gpt-6-luna');
   }
 });
 
@@ -199,17 +199,26 @@ test('Model Preferences - resolveEffectiveModelForTask cascades and auto resolut
   const effective3 = resolveEffectiveModelForTask('quizEvaluationModel', [], prefs3);
   assert.equal(effective3, 'gpt-4.5-preview');
 
-  // Case 4: Pure auto fallback with available catalog
+  // Case 4: Pure auto fallback with available catalog (without gpt-6-luna in mock catalog)
   const catalog = [
     { slug: 'gpt-4o-mini' },
     { slug: 'gpt-4o' },
     { slug: 'o3-mini' },
   ];
-  const effectiveAutoFast = resolveEffectiveModelForTask('quizEvaluationModel', catalog, DEFAULT_MODEL_PREFERENCES);
+  const autoPrefs = { ...DEFAULT_MODEL_PREFERENCES, quizEvaluationModel: 'auto', planModel: 'auto' };
+  const effectiveAutoFast = resolveEffectiveModelForTask('quizEvaluationModel', catalog, autoPrefs);
   assert.equal(effectiveAutoFast, 'gpt-4o-mini');
 
-  const effectiveAutoStandard = resolveEffectiveModelForTask('planModel', catalog, DEFAULT_MODEL_PREFERENCES);
+  const effectiveAutoStandard = resolveEffectiveModelForTask('planModel', catalog, autoPrefs);
   assert.equal(effectiveAutoStandard, 'gpt-4o');
+
+  // Case 5: Catalog with gpt-6-luna present
+  const lunaCatalog = [
+    { slug: 'gpt-6-luna' },
+    { slug: 'gpt-4o' },
+  ];
+  const effectiveLuna = resolveEffectiveModelForTask('planModel', lunaCatalog, DEFAULT_MODEL_PREFERENCES);
+  assert.equal(effectiveLuna, 'gpt-6-luna');
 });
 
 // -----------------------------------------------------------------------------

@@ -18,6 +18,86 @@ export const CHATGPT_USAGE_SETTINGS_URL = 'https://chatgpt.com/settings/usage';
 export const DEFAULT_FALLBACK_MODEL_SLUG = 'gpt-4o';
 export const DEFAULT_FALLBACK_MODEL_NAME = 'GPT-4o';
 
+export const MODELS_STORAGE_KEY = 'kalpad_byok_cached_models';
+
+/**
+ * Standard known OpenAI models catalog.
+ * Guarantees that users on both local and hosted environments (e.g. Vercel)
+ * always see the complete available model spectrum, with GPT-6 Luna as primary.
+ */
+export const KNOWN_MODELS_CATALOG = [
+  { slug: 'gpt-6-luna', displayName: 'GPT-6 Luna' },
+  { slug: 'gpt-4o', displayName: 'GPT-4o' },
+  { slug: 'gpt-4o-mini', displayName: 'GPT-4o mini' },
+  { slug: 'chatgpt-4o-latest', displayName: 'ChatGPT-4o Latest' },
+  { slug: 'o1', displayName: 'o1' },
+  { slug: 'o1-mini', displayName: 'o1-mini' },
+  { slug: 'o1-preview', displayName: 'o1-preview' },
+  { slug: 'o3-mini', displayName: 'o3-mini' },
+  { slug: 'gpt-4.5-preview', displayName: 'GPT-4.5 Preview' },
+];
+
+/**
+ * Merges discovered models with the standard known catalog, ensuring no duplicates
+ * and guaranteeing that gpt-6-luna is always present at the top.
+ *
+ * @param {Array<{ slug: string, displayName?: string }>} [discovered=[]]
+ * @returns {Array<{ slug: string, displayName: string }>}
+ */
+export function mergeWithKnownCatalog(discovered = []) {
+  const seen = new Set();
+  const merged = [];
+
+  // Guarantee gpt-6-luna is present at index 0
+  const lunaDiscovered = Array.isArray(discovered)
+    ? discovered.find((m) => m?.slug === 'gpt-6-luna')
+    : null;
+  merged.push(lunaDiscovered || { slug: 'gpt-6-luna', displayName: 'GPT-6 Luna' });
+  seen.add('gpt-6-luna');
+
+  if (Array.isArray(discovered)) {
+    for (const m of discovered) {
+      const slug = m?.slug || m?.id;
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      merged.push({
+        slug,
+        displayName: m.displayName || m.display_name || m.name || slug,
+      });
+    }
+  }
+
+  for (const km of KNOWN_MODELS_CATALOG) {
+    if (!seen.has(km.slug)) {
+      seen.add(km.slug);
+      merged.push(km);
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Retrieves cached models synchronously from localStorage if available,
+ * merged with KNOWN_MODELS_CATALOG.
+ *
+ * @returns {Array<{ slug: string, displayName: string }>}
+ */
+export function getStoredCachedModels() {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = window.localStorage.getItem(MODELS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return mergeWithKnownCatalog(parsed);
+        }
+      }
+    } catch (_) {}
+  }
+  return mergeWithKnownCatalog([]);
+}
+
 /**
  * Parameters strictly prohibited on the OpenAI Responses API for ChatGPT token sharing.
  */
@@ -270,6 +350,32 @@ export async function fetchAvailableModels(accessToken) {
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        try {
+          const refreshed = await refreshTokens();
+          if (refreshed?.accessToken) {
+            const retryRes = await fetch(MODELS_ENDPOINT, {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${refreshed.accessToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            if (retryRes.ok) {
+              const retryData = await retryRes.json();
+              const retryList = Array.isArray(retryData)
+                ? retryData
+                : Array.isArray(retryData?.models)
+                ? retryData.models
+                : Array.isArray(retryData?.data)
+                ? retryData.data
+                : [];
+              const retryFiltered = filterModelsForList(retryList);
+              if (retryFiltered.length > 0) return retryFiltered;
+            }
+          }
+        } catch (_) {}
+      }
       return [resolveFallbackModel()];
     }
 
@@ -666,11 +772,36 @@ export async function getCachedAvailableModels(accessToken, forceRefresh = false
     return cachedModelsCatalog;
   }
 
+  // Check localStorage if not forcing refresh
+  if (!forceRefresh && typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = window.localStorage.getItem(MODELS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const merged = mergeWithKnownCatalog(parsed);
+          cachedModelsCatalog = merged;
+          cachedModelsTimestamp = Date.now();
+          cachedModelsTokenPrefix = prefix;
+          return merged;
+        }
+      }
+    } catch (_) {}
+  }
+
   const list = await fetchAvailableModels(token);
-  cachedModelsCatalog = list;
+  const finalCatalog = mergeWithKnownCatalog(list);
+  cachedModelsCatalog = finalCatalog;
   cachedModelsTimestamp = Date.now();
   cachedModelsTokenPrefix = prefix;
-  return list;
+
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      window.localStorage.setItem(MODELS_STORAGE_KEY, JSON.stringify(finalCatalog));
+    } catch (_) {}
+  }
+
+  return finalCatalog;
 }
 
 /**

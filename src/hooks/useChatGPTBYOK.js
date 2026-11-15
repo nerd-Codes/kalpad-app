@@ -17,12 +17,14 @@ import {
 } from '../lib/byok/auth.js';
 import {
   getCachedAvailableModels,
+  getStoredCachedModels,
   streamResponsesChat,
   isUsageLimitError,
   DEFAULT_FALLBACK_MODEL_SLUG,
   DEFAULT_FALLBACK_MODEL_NAME,
+  KNOWN_MODELS_CATALOG,
 } from '../lib/byok/openai.js';
-import { resolveEffectiveModelForTask } from '../lib/byok/modelPreferences.js';
+import { resolveEffectiveModelForTask, DEFAULT_TASK_MODEL_SLUG } from '../lib/byok/modelPreferences.js';
 
 export function useChatGPTBYOK() {
   // Auth state
@@ -31,11 +33,11 @@ export function useChatGPTBYOK() {
   const [userEmail, setUserEmail] = useState(null);
   const [authError, setAuthError] = useState(null);
 
-  // Model catalog state
-  const [availableModels, setAvailableModels] = useState([
-    { slug: DEFAULT_FALLBACK_MODEL_SLUG, displayName: DEFAULT_FALLBACK_MODEL_NAME },
-  ]);
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_FALLBACK_MODEL_SLUG);
+  // Model catalog state initialized from local cache or known models catalog
+  const [availableModels, setAvailableModels] = useState(() => {
+    return getStoredCachedModels();
+  });
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_TASK_MODEL_SLUG);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   // Chat inference state
@@ -85,7 +87,7 @@ const abortControllerRef = useRef(null);
             return preferredChatSlug;
           }
           const exists = models.some((m) => m.slug === current);
-          return exists ? current : models[0].slug;
+          return exists ? current : DEFAULT_TASK_MODEL_SLUG;
         });
       }
     } catch (_) {
@@ -305,10 +307,8 @@ const abortControllerRef = useRef(null);
       setIsAuthenticated(false);
       setUserEmail(null);
       setAuthError(null);
-      setAvailableModels([
-        { slug: DEFAULT_FALLBACK_MODEL_SLUG, displayName: DEFAULT_FALLBACK_MODEL_NAME },
-      ]);
-      setSelectedModel(DEFAULT_FALLBACK_MODEL_SLUG);
+      setAvailableModels(getStoredCachedModels());
+      setSelectedModel(DEFAULT_TASK_MODEL_SLUG);
       setMessages([]);
       setStreamingContent('');
       setUsageLimitExceeded(false);
@@ -374,7 +374,7 @@ const abortControllerRef = useRef(null);
 
         await streamResponsesChat({
           accessToken: token,
-          model: selectedModel || DEFAULT_FALLBACK_MODEL_SLUG,
+          model: selectedModel || DEFAULT_TASK_MODEL_SLUG,
           input: inputTurns,
           signal: abortControllerRef.current.signal,
           onDelta: (delta) => {
