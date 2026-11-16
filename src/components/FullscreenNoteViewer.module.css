@@ -673,6 +673,39 @@
 .markdown .katex-display { margin: 1.15em 0; overflow-x: auto; overflow-y: hidden; padding: 0.25em 0; }
 .markdown hr { border: 0; height: 1px; background-color: var(--kp-border); margin: 2em 0; }
 
+.markdown details {
+  margin: 1.2em 0;
+  padding: 12px 16px;
+  background-color: var(--kp-raised);
+  border: 1px solid var(--kp-border);
+  border-radius: 14px;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.markdown details[open] {
+  background-color: var(--kp-surface);
+  border-color: var(--kp-border-strong);
+}
+
+.markdown summary {
+  font-family: var(--font-kp-sans);
+  font-weight: 700;
+  font-size: 0.94em;
+  color: var(--kp-ink);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.markdown details[open] summary {
+  margin-bottom: 10px;
+  border-bottom: 1px dashed var(--kp-border);
+  padding-bottom: 8px;
+}
+
 .floatingDock {
   position: fixed;
   bottom: 22px;
