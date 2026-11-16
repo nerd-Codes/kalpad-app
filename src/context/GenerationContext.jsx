@@ -3,6 +3,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { notifications } from '@mantine/notifications';
+import { generatePlanBYOK_v2 } from '@/lib/byok/pipelines/planGeneratorV2';
 import { generatePlanBYOK } from '@/lib/byok/pipelines/planGenerator';
 import { generateNoteBYOK } from '@/lib/byok/pipelines/notesGenerator';
 import { forgeCramSheetBYOK } from '@/lib/byok/pipelines/cramSheetForger';
@@ -32,6 +33,9 @@ export function GenerationProvider({ children }) {
     examDate,
     studyHoursPerDay = 3,
     planMode = 'default',
+    examFormat = 'theory',
+    prepLevel = 'standard',
+    priorityNote = '',
     isGuest = false,
     session = null,
     onPlanSaved = null,
@@ -46,6 +50,9 @@ export function GenerationProvider({ children }) {
       examDate,
       studyHoursPerDay,
       planMode,
+      examFormat,
+      prepLevel,
+      priorityNote,
       isGuest,
       status: 'generating',
       strategy: null,
@@ -63,13 +70,15 @@ export function GenerationProvider({ children }) {
       let accumulatedStrategy = null;
       const accumulatedTopics = [];
 
-      await generatePlanBYOK({
+      await generatePlanBYOK_v2({
         examName: cleanExamName,
         syllabus,
         examDate,
         studyHoursPerDay,
         planMode,
-        isGuest,
+        examFormat,
+        prepLevel,
+        priorityNote,
         onEvent: (msg) => {
           if (msg.type === 'status') {
             const statusMsg = msg.data?.message || msg.message || 'Scheduling syllabus...';

@@ -30,6 +30,7 @@ import { KalPadProgress } from '@/components/kalpad/KalPadProgress';
 import { WeekDatePickerDialog } from '@/components/dashboard/WeekDatePickerDialog';
 import { useGeneration } from '@/context/GenerationContext';
 import { generatePlanBYOK } from '@/lib/byok/pipelines/planGenerator';
+import { PlanClarificationModal } from '@/components/newplan/PlanClarificationModal';
 import classes from '@/components/newplan/NewPlan.module.css';
 
 const PLAN_MODES = [
@@ -170,6 +171,7 @@ export default function NewPlanPage() {
 
   // Date picker modal
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showClarificationModal, setShowClarificationModal] = useState(false);
 
   // Generation & save state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -232,9 +234,9 @@ export default function NewPlanPage() {
   const canContinue = useMemo(() => {
     if (isGenerating) return false;
     if (currentStep === 0) return examName.trim().length > 0 && Boolean(examDate);
-    if (currentStep === 2) return syllabus.trim().length > 0;
+    if (currentStep === 2) return examName.trim().length > 0;
     return true;
-  }, [currentStep, examName, examDate, syllabus, isGenerating]);
+  }, [currentStep, examName, examDate, isGenerating]);
 
   const goToStep = (nextStep) => {
     setDirection(nextStep >= currentStep ? 1 : -1);
@@ -375,8 +377,8 @@ export default function NewPlanPage() {
     }
   };
 
-  const handleGeneratePlan = async () => {
-    if (!examName.trim() || !examDate || !syllabus.trim()) return;
+  const handleGeneratePlan = async (calibration = {}) => {
+    if (!examName.trim() || !examDate) return;
     window.dispatchEvent(new CustomEvent('kalpad-onboarding-advance'));
 
     const fullSyllabus = specialInstructions.trim()
@@ -399,6 +401,9 @@ export default function NewPlanPage() {
         examDate,
         studyHoursPerDay,
         planMode,
+        examFormat: calibration.examFormat || 'theory',
+        prepLevel: calibration.prepLevel || 'standard',
+        priorityNote: calibration.priorityNote || '',
         isGuest: !session,
         session,
         onPlanSaved: (savedId) => {
@@ -948,15 +953,31 @@ export default function NewPlanPage() {
 
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--kp-secondary)' }}>
-                    Topics, chapters, or key ideas
+                    Topics, chapters, or key ideas (or leave blank to auto-populate)
                   </span>
                   <textarea
                     value={syllabus}
                     onChange={(e) => setSyllabus(e.target.value)}
-                    placeholder={'Cell structure\nGenetics\nEvolution and natural selection'}
+                    placeholder={'Cell structure\nGenetics\nEvolution and natural selection\n\n(Or leave blank and KalPad will auto-populate the official standard syllabus)'}
                     className={classes.textArea}
                   />
                 </label>
+
+                {syllabus.trim().length === 0 && (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '14px',
+                      backgroundColor: 'var(--kp-butter)',
+                      border: '1px solid var(--kp-border)',
+                      fontSize: '12px',
+                      color: 'var(--kp-ink)',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    💡 <strong>Auto-Syllabus Ready:</strong> If you don&apos;t have the exact syllabus, KalPad AI will automatically research and populate the official standard curriculum for <strong>{examName || 'your exam'}</strong>.
+                  </div>
+                )}
 
                 <div
                   style={{
@@ -1526,7 +1547,7 @@ export default function NewPlanPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={handleGeneratePlan}
+                      onClick={() => handleGeneratePlan()}
                       className="kp-tactile"
                       style={{
                         flex: 1,
@@ -1587,7 +1608,7 @@ export default function NewPlanPage() {
                 disabled={!canContinue}
                 onClick={() => {
                   if (currentStep < 2) goToStep(currentStep + 1);
-                  else handleGeneratePlan();
+                  else setShowClarificationModal(true);
                 }}
                 className="kp-tactile"
                 style={{
@@ -1777,6 +1798,18 @@ export default function NewPlanPage() {
         onConfirm={(selected) => {
           setExamDate(format(selected, 'yyyy-MM-dd'));
           setShowDatePicker(false);
+        }}
+      />
+
+      {/* Stage 0 Exam Clarification & Calibration Modal */}
+      <PlanClarificationModal
+        opened={showClarificationModal}
+        onClose={() => setShowClarificationModal(false)}
+        examName={examName}
+        hasSyllabus={syllabus.trim().length > 0}
+        onConfirm={(calibration) => {
+          setShowClarificationModal(false);
+          handleGeneratePlan(calibration);
         }}
       />
     </KalPadShell>
