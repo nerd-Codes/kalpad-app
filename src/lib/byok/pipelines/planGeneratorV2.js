@@ -586,6 +586,21 @@ export async function generatePlanBYOK_v2({
   }
 
   onEvent?.({
+    type: 'curriculum_insights',
+    data: {
+      examType: manifest.curriculum_analysis?.detected_exam_type || examFormat,
+      academicLevel: manifest.curriculum_analysis?.academic_level || 'Standard Academic',
+      totalTopics: manifest.topics?.length || 0,
+      confidenceBuilders: (manifest.topics || [])
+        .filter((t) => t.is_confidence_builder)
+        .map((t) => t.topic_name),
+      highYield: (manifest.topics || [])
+        .filter((t) => t.is_high_yield)
+        .map((t) => t.topic_name),
+    },
+  });
+
+  onEvent?.({
     type: 'status',
     data: {
       message: `Expanded into ${manifest.topics.length} mastery topics. Solving schedule constraints...`,
@@ -601,6 +616,15 @@ export async function generatePlanBYOK_v2({
     studyHoursPerDay,
     startDate,
     examFormat,
+  });
+
+  onEvent?.({
+    type: 'ledger_ready',
+    data: {
+      daysCount: ledger.length,
+      targetDailyHours: ledger[0]?.target_hours || studyHoursPerDay,
+      totalHours: ledger.reduce((s, d) => s + (d.allocated_hours || 0), 0),
+    },
   });
 
   // Calculate audit statistics

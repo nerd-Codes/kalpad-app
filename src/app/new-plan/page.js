@@ -33,39 +33,6 @@ import { generatePlanBYOK } from '@/lib/byok/pipelines/planGenerator';
 import { PlanClarificationModal } from '@/components/newplan/PlanClarificationModal';
 import classes from '@/components/newplan/NewPlan.module.css';
 
-const PLAN_MODES = [
-  {
-    value: 'default',
-    label: 'Balanced',
-    description: 'Steady progress with room to review',
-    icon: IconTargetArrow,
-  },
-  {
-    value: 'revision',
-    label: 'Revision',
-    description: 'Recall and practice come first',
-    icon: IconRefresh,
-  },
-  {
-    value: 'hardcore',
-    label: 'In-depth',
-    description: 'Build a thorough topic foundation',
-    icon: IconFlame,
-  },
-  {
-    value: 'sprint',
-    label: 'Sprint',
-    description: 'Make the most of a short timeline',
-    icon: IconBolt,
-  },
-  {
-    value: 'skill',
-    label: 'Applied',
-    description: 'Learn through practical problems',
-    icon: IconTool,
-  },
-];
-
 const HOUR_PRESETS = [
   { value: 2, label: 'Easy start' },
   { value: 4, label: 'Balanced' },
@@ -145,7 +112,7 @@ function resizeImage(blob, maxWidth = 768) {
 export default function NewPlanPage() {
   const router = useRouter();
   const { setIsLoading } = useLoading();
-  const { activePlanTask, startPlanGeneration } = useGeneration();
+  const { activePlanTask, startPlanGeneration, markPlanSaved } = useGeneration();
   const { isDark } = useKalPadTheme();
 
   const [session, setSession] = useState(null);
@@ -194,6 +161,7 @@ export default function NewPlanPage() {
     if (
       activePlanTask &&
       (activePlanTask.status === 'generating' ||
+        activePlanTask.status === 'generated' ||
         activePlanTask.status === 'saving' ||
         activePlanTask.status === 'completed')
     ) {
@@ -207,7 +175,7 @@ export default function NewPlanPage() {
         setGeneratedTopics(activePlanTask.generatedTopics);
       }
       setIsGenerating(activePlanTask.status === 'generating' || activePlanTask.status === 'saving');
-      if (activePlanTask.status === 'completed') {
+      if (activePlanTask.savedPlanId) {
         setSaveSuccess(true);
       }
     }
@@ -434,6 +402,10 @@ export default function NewPlanPage() {
     setIsSaving(true);
     setError('');
     try {
+      const cleanSyllabus = (typeof syllabus === 'string' && syllabus.trim().length > 0)
+        ? syllabus.trim()
+        : (examName || 'Standard Curriculum');
+
       const response = await fetch('/api/save-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -443,16 +415,26 @@ export default function NewPlanPage() {
           plan_topics: generatedTopics.filter(Boolean),
           generation_context: generationContext,
           page_image_urls: pageImageUrls,
-          syllabus,
+          syllabus: cleanSyllabus,
         }),
       });
       if (!response.ok) {
         const errPayload = await response.json().catch(() => ({}));
         throw new Error(errPayload.error || 'Could not save plan.');
       }
+      const payload = await response.json().catch(() => ({}));
+      const savedPlanId = payload?.planId;
+
       setSaveSuccess(true);
+      if (savedPlanId) {
+        markPlanSaved?.(savedPlanId);
+      }
       setIsLoading(true);
-      router.push('/plans');
+      if (savedPlanId) {
+        router.push(`/plan/${savedPlanId}`);
+      } else {
+        router.push('/plans');
+      }
     } catch (err) {
       setError(err?.message || 'Failed to save your study plan.');
     } finally {
@@ -817,76 +799,39 @@ export default function NewPlanPage() {
 
                 <div style={{ height: '1px', backgroundColor: 'var(--kp-border)' }} />
 
-                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--kp-ink)' }}>
-                  What kind of support would help?
-                </div>
-
-                <div className={classes.modesGrid} role="radiogroup" aria-label="Study mode">
-                  {PLAN_MODES.map((mode) => {
-                    const ModeIcon = mode.icon;
-                    const selected = planMode === mode.value;
-                    return (
-                      <button
-                        key={mode.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={selected}
-                        onClick={() => setPlanMode(mode.value)}
-                        className="kp-tactile"
-                        style={{
-                          minHeight: '82px',
-                          borderRadius: '20px',
-                          backgroundColor: selected ? 'var(--kp-primary)' : 'var(--kp-surface)',
-                          border: selected
-                            ? '2px solid var(--kp-orange)'
-                            : '1px solid var(--kp-border)',
-                          padding: '11px',
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '8px',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <ModeIcon
-                          size={17}
-                          stroke={1.8}
-                          color={selected ? 'var(--kp-orange)' : 'var(--kp-secondary)'}
-                          style={{ marginTop: '2px', flexShrink: 0 }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              color: selected ? 'var(--kp-on-primary)' : 'var(--kp-ink)',
-                            }}
-                          >
-                            {mode.label}
-                          </div>
-                          <div
-                            style={{
-                              marginTop: '3px',
-                              fontSize: '11px',
-                              lineHeight: '14px',
-                              color: selected ? 'var(--kp-on-primary)' : 'var(--kp-secondary)',
-                              opacity: selected ? 0.85 : 1,
-                            }}
-                          >
-                            {mode.description}
-                          </div>
-                        </div>
-                        {selected && (
-                          <IconCheck
-                            size={14}
-                            stroke={2.2}
-                            color="var(--kp-orange)"
-                            style={{ flexShrink: 0, marginTop: '2px' }}
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '14px 16px',
+                    borderRadius: '18px',
+                    backgroundColor: 'var(--kp-surface)',
+                    border: '1px solid var(--kp-border)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '10px',
+                      backgroundColor: 'var(--kp-butter)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <IconSparkles size={17} stroke={1.8} color="var(--kp-orange)" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--kp-ink)' }}>
+                      Intelligent Adaptive Pacing
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--kp-secondary)', lineHeight: 1.4, marginTop: '2px' }}>
+                      KalPad dynamically balances your daily workload — allocating deeper focus hours to heavy derivations and lighter sessions for active recall.
+                    </div>
+                  </div>
                 </div>
               </section>
             )}
@@ -1177,51 +1122,152 @@ export default function NewPlanPage() {
                   <div
                     style={{
                       borderRadius: '20px',
-                      backgroundColor: 'var(--kp-butter)',
+                      backgroundColor: 'var(--kp-surface)',
                       border: '1px solid var(--kp-border)',
-                      padding: '17px',
+                      padding: '18px 20px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '12px',
+                      gap: '14px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
-                      <div
-                        style={{
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '999px',
-                          border: '2px solid var(--kp-border-strong)',
-                          borderTopColor: 'var(--kp-ink)',
-                          animation: 'spin 0.8s linear infinite',
-                          flexShrink: 0,
-                        }}
-                      />
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--kp-ink)' }}>
-                          Building your plan
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--kp-secondary)', marginTop: '2px' }}>
-                          {strategy
-                            ? 'Sequencing daily sessions and review checkpoints…'
-                            : 'Finding a steady rhythm for your topics…'}
+                    {/* Top Header: Live message + Progress % */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+                        <div
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '999px',
+                            border: '2.5px solid var(--kp-border-strong)',
+                            borderTopColor: 'var(--kp-orange)',
+                            animation: 'spin 0.8s linear infinite',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--kp-ink)' }}>
+                            Building Your Study Battle Plan
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--kp-orange)', fontWeight: 600, marginTop: '2px' }}>
+                            {activePlanTask?.statusMessage || 'Unpacking syllabus & solving schedule constraints...'}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    {generatedTopics.length > 0 && (
                       <div
                         style={{
                           fontFamily: 'var(--font-kp-mono)',
-                          fontSize: '10px',
+                          fontSize: '13px',
                           fontWeight: 700,
                           color: 'var(--kp-ink)',
+                          padding: '4px 10px',
+                          borderRadius: '10px',
+                          backgroundColor: 'var(--kp-raised)',
                         }}
                       >
-                        {generatedTopics.length === 1
-                          ? '1 study day taking shape'
-                          : `${generatedTopics.length} study days taking shape`}
+                        {activePlanTask?.progress || 15}%
                       </div>
-                    )}
+                    </div>
+
+                    {/* Progress Bar */}
+                    <KalPadProgress progress={(activePlanTask?.progress || 15) / 100} height={5} />
+
+                    {/* Live Pipeline Milestones */}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                        gap: '8px',
+                        paddingTop: '4px',
+                      }}
+                    >
+                      {/* Milestone 1 */}
+                      <div
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: '12px',
+                          backgroundColor: activePlanTask?.curriculumInsights ? 'var(--kp-mint)' : 'var(--kp-raised)',
+                          border: '1px solid var(--kp-border)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 700, color: 'var(--kp-ink)' }}>
+                          {activePlanTask?.curriculumInsights ? '✓ ' : '1. '}Curriculum
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--kp-secondary)' }}>
+                          {activePlanTask?.curriculumInsights
+                            ? `${activePlanTask.curriculumInsights.totalTopics} topics found`
+                            : 'Deconstructing...'}
+                        </div>
+                      </div>
+
+                      {/* Milestone 2 */}
+                      <div
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: '12px',
+                          backgroundColor: activePlanTask?.ledgerReady ? 'var(--kp-mint)' : 'var(--kp-raised)',
+                          border: '1px solid var(--kp-border)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 700, color: 'var(--kp-ink)' }}>
+                          {activePlanTask?.ledgerReady ? '✓ ' : '2. '}Schedule
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--kp-secondary)' }}>
+                          {activePlanTask?.ledgerReady
+                            ? `${activePlanTask.ledgerReady.daysCount} days balanced`
+                            : 'Calculating load...'}
+                        </div>
+                      </div>
+
+                      {/* Milestone 3 */}
+                      <div
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: '12px',
+                          backgroundColor: generatedTopics.length > 0 ? 'var(--kp-mint)' : 'var(--kp-raised)',
+                          border: '1px solid var(--kp-border)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 700, color: 'var(--kp-ink)' }}>
+                          {generatedTopics.length > 0 ? '✓ ' : '3. '}Daily Tasks
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--kp-secondary)' }}>
+                          {generatedTopics.length > 0
+                            ? `${generatedTopics.length} days authored`
+                            : 'Minute budgets...'}
+                        </div>
+                      </div>
+
+                      {/* Milestone 4 */}
+                      <div
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: '12px',
+                          backgroundColor: strategy ? 'var(--kp-mint)' : 'var(--kp-raised)',
+                          border: '1px solid var(--kp-border)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 700, color: 'var(--kp-ink)' }}>
+                          {strategy ? '✓ ' : '4. '}Verification
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--kp-secondary)' }}>
+                          {strategy
+                            ? `${strategy.estimated_coverage}% verified`
+                            : 'Coverage audit...'}
+                        </div>
+                      </div>
+                    </div>
                     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                   </div>
                 )}
@@ -1265,7 +1311,8 @@ export default function NewPlanPage() {
                 )}
 
                 <div className={classes.resultColumns}>
-                  {strategy && (
+                  {/* Left Column: The Approach (or Skeleton/Early Insights while generating) */}
+                  {strategy ? (
                     <section
                       className={classes.journeyCard}
                       style={{ backgroundColor: 'var(--kp-surface)' }}
@@ -1355,9 +1402,64 @@ export default function NewPlanPage() {
                         </>
                       )}
                   </section>
-                )}
+                ) : isGenerating ? (
+                  <section
+                    className={classes.journeyCard}
+                    style={{ backgroundColor: 'var(--kp-surface)' }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--kp-ink)' }}>
+                        Strategy Formulation
+                      </div>
+                      <span
+                        style={{
+                          borderRadius: '20px',
+                          backgroundColor: 'var(--kp-butter)',
+                          padding: '4px 8px',
+                          fontFamily: 'var(--font-kp-mono)',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          color: 'var(--kp-ink)',
+                        }}
+                      >
+                        Synthesizing…
+                      </span>
+                    </div>
 
-                {generatedTopics.length > 0 && (
+                    {activePlanTask?.curriculumInsights ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <p style={{ margin: 0, fontSize: '12px', lineHeight: '18px', color: 'var(--kp-secondary)' }}>
+                          Iceberg deconstruction complete for <strong>{activePlanTask.curriculumInsights.academicLevel}</strong> ({activePlanTask.curriculumInsights.examType}). Discovered <strong>{activePlanTask.curriculumInsights.totalTopics} mastery topics &amp; derivations</strong>.
+                        </p>
+                        {activePlanTask.curriculumInsights.confidenceBuilders?.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--kp-ink)' }}>
+                              Starting momentum anchors:
+                            </span>
+                            {activePlanTask.curriculumInsights.confidenceBuilders.slice(0, 3).map((cb, idx) => (
+                              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--kp-secondary)' }}>
+                                <span style={{ color: 'var(--kp-orange)' }}>⚡</span>
+                                <span>{cb}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div className={classes.skeletonPulse} style={{ width: '100%', height: '14px' }} />
+                        <div className={classes.skeletonPulse} style={{ width: '92%', height: '14px' }} />
+                        <div className={classes.skeletonPulse} style={{ width: '75%', height: '14px' }} />
+                        <div style={{ height: '1px', backgroundColor: 'var(--kp-border)', margin: '4px 0' }} />
+                        <div className={classes.skeletonPulse} style={{ width: '110px', height: '14px' }} />
+                        <div className={classes.skeletonPulse} style={{ width: '85%', height: '14px' }} />
+                      </div>
+                    )}
+                  </section>
+                ) : null}
+
+                {/* Right Column: Generated Days (or Skeletons while generating) */}
+                {generatedTopics.length > 0 ? (
                   <section
                     className={classes.journeyCard}
                     style={{ backgroundColor: 'var(--kp-surface)' }}
@@ -1477,7 +1579,69 @@ export default function NewPlanPage() {
                       ))}
                     </div>
                   </section>
-                  )}
+                ) : isGenerating ? (
+                  <section
+                    className={classes.journeyCard}
+                    style={{ backgroundColor: 'var(--kp-surface)' }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--kp-ink)' }}>
+                          Daily Schedule
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--kp-secondary)', marginTop: '2px' }}>
+                          {activePlanTask?.ledgerReady
+                            ? `Pacing ${activePlanTask.ledgerReady.daysCount} days (${activePlanTask.ledgerReady.totalHours}h allocated)`
+                            : 'Synthesizing timeline & cognitive load…'}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          borderRadius: '20px',
+                          backgroundColor: 'var(--kp-butter)',
+                          padding: '4px 8px',
+                          fontFamily: 'var(--font-kp-mono)',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          color: 'var(--kp-ink)',
+                        }}
+                      >
+                        Drafting…
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {[1, 2, 3].map((placeholderDay) => (
+                        <div
+                          key={placeholderDay}
+                          style={{
+                            borderRadius: '16px',
+                            backgroundColor: 'var(--kp-raised)',
+                            border: '1px solid var(--kp-border)',
+                            padding: '12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className={classes.skeletonPulse} style={{ width: '80px', height: '14px' }} />
+                            <div className={classes.skeletonPulse} style={{ width: '32px', height: '12px' }} />
+                          </div>
+                          <div className={classes.skeletonPulse} style={{ width: '90%', height: '12px' }} />
+                          <div className={classes.skeletonPulse} style={{ width: '60%', height: '10px' }} />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
                 </div>
 
                 {ready && (
@@ -1714,9 +1878,7 @@ export default function NewPlanPage() {
                     {
                       step: 1,
                       label: 'Daily rhythm',
-                      value: `${studyHoursPerDay}h/day · ${
-                        PLAN_MODES.find((m) => m.value === planMode)?.label || 'Balanced'
-                      }`,
+                      value: `${studyHoursPerDay}h/day · Adaptive pacing`,
                       readyItem: currentStep >= 1,
                     },
                     {

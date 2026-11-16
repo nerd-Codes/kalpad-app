@@ -16,14 +16,21 @@ export async function POST(request) {
     }
 
     const { exam_name, exam_date, plan_topics, generation_context, syllabus, page_image_urls } = await request.json();
-    if (!exam_name || !exam_date || !plan_topics || !syllabus) {
-      return new Response(JSON.stringify({ error: 'Missing required plan data' }), { status: 400 });
+    const cleanSyllabus = (typeof syllabus === 'string' && syllabus.trim().length > 0)
+      ? syllabus.trim()
+      : (exam_name || 'Standard Curriculum');
+
+    if (!exam_name || !exam_date || !plan_topics || !Array.isArray(plan_topics) || plan_topics.length === 0) {
+      return new Response(JSON.stringify({ error: 'Missing required plan data (exam_name, exam_date, plan_topics)' }), { status: 400 });
     }
 
     // 1. Save the main plan details
     const { data: planData, error: planError } = await supabase.from('study_plans').insert({
         user_id: user.id,
-        exam_name, exam_date, generation_context, syllabus,
+        exam_name,
+        exam_date,
+        generation_context,
+        syllabus: cleanSyllabus,
     }).select().single();
     if (planError) throw new Error(`DB error (study_plans): ${planError.message}`);
 
@@ -62,7 +69,7 @@ export async function POST(request) {
     if (topicsError) throw new Error(`DB error (plan_topics): ${topicsError.message}`);
 
     logRouteResult('/api/save-plan', authMode, 200);
-    return new Response(JSON.stringify({ message: 'Plan saved successfully' }), { status: 200 });
+    return new Response(JSON.stringify({ message: 'Plan saved successfully', planId: planData.id }), { status: 200 });
   } catch (error) {
     console.error('Full error in save-plan API:', error);
     logRouteResult('/api/save-plan', authMode, 500);

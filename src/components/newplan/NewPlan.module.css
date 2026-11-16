@@ -176,3 +176,18 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
   cursor: pointer;
 }
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.skeletonPulse {
+  animation: pulseGlow 1.8s ease-in-out infinite;
+  background-color: var(--kp-raised);
+  border-radius: 8px;
+}

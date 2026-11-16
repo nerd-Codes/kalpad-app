@@ -83,17 +83,31 @@ export function GenerationProvider({ children }) {
           if (msg.type === 'status') {
             const statusMsg = msg.data?.message || msg.message || 'Scheduling syllabus...';
             setActivePlanTask((curr) => curr ? { ...curr, statusMessage: statusMsg } : curr);
+          } else if (msg.type === 'curriculum_insights') {
+            setActivePlanTask((curr) => curr ? {
+              ...curr,
+              curriculumInsights: msg.data,
+              progress: Math.max(curr.progress || 0, 30),
+              statusMessage: `Identified ${msg.data?.totalTopics || 0} mastery topics & derivations.`,
+            } : curr);
+          } else if (msg.type === 'ledger_ready') {
+            setActivePlanTask((curr) => curr ? {
+              ...curr,
+              ledgerReady: msg.data,
+              progress: Math.max(curr.progress || 0, 45),
+              statusMessage: `Master ledger locked for ${msg.data?.daysCount || 0} days. Authoring tasks...`,
+            } : curr);
           } else if (msg.type === 'strategy' && msg.data) {
             accumulatedStrategy = msg.data;
             setActivePlanTask((curr) => curr ? {
               ...curr,
               strategy: msg.data,
-              progress: 25,
-              statusMessage: 'Strategy locked. Building daily study tasks...',
+              progress: Math.max(curr.progress || 0, 95),
+              statusMessage: 'Strategy and coverage verified.',
             } : curr);
           } else if (msg.type === 'plan_topic' && msg.data) {
             accumulatedTopics.push(msg.data);
-            const approxProgress = Math.min(92, 25 + Math.round((accumulatedTopics.length * 70) / 10));
+            const approxProgress = Math.min(95, 45 + Math.round((accumulatedTopics.length * 50) / 10));
             setActivePlanTask((curr) => curr ? {
               ...curr,
               generatedTopics: [...accumulatedTopics],
@@ -106,65 +120,25 @@ export function GenerationProvider({ children }) {
         },
       });
 
-      // Auto-save plan upon completion
+      // Generation complete: mark ready for user review without auto-saving
       setActivePlanTask((curr) => curr ? {
         ...curr,
-        status: 'saving',
-        progress: 95,
-        statusMessage: 'Saving your battle plan...',
-      } : curr);
-
-      let savedId = null;
-
-      if (!isGuest && session) {
-        const response = await fetch('/api/save-plan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            exam_name: cleanExamName,
-            exam_date: examDate,
-            plan_topics: accumulatedTopics.filter(Boolean),
-            generation_context: JSON.stringify(accumulatedStrategy || {}),
-            syllabus,
-          }),
-        });
-        if (response.ok) {
-          const payload = await response.json().catch(() => ({}));
-          savedId = payload?.planId || payload?.plan?.id || null;
-        }
-      } else {
-        saveGuestArtifactDirect({
-          examName: cleanExamName,
-          examDate,
-          syllabus,
-          plan: accumulatedTopics,
-          strategy: accumulatedStrategy,
-          generationContext: planMode,
-          generatedNotes: [],
-        });
-        savedId = 'guest';
-      }
-
-      setActivePlanTask((curr) => curr ? {
-        ...curr,
-        status: 'completed',
+        status: 'generated',
         progress: 100,
-        statusMessage: 'Study plan ready on your desk.',
-        savedPlanId: savedId,
+        strategy: accumulatedStrategy,
+        generatedTopics: [...accumulatedTopics],
+        statusMessage: 'Study plan ready for your review.',
+        savedPlanId: null,
       } : curr);
 
       notifications.show({
         title: 'Study Plan Ready! 🎯',
-        message: `${cleanExamName} has been planned and saved.`,
+        message: `${cleanExamName} roadmap is generated. Review your study days and click Save to keep it.`,
         color: 'teal',
-        autoClose: 8000,
+        autoClose: 7000,
       });
 
-      if (onPlanSaved) {
-        onPlanSaved(savedId);
-      }
-
-      return { planId: savedId, strategy: accumulatedStrategy, topics: accumulatedTopics };
+      return { strategy: accumulatedStrategy, topics: accumulatedTopics };
     } catch (err) {
       if (err?.code === 'BYOK_NOT_CONNECTED' && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('open-byok-chat'));
@@ -181,6 +155,15 @@ export function GenerationProvider({ children }) {
 
   const clearCompletedPlan = useCallback(() => {
     setActivePlanTask(null);
+  }, []);
+
+  const markPlanSaved = useCallback((savedId) => {
+    setActivePlanTask((curr) => curr ? {
+      ...curr,
+      status: 'completed',
+      savedPlanId: savedId,
+      statusMessage: 'Study plan saved to your desk.',
+    } : curr);
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -386,6 +369,7 @@ export function GenerationProvider({ children }) {
         activePlanTask,
         startPlanGeneration,
         clearCompletedPlan,
+        markPlanSaved,
 
         // Note generation
         activeNoteTasks,
