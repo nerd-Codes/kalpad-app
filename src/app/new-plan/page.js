@@ -17,6 +17,7 @@ import {
   IconFileText,
   IconFlame,
   IconRefresh,
+  IconSparkles,
   IconTargetArrow,
   IconTool,
   IconUpload,
