@@ -137,3 +137,80 @@ test("Dashboard Today's Mission Subtopic Notes Button Parity Contract", () => {
     'dashboard/page.js must pass activeNoteTasks to TodayAgenda'
   );
 });
+
+test('FullscreenNoteViewer and HighlightableMarkdown Client Stability Contract', () => {
+  const noteViewer = readFile('src/components/FullscreenNoteViewer.jsx');
+  const highlightable = readFile('src/components/HighlightableMarkdown.jsx');
+  const timelineDayCard = readFile('src/components/TimelineDayCard.jsx');
+  const timelineEntry = readFile('src/components/TimelineEntry.jsx');
+  const dashboardPage = readFile('src/app/dashboard/page.js');
+
+  // 1. React Rules of Hooks: No early return before hooks in FullscreenNoteViewer
+  const hookMatches = [
+    'useCallback(',
+    'useRef(',
+    'useMemo(',
+    'useEffect(',
+    'useState(',
+  ];
+  const viewerLines = noteViewer.split('\n');
+  const overlayLineIdx = viewerLines.findIndex((line) => line.includes('const overlay = ('));
+  assert.ok(overlayLineIdx > 0, 'FullscreenNoteViewer must define overlay');
+
+  // Check that no `return null` or early return exists before all hooks
+  const earlyReturnLineIdx = viewerLines.slice(0, overlayLineIdx).findIndex(
+    (line) => line.trim() === 'if (!activeNoteData) return null;'
+  );
+  assert.equal(
+    earlyReturnLineIdx,
+    -1,
+    'FullscreenNoteViewer must NOT have an early return before hooks (violates React Rules of Hooks)'
+  );
+
+  // 2. Safe mount and activeNoteData guard placed directly before overlay
+  assert.ok(
+    noteViewer.includes('if (!mounted || !activeNoteData) return null;'),
+    'FullscreenNoteViewer must check mounted and activeNoteData right before overlay creation'
+  );
+
+  // 3. Clean portal rendering on document.body
+  assert.ok(
+    noteViewer.includes('return createPortal(overlay, document.body);'),
+    'FullscreenNoteViewer must return createPortal(overlay, document.body) on client'
+  );
+
+  // 4. Synchronous prop synchronization pattern
+  assert.ok(
+    noteViewer.includes('if (noteData !== prevNoteData) {'),
+    'FullscreenNoteViewer must synchronize activeNoteData when noteData prop changes'
+  );
+
+  // 5. HighlightableMarkdown null-safety for database records with null highlights
+  assert.ok(
+    highlightable.includes('const safeHighlights = Array.isArray(highlights) ? highlights : [];'),
+    'HighlightableMarkdown must define safeHighlights fallback'
+  );
+  assert.ok(
+    !highlightable.includes('highlights.length'),
+    'HighlightableMarkdown must not directly read length on nullable highlights'
+  );
+  assert.ok(
+    highlightable.includes('preprocessMathBlocks(markdown || \'\')'),
+    'HighlightableMarkdown must pass fallback empty string to preprocessMathBlocks'
+  );
+
+  // 6. Call sites must conditionally mount FullscreenNoteViewer only when noteToView is truthy
+  assert.ok(
+    timelineDayCard.includes('{noteToView && (\n        <FullscreenNoteViewer') ||
+    timelineDayCard.includes('{noteToView && ('),
+    'TimelineDayCard must guard FullscreenNoteViewer with noteToView'
+  );
+  assert.ok(
+    timelineEntry.includes('{noteToView && ('),
+    'TimelineEntry must guard FullscreenNoteViewer with noteToView'
+  );
+  assert.ok(
+    dashboardPage.includes('{noteToView && ('),
+    'dashboard/page.js must guard FullscreenNoteViewer with noteToView'
+  );
+});

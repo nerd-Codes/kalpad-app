@@ -411,6 +411,13 @@ export function FullscreenNoteViewer({
   isCramSheet = false,
 }) {
   const [activeNoteData, setActiveNoteData] = useState(noteData);
+  const [prevNoteData, setPrevNoteData] = useState(noteData);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [renderContent, setRenderContent] = useState(false);
   const noteContentRef = useRef(null);
   const scrollAreaRef = useRef(null);
@@ -458,6 +465,13 @@ export function FullscreenNoteViewer({
   const [localHighlights, setLocalHighlights] = useState(
     Array.isArray(highlights) ? highlights : []
   );
+
+  if (noteData !== prevNoteData) {
+    setPrevNoteData(noteData);
+    setActiveNoteData(noteData);
+    setLocalMarkdown(noteData?.notes_markdown || 'No content available.');
+    setLocalHighlights(Array.isArray(noteData?.highlights) ? noteData.highlights : []);
+  }
 
   useEffect(() => {
     setLocalMarkdown(notes_markdown);
@@ -543,9 +557,7 @@ export function FullscreenNoteViewer({
 
   const outlineHeadings = useMemo(() => extractMarkdownOutline(localMarkdown), [localMarkdown]);
 
-  if (!activeNoteData) return null;
-
-  const canPersistStructuredHighlights = Boolean(activeNoteData.id) && !isCramSheet;
+  const canPersistStructuredHighlights = Boolean(activeNoteData?.id) && !isCramSheet;
   const hasSelection = Boolean(selection.text.trim());
   const siblingSubTopics = Array.isArray(day_topic?.sub_topics) ? day_topic.sub_topics : [];
 
@@ -858,8 +870,8 @@ export function FullscreenNoteViewer({
     setIsExporting(true);
     setExportModalOpened(false);
     const printUrl = isCramSheet
-      ? `/print-cram-sheet/${activeNoteData.id}`
-      : `/print/${activeNoteData.id}`;
+      ? `/print-cram-sheet/${activeNoteData?.id}`
+      : `/print/${activeNoteData?.id}`;
     const printWindow = window.open(printUrl, '_blank');
     if (!printWindow) {
       notifications.show({
@@ -906,10 +918,10 @@ export function FullscreenNoteViewer({
       const { error: saveError } = await supabase
         .from('generated_notes')
         .update({ highlights: mergedHighlights })
-        .eq('id', activeNoteData.id);
+        .eq('id', activeNoteData?.id);
 
       if (saveError) throw saveError;
-      onNoteUpdate?.(activeNoteData.id, { highlights: mergedHighlights });
+      onNoteUpdate?.(activeNoteData?.id, { highlights: mergedHighlights });
     } catch (e) {
       console.error('Highlight save failed', e);
       setLocalHighlights(previousHighlights);
@@ -967,6 +979,8 @@ export function FullscreenNoteViewer({
   );
 
   const isCompleted = Boolean(sub_topic?.completed);
+
+  if (!mounted || !activeNoteData) return null;
 
   const overlay = (
     <motion.div
@@ -1683,5 +1697,5 @@ export function FullscreenNoteViewer({
     </motion.div>
   );
 
-  return typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay;
+  return createPortal(overlay, document.body);
 }

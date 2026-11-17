@@ -198,12 +198,14 @@ export function TimelineEntry({ taskGroup, onUpdate, onNoteGenerated }) {
 
             <QuizModal opened={quizModalOpened} onClose={() => setQuizModalOpened(false)} planTopicId={dailyTopic.id} />
             <SummaryModal opened={summaryModalOpened} onClose={() => setSummaryModalOpened(false)} planTopicId={dailyTopic.id} />
-            <FullscreenNoteViewer
-                noteData={noteToView}
-                onClose={() => setNoteToView(null)}
-                onUpdate={onUpdate}
-                onNoteUpdate={patchNoteLocally}
-            />
+            {noteToView && (
+                <FullscreenNoteViewer
+                    noteData={noteToView}
+                    onClose={() => setNoteToView(null)}
+                    onUpdate={onUpdate}
+                    onNoteUpdate={patchNoteLocally}
+                />
+            )}
         </>
     );
 }

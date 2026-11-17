@@ -878,18 +878,20 @@ export function TimelineDayCard({
         onClose={() => setQuizOpened(false)}
         planTopicId={dayTopic.id}
       />
-      <FullscreenNoteViewer
-        noteData={noteToView}
-        onClose={() => setNoteToView(null)}
-        onUpdate={onUpdate}
-        onNoteUpdate={patchNoteLocally}
-        onSubTopicNoteSwitch={(resolvedPayload) => {
-          if (!resolvedPayload?.id) return;
-          setLocalNotes((prev) =>
-            prev.some((n) => n.id === resolvedPayload.id) ? prev : [...prev, resolvedPayload]
-          );
-        }}
-      />
+      {noteToView && (
+        <FullscreenNoteViewer
+          noteData={noteToView}
+          onClose={() => setNoteToView(null)}
+          onUpdate={onUpdate}
+          onNoteUpdate={patchNoteLocally}
+          onSubTopicNoteSwitch={(resolvedPayload) => {
+            if (!resolvedPayload?.id) return;
+            setLocalNotes((prev) =>
+              prev.some((n) => n.id === resolvedPayload.id) ? prev : [...prev, resolvedPayload]
+            );
+          }}
+        />
+      )}
 
       {/* Bulk Forge Dialog */}
       {bulkNoteModalOpened && (

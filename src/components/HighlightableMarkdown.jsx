@@ -39,8 +39,9 @@ export const HighlightableMarkdown = memo(function HighlightableMarkdown({
 }) {
     const internalContentRef = useRef(null);
     const [rects, setRects] = useState([]);
-    const highlightSignature = JSON.stringify(highlights || []);
-    const processedMarkdown = preprocessMathBlocks(markdown);
+    const safeHighlights = Array.isArray(highlights) ? highlights : [];
+    const highlightSignature = JSON.stringify(safeHighlights);
+    const processedMarkdown = preprocessMathBlocks(markdown || '');
 
     const pushRect = (targetRects, rootRect, rect, id, highlightId, color, atomic = false) => {
         if (!rect || rect.width < 1 || rect.height < 1) return;
@@ -68,7 +69,7 @@ export const HighlightableMarkdown = memo(function HighlightableMarkdown({
 
         if (!root) {
             setRects([]);
-            onHighlightsRendered?.({ ready: true, resolvedCount: 0, unresolvedCount: highlights.length });
+            onHighlightsRendered?.({ ready: true, resolvedCount: 0, unresolvedCount: safeHighlights.length });
             return undefined;
         }
 
@@ -78,7 +79,7 @@ export const HighlightableMarkdown = memo(function HighlightableMarkdown({
 
         const recompute = () => {
             const stream = buildCanonicalStream(root);
-            const resolvedHighlights = resolveHighlightsAgainstStream(highlights, stream.text, stream.fingerprint);
+            const resolvedHighlights = resolveHighlightsAgainstStream(safeHighlights, stream.text, stream.fingerprint);
             const nextRects = [];
             const rootRect = root.getBoundingClientRect();
 
@@ -123,7 +124,7 @@ export const HighlightableMarkdown = memo(function HighlightableMarkdown({
             onHighlightsRendered?.({
                 ready: true,
                 resolvedCount: resolvedHighlights.length,
-                unresolvedCount: Math.max(0, highlights.length - resolvedHighlights.length),
+                unresolvedCount: Math.max(0, safeHighlights.length - resolvedHighlights.length),
             });
         };
 
@@ -149,7 +150,7 @@ export const HighlightableMarkdown = memo(function HighlightableMarkdown({
             window.removeEventListener('resize', scheduleRecompute);
             resizeObserver?.disconnect();
         };
-    }, [highlightSignature, highlights.length, onHighlightsRendered, processedMarkdown]);
+    }, [highlightSignature, safeHighlights.length, onHighlightsRendered, processedMarkdown]);
 
     return (
         <div className={highlightStyles.root}>
