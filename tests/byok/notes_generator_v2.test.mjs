@@ -6,6 +6,7 @@ import {
   ARCHETYPES,
   DEPTH_GUIDE,
   deriveDepthDirective,
+  extractAllocatedMinutes,
   resolveArchetype,
   stripTimePrefix,
   splitOutlineIntoSections,
@@ -16,25 +17,25 @@ import {
   generateCustomNoteBYOK,
 } from '../../src/lib/byok/pipelines/notesGenerator.js';
 
-test('Notes Generator v3 - ARCHETYPES and DEPTH_GUIDE definitions are comprehensive with word floors', () => {
+test('Notes Generator v3.1 - ARCHETYPES and DEPTH_GUIDE provide qualitative guidance without hardcoded word limits', () => {
   assert.ok(ARCHETYPES.CONCEPT_MASTER);
   assert.ok(ARCHETYPES.DERIVATION_DEEP_DIVE);
   assert.ok(ARCHETYPES.PROBLEM_SOLVING);
   assert.ok(ARCHETYPES.VIVA_DRILL);
   assert.ok(ARCHETYPES.LAB_PROCEDURE);
 
-  // Minimum word floors (not ceilings)
-  assert.ok(DEPTH_GUIDE.FOCUSED.minWords >= 1200);
-  assert.ok(DEPTH_GUIDE.STANDARD.minWords >= 2500);
-  assert.ok(DEPTH_GUIDE.DEEP.minWords >= 3500);
-  assert.ok(DEPTH_GUIDE.EXHAUSTIVE.minWords >= 5000);
+  // Depth guide provides qualitative guidance
+  assert.ok(DEPTH_GUIDE.FOCUSED.directive.includes('FOCUSED'));
+  assert.ok(DEPTH_GUIDE.STANDARD.directive.includes('STANDARD'));
+  assert.ok(DEPTH_GUIDE.DEEP.directive.includes('DEEP'));
+  assert.ok(DEPTH_GUIDE.EXHAUSTIVE.directive.includes('EXHAUSTIVE'));
 
-  // Backward compatibility aliases
-  assert.equal(DEPTH_GUIDE.ESSENTIAL.minWords, DEPTH_GUIDE.FOCUSED.minWords);
-  assert.equal(DEPTH_GUIDE.COMPREHENSIVE.minWords, DEPTH_GUIDE.DEEP.minWords);
+  // Backward compatibility aliases exist
+  assert.ok(DEPTH_GUIDE.ESSENTIAL.directive);
+  assert.ok(DEPTH_GUIDE.COMPREHENSIVE.directive);
 });
 
-test('Notes Generator v3 - resolveArchetype maps Plan v2 types and text semantics accurately', () => {
+test('Notes Generator v3.1 - resolveArchetype maps Plan v2 types and text semantics accurately', () => {
   // Plan v2 types
   assert.equal(resolveArchetype({ subTopicType: 'Derivation' }), 'DERIVATION_DEEP_DIVE');
   assert.equal(resolveArchetype({ subTopicType: 'Practice' }), 'PROBLEM_SOLVING');
@@ -71,7 +72,13 @@ test('Notes Generator v3 - resolveArchetype maps Plan v2 types and text semantic
   );
 });
 
-test('Notes Generator v3 - deriveDepthDirective calibrates word floors based on time and difficulty', () => {
+test('Notes Generator v3.1 - extractAllocatedMinutes and deriveDepthDirective accurately parse time budgets', () => {
+  // Parsing minutes
+  assert.equal(extractAllocatedMinutes('(45 min) Core topic'), 45);
+  assert.equal(extractAllocatedMinutes('(1.5 hrs) Heavy proof'), 90);
+  assert.equal(extractAllocatedMinutes('No time prefix', 30), 30);
+  assert.equal(extractAllocatedMinutes('No time prefix', null), null);
+
   // By allocated minutes
   assert.equal(deriveDepthDirective('', 20), 'FOCUSED');
   assert.equal(deriveDepthDirective('', 45), 'STANDARD');
@@ -90,13 +97,13 @@ test('Notes Generator v3 - deriveDepthDirective calibrates word floors based on 
   assert.equal(deriveDepthDirective('', null, 'Medium'), 'STANDARD');
 });
 
-test('Notes Generator v3 - stripTimePrefix cleans topic text', () => {
+test('Notes Generator v3.1 - stripTimePrefix cleans topic text', () => {
   assert.equal(stripTimePrefix('(45 min) Understand First Law of Thermodynamics'), 'Understand First Law of Thermodynamics');
   assert.equal(stripTimePrefix('(1.5 hrs) Derivation of Wave Equation'), 'Derivation of Wave Equation');
   assert.equal(stripTimePrefix('Clean text without timer'), 'Clean text without timer');
 });
 
-test('Notes Generator v3 - splitOutlineIntoSections accurately segments markdown headings', () => {
+test('Notes Generator v3.1 - splitOutlineIntoSections accurately segments markdown headings', () => {
   const outline = `
 ### 1. Intuition & Mental Model
 [MISCONCEPTION: Energy isn't destroyed]
@@ -117,7 +124,7 @@ Calculations here.
   assert.equal(sections[2].heading, '### 3. Worked Examples');
 });
 
-test('Notes Generator v3 - normalizeNoteMarkdown repairs LaTeX spacing and auto-closes details tags', () => {
+test('Notes Generator v3.1 - normalizeNoteMarkdown repairs LaTeX spacing and auto-closes details tags', () => {
   const dirty = `
 Some text
 $$E = mc^2$$
@@ -131,35 +138,39 @@ Step 1: Calculate energy.
   assert.ok(normalized.includes('</details>'));
 });
 
-test('Notes Generator v3 - prompts enforce anti-compression and visual design system', () => {
+test('Notes Generator v3.1 - prompts enforce Scope Fence and Anti-Overcomplication', () => {
   const outlinePrompt = buildOutlinePrompt({
-    examName: 'JEE Advanced',
-    academicLevel: 'High School Competitive',
+    examName: 'University Exam',
+    academicLevel: 'Undergraduate',
     examFormat: 'Theory',
     dayTopic: 'Thermodynamics',
     cleanSubTopic: 'First Law of Thermodynamics & Enthalpy',
     archetype: 'DERIVATION_DEEP_DIVE',
-    depthDirective: 'DEEP',
-    previousContext: 'Zeroth Law & Heat Capacities',
-    strategicContext: { high_yield_topics: ['Enthalpy of Reaction'] },
+    depthDirective: 'STANDARD',
+    previousContext: 'Zeroth Law',
+    upcomingContext: 'Second Law of Thermodynamics → Carnot Cycle',
+    positionContext: 'Subtopic 2 of 5 (Day 1)',
+    allocatedMinutes: 40,
   });
 
-  assert.ok(outlinePrompt.includes('JEE Advanced'));
-  assert.ok(outlinePrompt.includes('Derivation Deep-Dive'));
+  assert.ok(outlinePrompt.includes('University Exam'));
+  assert.ok(outlinePrompt.includes('STRICT SCOPE FENCE'));
+  assert.ok(outlinePrompt.includes('Second Law of Thermodynamics'));
+  assert.ok(outlinePrompt.includes('40 minutes'));
   assert.ok(outlinePrompt.includes('[MISCONCEPTION'));
   assert.ok(outlinePrompt.includes('[DERIVATION'));
-  assert.ok(outlinePrompt.includes('[EXAM TRAP'));
-  assert.ok(outlinePrompt.includes('3500'));
 
   const authorPrompt = buildAuthorPrompt({
-    examName: 'JEE Advanced',
-    academicLevel: 'High School Competitive',
+    examName: 'University Exam',
+    academicLevel: 'Undergraduate',
     examFormat: 'Theory',
     dayTopic: 'Thermodynamics',
     cleanSubTopic: 'First Law of Thermodynamics & Enthalpy',
     archetype: 'DERIVATION_DEEP_DIVE',
-    depthDirective: 'DEEP',
+    depthDirective: 'STANDARD',
     previousContext: 'Zeroth Law',
+    upcomingContext: 'Second Law of Thermodynamics → Carnot Cycle',
+    allocatedMinutes: 40,
     chapterOutline: '### 1. Mental Model\n[MISCONCEPTION: Energy created]',
     chunkMode: 'SINGLE',
   });
@@ -167,21 +178,23 @@ test('Notes Generator v3 - prompts enforce anti-compression and visual design sy
   assert.ok(authorPrompt.includes('Intuition & Mental Model'));
   assert.ok(authorPrompt.includes('Common Exam Trap'));
   assert.ok(authorPrompt.includes('30-Second Examiner Answer'));
+  assert.ok(authorPrompt.includes('STRICT SCOPE FENCE'));
+  assert.ok(authorPrompt.includes('Second Law of Thermodynamics'));
   assert.ok(authorPrompt.includes('UNBREAKABLE KATEX MATH RULES'));
   assert.ok(authorPrompt.includes('<details>'));
   assert.ok(authorPrompt.includes('<summary>Reveal Step-by-Step Solution</summary>'));
-  assert.ok(authorPrompt.includes('ANTI-COMPRESSION MANDATE'));
+  assert.ok(authorPrompt.includes('Do NOT turn this into a 26-page dissertation'));
 });
 
-test('Notes Generator v3 - chunkMode correctly formats Part 1 and Part 2 author prompts', () => {
+test('Notes Generator v3.1 - parallel chunkMode correctly formats Part 1 and Part 2 author prompts', () => {
   const part1Prompt = buildAuthorPrompt({
     examName: 'GATE Computer Science',
     cleanSubTopic: 'Bayes Rule & Classification',
     chapterOutline: '### 1. Prior\n### 2. Likelihood',
     chunkMode: 'PART_1',
-    depthDirective: 'DEEP',
+    depthDirective: 'STANDARD',
   });
-  assert.ok(part1Prompt.includes('PART 1 OF 2'));
+  assert.ok(part1Prompt.includes('PART 1 OF 2 - PARALLEL AUTHORING'));
   assert.ok(!part1Prompt.includes('Reveal Step-by-Step Solution'));
 
   const part2Prompt = buildAuthorPrompt({
@@ -189,15 +202,15 @@ test('Notes Generator v3 - chunkMode correctly formats Part 1 and Part 2 author 
     cleanSubTopic: 'Bayes Rule & Classification',
     chapterOutline: '### 3. Worked Example\n### 4. Self-Test',
     chunkMode: 'PART_2',
-    depthDirective: 'DEEP',
-    continuationSnippet: 'Final step of derivation completed.',
+    depthDirective: 'STANDARD',
+    part1HeadingsSummary: '### 1. Prior, ### 2. Likelihood',
   });
-  assert.ok(part2Prompt.includes('PART 2 OF 2'));
-  assert.ok(part2Prompt.includes('Final step of derivation completed.'));
+  assert.ok(part2Prompt.includes('PART 2 OF 2 - PARALLEL AUTHORING'));
+  assert.ok(part2Prompt.includes('### 1. Prior, ### 2. Likelihood'));
   assert.ok(part2Prompt.includes('Reveal Step-by-Step Solution'));
 });
 
-test('Notes Generator v3 - generateNoteBYOK and generateCustomNoteBYOK throw BYOK_NOT_CONNECTED when unauthenticated', async () => {
+test('Notes Generator v3.1 - generateNoteBYOK and generateCustomNoteBYOK throw BYOK_NOT_CONNECTED when unauthenticated', async () => {
   let noteErr = null;
   try {
     await generateNoteBYOK({ planTopicId: 10, subTopicText: 'Kinematics' });
