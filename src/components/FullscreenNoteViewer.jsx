@@ -1,7 +1,7 @@
 // src/components/FullscreenNoteViewer.jsx
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -176,6 +176,232 @@ function CollapsibleRailCard({
   );
 }
 
+const ChatMessageBubble = React.memo(function ChatMessageBubble({ msg, customRenderers }) {
+  if (msg.role === 'user') {
+    return (
+      <div className={classes.chatBubbleUser}>
+        {msg.content}
+      </div>
+    );
+  }
+  if (msg.role === 'error') {
+    return (
+      <div
+        style={{
+          padding: '8px 10px',
+          borderRadius: '10px',
+          backgroundColor: 'var(--kp-error-subtle)',
+          color: 'var(--kp-error-ink)',
+          fontSize: '12px',
+        }}
+      >
+        {msg.content}
+      </div>
+    );
+  }
+  return (
+    <div className={classes.chatBubbleAi}>
+      <div className={classes.chatMarkdown}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeRaw, rehypeKatex]}
+          components={customRenderers}
+        >
+          {preprocessMathBlocks(msg.content)}
+        </ReactMarkdown>
+      </div>
+    </div>
+  );
+});
+
+const TutorChatForm = React.memo(function TutorChatForm({ onSend, loading, inputRef }) {
+  const [text, setText] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const trimmed = text.trim();
+    if (!trimmed || loading) return;
+    onSend(trimmed);
+    setText('');
+  };
+
+  return (
+    <form className={classes.chatForm} onSubmit={handleSubmit}>
+      <input
+        ref={inputRef}
+        type="text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Ask tutor about this note..."
+        aria-label="Ask AI tutor question"
+        className={classes.chatInput}
+      />
+      <button
+        type="submit"
+        disabled={!text.trim() || loading}
+        aria-label="Send message"
+        className={classes.chatSendBtn}
+      >
+        <IconSend size={16} stroke={2} />
+      </button>
+    </form>
+  );
+});
+
+const TutorChatSection = React.memo(function TutorChatSection({
+  subTopicText,
+  chatMessages,
+  chatLoading,
+  chatScrollRef,
+  chatInputRef,
+  onSend,
+  onClear,
+  onClose,
+  customRenderers,
+}) {
+  return (
+    <div className={classes.chatContainer}>
+      <div className={classes.chatHeaderRow}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <IconMessageCircle size={15} stroke={2} color="var(--kp-primary)" />
+          <span
+            style={{
+              fontFamily: 'var(--font-kp-mono)',
+              fontSize: '11px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.07em',
+              color: 'var(--kp-ink)',
+            }}
+          >
+            Tutor chat
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {chatMessages.length > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--kp-secondary)',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '2px 4px',
+              }}
+            >
+              Clear
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close tutor chat"
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--kp-secondary)',
+              display: 'inline-flex',
+              cursor: 'pointer',
+              padding: '2px',
+            }}
+          >
+            <IconX size={15} stroke={1.9} />
+          </button>
+        </div>
+      </div>
+
+      <div ref={chatScrollRef} className={`${classes.chatMessages} ${classes.customScroll}`}>
+        {chatMessages.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ fontSize: '12.5px', lineHeight: 1.45, color: 'var(--kp-secondary)' }}>
+              Ask anything about <strong>{subTopicText}</strong> while you keep reading.
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {[
+                'Summarize the core intuition',
+                'Common exam traps here?',
+                'Give me a concrete example',
+              ].map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  className={classes.chatPromptChip}
+                  onClick={() => onSend(prompt)}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          chatMessages.map((msg) => (
+            <ChatMessageBubble
+              key={msg.id}
+              msg={msg}
+              customRenderers={customRenderers}
+            />
+          ))
+        )}
+
+        {chatLoading && (
+          <div className={classes.chatBubbleAi} style={{ color: 'var(--kp-secondary)' }}>
+            Thinking through your note...
+          </div>
+        )}
+      </div>
+
+      <TutorChatForm
+        onSend={onSend}
+        loading={chatLoading}
+        inputRef={chatInputRef}
+      />
+    </div>
+  );
+});
+
+const NoteArticleBody = React.memo(function NoteArticleBody({
+  topicLabel,
+  subtopicHeading,
+  switchingSubTopic,
+  renderContent,
+  markdown,
+  highlights,
+  customRenderers,
+  contentRef,
+}) {
+  return (
+    <article className={classes.articleSheet}>
+      <div className={classes.articleShell}>
+        <div className={classes.titleBlock}>
+          <p className={classes.topicLabel}>{topicLabel}</p>
+          <h1 className={classes.subtopicHeading}>{subtopicHeading}</h1>
+        </div>
+
+        {switchingSubTopic ? (
+          <div style={{ padding: '40px 0', color: 'var(--kp-secondary)', fontSize: '14px' }}>
+            Loading note for <strong>{switchingSubTopic}</strong>...
+          </div>
+        ) : renderContent ? (
+          <HighlightableMarkdown
+            markdown={markdown}
+            highlights={highlights}
+            className={classes.markdown}
+            components={customRenderers}
+            contentRef={contentRef}
+          />
+        ) : (
+          <div style={{ padding: '32px 0', color: 'var(--kp-secondary)', fontSize: '14px' }}>
+            Loading study note...
+          </div>
+        )}
+      </div>
+    </article>
+  );
+});
+
 export function FullscreenNoteViewer({
   noteData,
   onClose,
@@ -190,6 +416,8 @@ export function FullscreenNoteViewer({
   const scrollAreaRef = useRef(null);
   const chatScrollRef = useRef(null);
   const chatInputRef = useRef(null);
+  const mobileChatScrollRef = useRef(null);
+  const mobileChatInputRef = useRef(null);
 
   // Keep synced with incoming prop changes
   useEffect(() => {
@@ -209,7 +437,6 @@ export function FullscreenNoteViewer({
   // Embedded Tutor Chat State (non-blocking inside desktop sidebar, slide-up drawer on mobile)
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
-  const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
 
   // Collapsible Sidebar Cards State
@@ -293,6 +520,9 @@ export function FullscreenNoteViewer({
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
+    if (mobileChatScrollRef.current) {
+      mobileChatScrollRef.current.scrollTop = mobileChatScrollRef.current.scrollHeight;
+    }
   }, [chatMessages, chatLoading]);
 
   useEffect(() => {
@@ -319,84 +549,98 @@ export function FullscreenNoteViewer({
   const hasSelection = Boolean(selection.text.trim());
   const siblingSubTopics = Array.isArray(day_topic?.sub_topics) ? day_topic.sub_topics : [];
 
-  const handleOpenChat = () => {
+  const handleOpenChat = useCallback(() => {
     setChatOpen(true);
-    setTimeout(() => chatInputRef.current?.focus(), 140);
-  };
+    setTimeout(() => {
+      chatInputRef.current?.focus();
+      mobileChatInputRef.current?.focus();
+    }, 140);
+  }, []);
 
-  const handleDoubtRequest = async (action, textOverride = null) => {
-    const questionText = (textOverride ?? (action === 'custom' ? chatInput : selection.text)).trim();
-    if (!questionText || chatLoading) return;
+  const handleDoubtRequest = useCallback(
+    async (action, textOverride = null) => {
+      const questionText = (textOverride ?? selection.text).trim();
+      if (!questionText || chatLoading) return;
 
-    const userLabel =
-      action === 'explain'
-        ? `Explain: "${questionText}"`
-        : action === 'analogy'
-          ? `Give an analogy for: "${questionText}"`
-          : action === 'importance'
-            ? `Why does this matter: "${questionText}"`
-            : questionText;
+      const userLabel =
+        action === 'explain'
+          ? `Explain: "${questionText}"`
+          : action === 'analogy'
+            ? `Give an analogy for: "${questionText}"`
+            : action === 'importance'
+              ? `Why does this matter: "${questionText}"`
+              : questionText;
 
-    setChatOpen(true);
-    if (action === 'custom') setChatInput('');
-    clearSelection();
+      setChatOpen(true);
+      clearSelection();
 
-    const userMsg = { id: `u-${Date.now()}`, role: 'user', content: userLabel };
-    const priorHistory = chatMessages.slice(-4);
-    setChatMessages((prev) => [...prev, userMsg]);
-    setChatLoading(true);
+      const userMsg = { id: `u-${Date.now()}`, role: 'user', content: userLabel };
+      const priorHistory = chatMessages.slice(-4);
+      setChatMessages((prev) => [...prev, userMsg]);
+      setChatLoading(true);
 
-    // Build conversational context for follow-ups while keeping existing /api/solve-doubt contract intact
-    const enrichedQuestion =
-      priorHistory.length > 0 && action === 'custom'
-        ? `Previous chat context:\n${priorHistory
-            .map((m) => `${m.role === 'user' ? 'Student' : 'Tutor'}: ${m.content}`)
-            .join('\n')}\n\nLatest question: ${questionText}`
-        : questionText;
+      // Build conversational context for follow-ups while keeping existing /api/solve-doubt contract intact
+      const enrichedQuestion =
+        priorHistory.length > 0 && action === 'custom'
+          ? `Previous chat context:\n${priorHistory
+              .map((m) => `${m.role === 'user' ? 'Student' : 'Tutor'}: ${m.content}`)
+              .join('\n')}\n\nLatest question: ${questionText}`
+          : questionText;
 
-    const bodyPayload = {
-      fullNoteContent: localMarkdown,
-      context: {
-        examName: exam_name,
-        dayTopic: day_topic.topic_name,
-        subTopic: sub_topic.text,
-      },
-      action,
-      highlightedText: action !== 'custom' ? questionText : undefined,
-      question: action === 'custom' ? enrichedQuestion : undefined,
-    };
-
-    try {
-      const data = await solveDoubtBYOK({
-        fullNoteContent: bodyPayload.fullNoteContent,
-        context: bodyPayload.context,
-        action: bodyPayload.action,
-        highlightedText: bodyPayload.highlightedText,
-        question: bodyPayload.question,
-      });
-      setChatMessages((prev) => [
-        ...prev,
-        { id: `a-${Date.now()}`, role: 'assistant', content: data.response },
-      ]);
-    } catch (err) {
-      if (err?.code === 'BYOK_NOT_CONNECTED' && typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('open-byok-chat'));
-      }
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: `e-${Date.now()}`,
-          role: 'error',
-          content:
-            err?.code === 'BYOK_NOT_CONNECTED'
-              ? 'Connect your ChatGPT account in the opened panel to ask the inline tutor.'
-              : err?.message || 'Unable to get response.',
+      const bodyPayload = {
+        fullNoteContent: localMarkdown,
+        context: {
+          examName: exam_name,
+          dayTopic: day_topic?.topic_name,
+          subTopic: sub_topic?.text,
         },
-      ]);
-    } finally {
-      setChatLoading(false);
-    }
-  };
+        action,
+        highlightedText: action !== 'custom' ? questionText : undefined,
+        question: action === 'custom' ? enrichedQuestion : undefined,
+      };
+
+      try {
+        const data = await solveDoubtBYOK({
+          fullNoteContent: bodyPayload.fullNoteContent,
+          context: bodyPayload.context,
+          action: bodyPayload.action,
+          highlightedText: bodyPayload.highlightedText,
+          question: bodyPayload.question,
+        });
+        setChatMessages((prev) => [
+          ...prev,
+          { id: `a-${Date.now()}`, role: 'assistant', content: data.response },
+        ]);
+      } catch (err) {
+        if (err?.code === 'BYOK_NOT_CONNECTED' && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('open-byok-chat'));
+        }
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: `e-${Date.now()}`,
+            role: 'error',
+            content:
+              err?.code === 'BYOK_NOT_CONNECTED'
+                ? 'Connect your ChatGPT account in the opened panel to ask the inline tutor.'
+                : err?.message || 'Unable to get response.',
+          },
+        ]);
+      } finally {
+        setChatLoading(false);
+      }
+    },
+    [
+      selection.text,
+      chatLoading,
+      clearSelection,
+      chatMessages,
+      localMarkdown,
+      exam_name,
+      day_topic?.topic_name,
+      sub_topic?.text,
+    ]
+  );
 
   const handleScrollToOutline = (headingIdx) => {
     const container = noteContentRef.current;
@@ -677,186 +921,52 @@ export function FullscreenNoteViewer({
     }
   };
 
-  const customRenderers = {
-    img: ({ node, ...props }) => {
-      const src = props.src || '';
-      return (
-        <span style={{ display: 'flex', justifyContent: 'center', padding: '0.75rem 0' }}>
-          <img
-            {...props}
-            onClick={() => src && setZoomImageSrc(src)}
-            alt={props.alt || 'Study diagram'}
-          />
-        </span>
-      );
-    },
-    mark: ({ node, ...props }) => {
-      const textContent = Array.isArray(props.children)
-        ? props.children.join('')
-        : String(props.children ?? '');
+  const handleDoubtRequestRef = useRef(handleDoubtRequest);
+  useEffect(() => {
+    handleDoubtRequestRef.current = handleDoubtRequest;
+  });
 
-      return (
-        <mark
-          title="Click to ask AI tutor"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDoubtRequest('explain', textContent);
-          }}
-        >
-          {props.children}
-        </mark>
-      );
-    },
-  };
+  const setZoomImageSrcRef = useRef(setZoomImageSrc);
+  useEffect(() => {
+    setZoomImageSrcRef.current = setZoomImageSrc;
+  });
+
+  const customRenderers = useMemo(
+    () => ({
+      img: ({ node, ...props }) => {
+        const src = props.src || '';
+        return (
+          <span style={{ display: 'flex', justifyContent: 'center', padding: '0.75rem 0' }}>
+            <img
+              {...props}
+              onClick={() => src && setZoomImageSrcRef.current?.(src)}
+              alt={props.alt || 'Study diagram'}
+            />
+          </span>
+        );
+      },
+      mark: ({ node, ...props }) => {
+        const textContent = Array.isArray(props.children)
+          ? props.children.join('')
+          : String(props.children ?? '');
+
+        return (
+          <mark
+            title="Click to ask AI tutor"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDoubtRequestRef.current?.('explain', textContent);
+            }}
+          >
+            {props.children}
+          </mark>
+        );
+      },
+    }),
+    []
+  );
 
   const isCompleted = Boolean(sub_topic?.completed);
-
-  const renderChatBody = () => (
-    <div className={classes.chatContainer}>
-      <div className={classes.chatHeaderRow}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-          <IconMessageCircle size={15} stroke={2} color="var(--kp-primary)" />
-          <span
-            style={{
-              fontFamily: 'var(--font-kp-mono)',
-              fontSize: '11px',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.07em',
-              color: 'var(--kp-ink)',
-            }}
-          >
-            Tutor chat
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {chatMessages.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setChatMessages([])}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                color: 'var(--kp-secondary)',
-                fontSize: '11px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                padding: '2px 4px',
-              }}
-            >
-              Clear
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setChatOpen(false)}
-            aria-label="Close tutor chat"
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: 'var(--kp-secondary)',
-              display: 'inline-flex',
-              cursor: 'pointer',
-              padding: '2px',
-            }}
-          >
-            <IconX size={15} stroke={1.9} />
-          </button>
-        </div>
-      </div>
-
-      <div ref={chatScrollRef} className={`${classes.chatMessages} ${classes.customScroll}`}>
-        {chatMessages.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ fontSize: '12.5px', lineHeight: 1.45, color: 'var(--kp-secondary)' }}>
-              Ask anything about <strong>{sub_topic?.text}</strong> while you keep reading.
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {[
-                'Summarize the core intuition',
-                'Common exam traps here?',
-                'Give me a concrete example',
-              ].map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  className={classes.chatPromptChip}
-                  onClick={() => handleDoubtRequest('custom', prompt)}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          chatMessages.map((msg) =>
-            msg.role === 'user' ? (
-              <div key={msg.id} className={classes.chatBubbleUser}>
-                {msg.content}
-              </div>
-            ) : msg.role === 'error' ? (
-              <div
-                key={msg.id}
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: '10px',
-                  backgroundColor: 'var(--kp-error-subtle)',
-                  color: 'var(--kp-error-ink)',
-                  fontSize: '12px',
-                }}
-              >
-                {msg.content}
-              </div>
-            ) : (
-              <div key={msg.id} className={classes.chatBubbleAi}>
-                <div className={classes.chatMarkdown}>
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeRaw, rehypeKatex]}
-                    components={customRenderers}
-                  >
-                    {preprocessMathBlocks(msg.content)}
-                  </ReactMarkdown>
-                </div>
-              </div>
-            )
-          )
-        )}
-
-        {chatLoading && (
-          <div className={classes.chatBubbleAi} style={{ color: 'var(--kp-secondary)' }}>
-            Thinking through your note...
-          </div>
-        )}
-      </div>
-
-      <form
-        className={classes.chatForm}
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleDoubtRequest('custom');
-        }}
-      >
-        <input
-          ref={chatInputRef}
-          type="text"
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          placeholder="Ask tutor about this note..."
-          aria-label="Ask AI tutor question"
-          className={classes.chatInput}
-        />
-        <button
-          type="submit"
-          disabled={!chatInput.trim() || chatLoading}
-          aria-label="Send message"
-          className={classes.chatSendBtn}
-        >
-          <IconSend size={16} stroke={2} />
-        </button>
-      </form>
-    </div>
-  );
 
   const overlay = (
     <motion.div
@@ -900,32 +1010,16 @@ export function FullscreenNoteViewer({
       {/* Main Reading Workspace */}
       <div ref={scrollAreaRef} className={`${classes.scrollArea} ${classes.customScroll}`}>
         <div className={classes.readerWorkspace}>
-          <article className={classes.articleSheet}>
-            <div className={classes.articleShell}>
-              <div className={classes.titleBlock}>
-                <p className={classes.topicLabel}>{day_topic?.topic_name || exam_name}</p>
-                <h1 className={classes.subtopicHeading}>{sub_topic?.text || 'Study note'}</h1>
-              </div>
-
-              {switchingSubTopic ? (
-                <div style={{ padding: '40px 0', color: 'var(--kp-secondary)', fontSize: '14px' }}>
-                  Loading note for <strong>{switchingSubTopic}</strong>...
-                </div>
-              ) : renderContent ? (
-                <HighlightableMarkdown
-                  markdown={localMarkdown}
-                  highlights={localHighlights}
-                  className={classes.markdown}
-                  components={customRenderers}
-                  contentRef={noteContentRef}
-                />
-              ) : (
-                <div style={{ padding: '32px 0', color: 'var(--kp-secondary)', fontSize: '14px' }}>
-                  Loading study note...
-                </div>
-              )}
-            </div>
-          </article>
+          <NoteArticleBody
+            topicLabel={day_topic?.topic_name || exam_name}
+            subtopicHeading={sub_topic?.text || 'Study note'}
+            switchingSubTopic={switchingSubTopic}
+            renderContent={renderContent}
+            markdown={localMarkdown}
+            highlights={localHighlights}
+            customRenderers={customRenderers}
+            contentRef={noteContentRef}
+          />
 
           {/* Persistent Desktop Study Sidebar (>= 960px) */}
           <aside className={`${classes.companionRail} ${classes.customScroll}`} aria-label="Study companion">
@@ -1081,7 +1175,17 @@ export function FullscreenNoteViewer({
                     transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                     style={{ overflow: 'hidden' }}
                   >
-                    {renderChatBody()}
+                    <TutorChatSection
+                      subTopicText={sub_topic?.text}
+                      chatMessages={chatMessages}
+                      chatLoading={chatLoading}
+                      chatScrollRef={chatScrollRef}
+                      chatInputRef={chatInputRef}
+                      onSend={(q) => handleDoubtRequest('custom', q)}
+                      onClear={() => setChatMessages([])}
+                      onClose={() => setChatOpen(false)}
+                      customRenderers={customRenderers}
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1385,7 +1489,17 @@ export function FullscreenNoteViewer({
             style={{ padding: '16px 18px' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {renderChatBody()}
+            <TutorChatSection
+              subTopicText={sub_topic?.text}
+              chatMessages={chatMessages}
+              chatLoading={chatLoading}
+              chatScrollRef={mobileChatScrollRef}
+              chatInputRef={mobileChatInputRef}
+              onSend={(q) => handleDoubtRequest('custom', q)}
+              onClear={() => setChatMessages([])}
+              onClose={() => setChatOpen(false)}
+              customRenderers={customRenderers}
+            />
           </div>
         </div>
       )}

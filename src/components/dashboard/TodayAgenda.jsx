@@ -7,8 +7,9 @@ import {
   IconAlarm,
   IconArrowRight,
   IconCheck,
-  IconListDetails,
+  IconEye,
   IconLock,
+  IconPencilPlus,
 } from '@tabler/icons-react';
 import { SubTopicMathText } from '@/components/common/SubTopicMathText';
 import classes from './Dashboard.module.css';
@@ -39,6 +40,7 @@ function TopicCard({
   task,
   userTier = 'free',
   generatingFor,
+  activeNoteTasks = [],
   onOpenPlan,
   onToggleSubTopic,
   onOpenOrForgeNote,
@@ -147,8 +149,11 @@ function TopicCard({
               const completed = Boolean(subTopic.completed);
               const existingNote = findExistingNote(topic, subTopic.text, itemIndex);
               const isGenerating =
-                generatingFor?.topicId === topic.id &&
-                generatingFor?.subTopicText === subTopic.text;
+                (generatingFor?.topicId === topic.id &&
+                  generatingFor?.subTopicText === subTopic.text) ||
+                activeNoteTasks.some(
+                  (t) => t.id === `${topic.id}-${subTopic.text}` && t.status === 'generating'
+                );
               const lockedNote = !existingNote && isLockedForNewNote;
 
               return (
@@ -234,52 +239,94 @@ function TopicCard({
                     </span>
                   </button>
 
-                  <button
-                    type="button"
-                    className={classes.iconBtn44}
-                    disabled={isGenerating}
-                    aria-label={
-                      existingNote
-                        ? `Open study note for ${subTopic.text}`
-                        : lockedNote
-                          ? `Unlock notes for ${subTopic.text}`
-                          : `Create study note for ${subTopic.text}`
-                    }
-                    title={
-                      existingNote
-                        ? 'Open study note'
-                        : lockedNote
-                          ? 'Upgrade to generate notes for other days'
-                          : 'Generate study note'
-                    }
-                    onClick={() =>
-                      onOpenOrForgeNote(task, subTopic, existingNote, lockedNote)
-                    }
-                    style={{
-                      color: existingNote
-                        ? 'var(--kp-success-ink)'
-                        : lockedNote
-                          ? 'var(--kp-accent-ink)'
-                          : 'var(--kp-secondary)',
-                    }}
-                  >
-                    {isGenerating ? (
-                      <span
-                        style={{
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '999px',
-                          border: '2px solid var(--kp-border-strong)',
-                          borderTopColor: 'var(--kp-ink)',
-                          animation: 'spin 0.8s linear infinite',
-                        }}
-                      />
-                    ) : lockedNote ? (
+                  {existingNote ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onOpenOrForgeNote(task, subTopic, existingNote, false)
+                      }
+                      aria-label={`View note for ${subTopic.text}`}
+                      title="View note"
+                      className="kp-tactile"
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '999px',
+                        border: '1px solid var(--kp-border-strong)',
+                        backgroundColor: 'var(--kp-apricot)',
+                        color: 'var(--kp-primary)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <IconEye size={18} stroke={1.9} />
+                    </button>
+                  ) : lockedNote ? (
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-upgrade-modal'))}
+                      aria-label={`Unlock note creation for ${subTopic.text}`}
+                      title="Unlock notes"
+                      className="kp-tactile"
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '999px',
+                        border: '1px solid var(--kp-border)',
+                        backgroundColor: 'var(--kp-raised)',
+                        color: 'var(--kp-secondary)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    >
                       <IconLock size={17} stroke={1.8} />
-                    ) : (
-                      <IconListDetails size={18} stroke={1.8} />
-                    )}
-                  </button>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isGenerating}
+                      onClick={() =>
+                        onOpenOrForgeNote(task, subTopic, null, false)
+                      }
+                      aria-label={`Create note for ${subTopic.text}`}
+                      title="Create note"
+                      className="kp-tactile"
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '999px',
+                        border: '1px solid var(--kp-border)',
+                        backgroundColor: 'var(--kp-raised)',
+                        color: 'var(--kp-ink)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: isGenerating ? 'wait' : 'pointer',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isGenerating ? (
+                        <span
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '999px',
+                            border: '2px solid var(--kp-border)',
+                            borderTopColor: 'var(--kp-primary)',
+                            animation: 'kp-spin 0.8s linear infinite',
+                          }}
+                        />
+                      ) : (
+                        <IconPencilPlus size={18} stroke={1.8} />
+                      )}
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -295,6 +342,7 @@ export function TodayAgenda({
   tasks = [],
   userTier = 'free',
   generatingFor = null,
+  activeNoteTasks = [],
   onOpenPlan,
   onToggleSubTopic,
   onOpenOrForgeNote,
@@ -422,6 +470,7 @@ export function TodayAgenda({
                   task={task}
                   userTier={userTier}
                   generatingFor={generatingFor}
+                  activeNoteTasks={activeNoteTasks}
                   onOpenPlan={onOpenPlan}
                   onToggleSubTopic={onToggleSubTopic}
                   onOpenOrForgeNote={onOpenOrForgeNote}
@@ -432,6 +481,7 @@ export function TodayAgenda({
           )}
         </motion.div>
       </AnimatePresence>
+      <style>{`@keyframes kp-spin { to { transform: rotate(360deg); } }`}</style>
     </section>
   );
 }

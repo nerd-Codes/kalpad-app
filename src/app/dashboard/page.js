@@ -8,6 +8,7 @@ import { IconAlertTriangle, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import supabase from '@/lib/supabaseClient';
 import { useLoading } from '@/context/LoadingContext';
+import { useGeneration } from '@/context/GenerationContext';
 import KalPadShell from '@/components/kalpad/KalPadShell';
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting';
 import {
@@ -20,7 +21,6 @@ import { WeekDatePickerDialog } from '@/components/dashboard/WeekDatePickerDialo
 import { TodayAgenda } from '@/components/dashboard/TodayAgenda';
 import { CadenceSection } from '@/components/dashboard/CadenceSection';
 import { FullscreenNoteViewer } from '@/components/FullscreenNoteViewer';
-import { generateNoteBYOK } from '@/lib/byok/pipelines/notesGenerator';
 import classes from '@/components/dashboard/Dashboard.module.css';
 
 function computeStats(allPlans = []) {
@@ -72,6 +72,7 @@ function computeStats(allPlans = []) {
 export default function DashboardPage() {
   const router = useRouter();
   const { setIsLoading } = useLoading();
+  const { startNoteGeneration, activeNoteTasks } = useGeneration();
 
   const [session, setSession] = useState(null);
   const [userTier, setUserTier] = useState('free');
@@ -104,7 +105,7 @@ export default function DashboardPage() {
         supabase
           .from('study_plans')
           .select(
-            `id, exam_name, exam_date, created_at, plan_topics ( id, day, date, topic_name, day_summary, sub_topics )`
+            `id, exam_name, exam_date, created_at, plan_topics ( id, day, date, topic_name, day_summary, sub_topics, new_notes: generated_notes ( * ) )`
           )
           .eq('is_active', true)
           .order('created_at', { ascending: false }),
@@ -318,7 +319,7 @@ export default function DashboardPage() {
 
     setGeneratingFor({ topicId: task.topic.id, subTopicText: subTopic.text });
     try {
-      const payload = await generateNoteBYOK({
+      const newNote = await startNoteGeneration({
         planTopicId: task.topic.id,
         subTopicText: subTopic.text,
         examName: task.planName,
@@ -326,7 +327,8 @@ export default function DashboardPage() {
         isGuest: false,
       });
 
-      const newNote = payload.note;
+      if (!newNote) return;
+
       setOnlineTasks((prev) =>
         prev
           ? prev.map((item) => {
@@ -344,19 +346,36 @@ export default function DashboardPage() {
           : prev
       );
 
-      setNoteToView({
-        ...newNote,
-        sub_topic: subTopic,
-        day_topic: task.topic,
-        exam_name: task.planName,
-      });
+      setPlans((prev) =>
+        prev.map((plan) => {
+          if (plan.id !== task.planId) return plan;
+          const nextTopics = (plan.plan_topics || []).map((t) => {
+            if (t.id !== task.topic.id) return t;
+            const existingNotes = t.new_notes || [];
+            const idx = existingNotes.findIndex(
+              (n) => (n.sub_topic_text || '').trim().toLowerCase() === subTopic.text.trim().toLowerCase()
+            );
+            const nextNotes =
+              idx >= 0
+                ? existingNotes.map((n, i) => (i === idx ? newNote : n))
+                : [...existingNotes, newNote];
+            return { ...t, new_notes: nextNotes };
+          });
+          return { ...plan, plan_topics: nextTopics };
+        })
+      );
     } catch (err) {
       if (err?.code === 'BYOK_NOT_CONNECTED' && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('open-byok-chat'));
-        setError('Connect your ChatGPT account in the opened panel to generate study notes.');
-      } else {
-        setError(err?.message || 'Unable to generate study note.');
       }
+      notifications.show({
+        title: 'Error',
+        message:
+          err?.code === 'BYOK_NOT_CONNECTED'
+            ? 'Connect your ChatGPT account in the opened panel to generate notes.'
+            : err?.message || 'Failed to create note.',
+        color: 'red',
+      });
     } finally {
       setGeneratingFor(null);
     }
@@ -514,6 +533,7 @@ export default function DashboardPage() {
                     tasks={tasksToDisplay}
                     userTier={userTier}
                     generatingFor={generatingFor}
+                    activeNoteTasks={activeNoteTasks}
                     onOpenPlan={handleOpenPlan}
                     onToggleSubTopic={handleToggleSubTopic}
                     onOpenOrForgeNote={handleOpenOrForgeNote}
