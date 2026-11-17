@@ -10,6 +10,7 @@ import {
   IconListDetails,
   IconLock,
 } from '@tabler/icons-react';
+import { SubTopicMathText } from '@/components/common/SubTopicMathText';
 import classes from './Dashboard.module.css';
 
 const CHECKBOX_PASTEL_FILLS = [
@@ -223,14 +224,13 @@ function TopicCard({
                         lineHeight: '18px',
                         fontWeight: 500,
                         color: completed ? 'var(--kp-secondary)' : 'var(--kp-ink)',
-                        textDecoration: completed ? 'line-through' : 'none',
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
                       }}
                     >
-                      {subTopic.text}
+                      <SubTopicMathText text={subTopic.text} completed={completed} />
                     </span>
                   </button>
 

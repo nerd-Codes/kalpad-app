@@ -70,10 +70,12 @@ export default function TemporaryChatModal({ opened, onClose }) {
 
   const handleManualCodeSubmit = async (e) => {
     e?.preventDefault();
-    if (!manualCodeInput.trim() || chat.isAuthenticating) return;
-    await chat.submitManualCode(manualCodeInput);
-    setManualCodeInput('');
-    setManualCodeOpen(false);
+    if (!manualCodeInput.trim() || chat.isSubmittingManual) return;
+    try {
+      await chat.submitManualCode(manualCodeInput);
+      setManualCodeInput('');
+      setManualCodeOpen(false);
+    } catch (_) {}
   };
 
   return (
@@ -140,7 +142,7 @@ export default function TemporaryChatModal({ opened, onClose }) {
                 <Text fw={600} size="sm" c="var(--kp-ink)">
                   OpenAI Sign in with ChatGPT
                 </Text>
-                <Text size="xs" c="var(--kp-secondary, #4b5563)" maw={420}>
+                <Text size="xs" c="var(--kp-secondary)" maw={420}>
                   Connect your ChatGPT Plus or Pro account via OpenAI Sign in with ChatGPT (SIWC) to
                   test direct token sharing and interactive inference against your plan quota.
                 </Text>
@@ -218,8 +220,8 @@ export default function TemporaryChatModal({ opened, onClose }) {
                 >
                   <form onSubmit={handleManualCodeSubmit}>
                     <Stack gap="xs">
-                      <Text size="xs" c="var(--kp-secondary, #4b5563)">
-                        <strong>Hosted / Vercel Note:</strong> OpenAI&apos;s open-source BYOK protocol strictly redirects to loopback (<code>127.0.0.1:3000</code>). If the popup shows a connection error after you authorize in OpenAI, simply copy the URL from the popup address bar and paste it below:
+                      <Text size="xs" c="var(--kp-secondary)">
+                        <strong>Hosted / Vercel Note:</strong> OpenAI&apos;s open-source BYOK protocol strictly redirects to loopback (<code style={{ padding: '1px 5px', borderRadius: '4px', backgroundColor: 'var(--kp-canvas)', color: 'var(--kp-primary)' }}>127.0.0.1:3000</code>). If the popup shows a connection error after you authorize in OpenAI, simply copy the URL from the popup address bar and paste it below:
                       </Text>
                       <TextInput
                         id="byok-manual-code-input"
@@ -227,7 +229,7 @@ export default function TemporaryChatModal({ opened, onClose }) {
                         size="xs"
                         value={manualCodeInput}
                         onChange={(e) => setManualCodeInput(e.target.value)}
-                        disabled={false}
+                        disabled={chat.isSubmittingManual}
                         styles={{
                           input: {
                             backgroundColor: 'var(--kp-canvas)',
@@ -240,9 +242,14 @@ export default function TemporaryChatModal({ opened, onClose }) {
                         <Button
                           type="submit"
                           size="xs"
-                          variant="light"
-                          loading={chat.isAuthenticating}
-                          disabled={!manualCodeInput.trim()}
+                          radius="md"
+                          loading={chat.isSubmittingManual}
+                          disabled={!manualCodeInput.trim() || chat.isSubmittingManual}
+                          style={{
+                            backgroundColor: 'var(--kp-primary, #6366f1)',
+                            color: 'var(--kp-on-primary, #ffffff)',
+                            fontWeight: 700,
+                          }}
                         >
                           Complete Sign-In
                         </Button>
@@ -277,7 +284,7 @@ export default function TemporaryChatModal({ opened, onClose }) {
                   >
                     Connected
                   </Badge>
-                  <Text size="xs" c="var(--kp-secondary, #4b5563)" fw={500}>
+                  <Text size="xs" c="var(--kp-secondary)" fw={500}>
                     {chat.userEmail || 'ChatGPT Account'}
                   </Text>
                 </Group>

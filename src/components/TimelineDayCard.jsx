@@ -23,6 +23,7 @@ import { useGeneration } from '@/context/GenerationContext';
 import { useGuest } from '@/context/GuestContext';
 import { KalPadProgress } from '@/components/kalpad/KalPadProgress';
 import { generateNoteBYOK } from '@/lib/byok/pipelines/notesGenerator';
+import { SubTopicMathText } from '@/components/common/SubTopicMathText';
 import { FullscreenNoteViewer } from './FullscreenNoteViewer';
 import { QuizOrchestratorModal } from './QuizOrchestratorModal';
 
@@ -665,10 +666,9 @@ export function TimelineDayCard({
                         fontWeight: 500,
                         lineHeight: 1.4,
                         color: subTopic.completed ? 'var(--kp-muted)' : 'var(--kp-ink)',
-                        textDecoration: subTopic.completed ? 'line-through' : 'none',
                       }}
                     >
-                      {subTopic.text}
+                      <SubTopicMathText text={subTopic.text} completed={subTopic.completed} />
                     </div>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
@@ -1032,7 +1032,7 @@ export function TimelineDayCard({
                         color: exists ? 'var(--kp-muted)' : 'var(--kp-ink)',
                       }}
                     >
-                      {sub.text}
+                      <SubTopicMathText text={sub.text} />
                     </span>
                   </button>
                 );

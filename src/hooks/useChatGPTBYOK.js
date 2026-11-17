@@ -30,6 +30,7 @@ export function useChatGPTBYOK() {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
   const [userEmail, setUserEmail] = useState(null);
   const [authError, setAuthError] = useState(null);
 
@@ -275,7 +276,7 @@ const abortControllerRef = useRef(null);
       const trimmed = codeOrUrl.trim();
       if (!trimmed) return;
 
-      setIsAuthenticating(true);
+      setIsSubmittingManual(true);
       setAuthError(null);
 
       try {
@@ -295,13 +296,16 @@ const abortControllerRef = useRef(null);
 
         const session = await handleOAuthCallback({ code, state, clientId });
         setIsAuthenticated(true);
+        setIsAuthenticating(false);
         setUserEmail(session.email || null);
         setAuthError(null);
         await discoverModels(session.accessToken, true);
+        return session;
       } catch (err) {
         setAuthError(err?.message || 'Manual code verification failed');
+        throw err;
       } finally {
-        setIsAuthenticating(false);
+        setIsSubmittingManual(false);
       }
     },
     [discoverModels]
@@ -433,6 +437,7 @@ const abortControllerRef = useRef(null);
     // Auth state
     isAuthenticated,
     isAuthenticating,
+    isSubmittingManual,
     userEmail,
     authError,
     connectChatGPT,

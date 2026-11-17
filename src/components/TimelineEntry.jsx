@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useLoading } from '@/context/LoadingContext';
 import { notifications } from '@mantine/notifications';
 import { generateNoteBYOK } from '@/lib/byok/pipelines/notesGenerator';
+import { SubTopicMathText } from '@/components/common/SubTopicMathText';
 import { FullscreenNoteViewer } from './FullscreenNoteViewer';
 import { QuizModal } from './QuizModal';
 import { SummaryModal } from './SummaryModal';
@@ -152,7 +153,7 @@ export function TimelineEntry({ taskGroup, onUpdate, onNoteGenerated }) {
                                             onChange={(event) => handleCheckboxChange(index, event.currentTarget.checked)}
                                             label={
                                                 <Text td={subTopic.completed ? 'line-through' : 'none'} c={subTopic.completed ? 'dimmed' : 'inherit'}>
-                                                    {subTopic.text}
+                                                    <SubTopicMathText text={subTopic.text} completed={subTopic.completed} />
                                                 </Text>
                                             }
                                         />

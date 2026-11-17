@@ -28,6 +28,7 @@ import { buildCanonicalStream, mergeHighlightIntoSet } from '@/lib/noteHighlight
 import { preprocessMathBlocks } from '@/lib/noteMarkdown';
 import { solveDoubtBYOK } from '@/lib/byok/pipelines/doubtSolver';
 import { generateNoteBYOK } from '@/lib/byok/pipelines/notesGenerator';
+import { SubTopicMathText } from '@/components/common/SubTopicMathText';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -1222,7 +1223,7 @@ export function FullscreenNoteViewer({
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {st.text}
+                            <SubTopicMathText text={st.text} />
                           </span>
                         </span>
                         <span

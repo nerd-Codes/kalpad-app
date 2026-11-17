@@ -16,6 +16,7 @@ import { wittyFacts } from '@/lib/newplanFacts';
 import { useLoading } from '@/context/LoadingContext';
 import { KalPadProgress } from '@/components/kalpad/KalPadProgress';
 import { regeneratePlanBYOK } from '@/lib/byok/pipelines/planGenerator';
+import { SubTopicMathText } from '@/components/common/SubTopicMathText';
 
 function useTypingEffect(text = '', speed = 2) {
   const [displayedText, setDisplayedText] = useState('');
@@ -110,7 +111,7 @@ const DayCard = React.memo(function DayCard({ item }) {
         <ul style={{ margin: '2px 0 0 18px', padding: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {item.sub_topics.map((sub, i) => (
             <li key={i} style={{ fontSize: '12px', color: 'var(--kp-ink)', lineHeight: 1.45 }}>
-              {sub.text}
+              <SubTopicMathText text={sub.text} />
             </li>
           ))}
         </ul>

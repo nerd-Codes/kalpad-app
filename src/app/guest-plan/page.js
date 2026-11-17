@@ -28,6 +28,7 @@ import { KalPadProgress } from '@/components/kalpad/KalPadProgress';
 import { WeekDatePickerDialog } from '@/components/dashboard/WeekDatePickerDialog';
 import { wittyFacts } from '@/lib/newplanFacts';
 import { generatePlanBYOK } from '@/lib/byok/pipelines/planGenerator';
+import { SubTopicMathText } from '@/components/common/SubTopicMathText';
 import classes from '@/components/newplan/NewPlan.module.css';
 
 const PLAN_MODES = [
@@ -180,7 +181,7 @@ function DayCard({ day }) {
               }}
             >
               <div style={{ fontSize: '13px', color: 'var(--kp-ink)', lineHeight: 1.45 }}>
-                {sub.text}
+                <SubTopicMathText text={sub.text} />
               </div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {sub.type && (

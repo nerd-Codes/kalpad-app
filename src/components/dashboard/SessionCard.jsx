@@ -3,6 +3,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { IconArrowRight, IconCheck, IconPlus, IconTargetArrow } from '@tabler/icons-react';
+import { SubTopicMathText } from '@/components/common/SubTopicMathText';
 import { KalPadProgress } from '@/components/kalpad/KalPadProgress';
 
 export function LoadingSessionCard() {
@@ -187,7 +188,7 @@ function SessionSteps({ subTopics = [], maxItems = 2 }) {
               overflow: 'hidden',
             }}
           >
-            {step.text}
+            <SubTopicMathText text={step.text} completed={step.completed} />
           </span>
         </div>
       ))}

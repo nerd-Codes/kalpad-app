@@ -29,6 +29,8 @@ import { UpgradeModal } from '@/components/payment/UpgradeModal';
 import { TransactionStatusModal } from '@/components/payment/TransactionStatusModal';
 import { FounderWelcomeModal } from '@/components/payment/FounderWelcomeModal';
 import TemporaryChatModal from '@/components/chat/TemporaryChatModal';
+import { ChatGPTConnectModal } from '@/components/byok/ChatGPTConnectModal';
+import { getStoredSession } from '@/lib/byok/auth';
 import classes from './KalPadShell.module.css';
 
 const SIDEBAR_STORAGE_KEY = 'kalpad_sidebar_collapsed';
@@ -65,6 +67,29 @@ export default function KalPadShell({
   const [founderModalOpened, setFounderModalOpened] = useState(false);
   const [upgradeOpened, { open: openUpgrade, close: closeUpgrade }] = useDisclosure(false);
   const [byokChatOpen, setByokChatOpen] = useState(false);
+  const [byokConnectOpened, setByokConnectOpened] = useState(false);
+
+  // Auto-prompt BYOK connection if user is signed in to KalPad but ChatGPT isn't connected on this device
+  useEffect(() => {
+    if (!session?.user) return;
+    try {
+      const stored = getStoredSession();
+      const dismissed = sessionStorage.getItem('kalpad_byok_prompt_dismissed');
+      if (!stored?.accessToken && !dismissed) {
+        const timer = setTimeout(() => {
+          setByokConnectOpened(true);
+        }, 750);
+        return () => clearTimeout(timer);
+      }
+    } catch (_) {}
+  }, [session]);
+
+  // Global event listener to trigger BYOK Connect modal from any button
+  useEffect(() => {
+    const handleOpenConnect = () => setByokConnectOpened(true);
+    window.addEventListener('open-byok-connect', handleOpenConnect);
+    return () => window.removeEventListener('open-byok-connect', handleOpenConnect);
+  }, []);
 
   const { failedTransaction, setFailedTransaction } = usePaymentStatus(session);
 
@@ -196,6 +221,10 @@ export default function KalPadShell({
       <TemporaryChatModal
         opened={byokChatOpen}
         onClose={() => setByokChatOpen(false)}
+      />
+      <ChatGPTConnectModal
+        opened={byokConnectOpened}
+        onClose={() => setByokConnectOpened(false)}
       />
 
       {/* Fluid Collapsible Left Sidebar (>= 640px) */}
