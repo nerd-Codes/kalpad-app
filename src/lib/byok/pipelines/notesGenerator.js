@@ -1,109 +1,24 @@
 // src/lib/byok/pipelines/notesGenerator.js
 /**
- * KalPad Notes Generation Engine v3.1: Scope-Guarded & Dynamic AI-Calibrated System
- *
- * Built on the "Teach Like You Mean It, Respect the Curriculum Horizon" philosophy:
- *   - Bidirectional Plan Horizon: AI is aware of past mastered topics AND upcoming topics (strict scope fence).
- *     Guarantees the note never bleeds into future curriculum items or turns into a 26-page dissertation.
- *   - Dynamic Length Calibration: NO hardcoded word floors or ceilings. The AI dynamically calibrates
- *     the depth and length to the allocated study minutes, specific subtopic prompt, and curriculum position.
- *   - High-Speed Parallel Chunking: If an outline is genuinely extensive (>= 6 sections), Part 1 and Part 2
- *     stream in parallel via Promise.all, cutting latency from ~75s down to ~18-22s.
- *   - Anti-Wall-of-Text Visual Design: 💡 Intuition & Mental Model, ⚠️ Common Exam Trap, 🎯 30s Examiner Answer.
- *   - Unbreakable KaTeX ($...$ inline, $$...$$ display with blank lines before/after).
- *   - Interactive Active Recall Self-Tests (<details><summary>Reveal Solution</summary></details>).
- *   - Full backward compatibility with existing call sites and custom notes.
+ * Client-side 3-Stage Notes Generation Pipeline powered by ChatGPT BYOK quota.
+ * Granular Model Routing:
+ *   - Stage 0: Exam Persona       -> modelPreferences.notesPersonaModel
+ *   - Stage 1: Pedagogical Outline -> modelPreferences.notesOutlineModel
+ *   - Stage 2: Textbook Authoring  -> modelPreferences.notesAuthorModel
  */
 
 import supabase from '../../supabaseClient.js';
 import { ensureByokConnected, generateText, resolveModelForTask } from '../openai.js';
-import { sanitizeDoubleEscapedLatex } from '../jsonSanitizer.js';
-import { preprocessMathBlocks } from '../../noteMarkdown.js';
-
-// =============================================================================
-// 1. ARCHETYPES & TONE FLAVORING
-// =============================================================================
-
-export const ARCHETYPES = {
-  CONCEPT_MASTER: {
-    id: 'CONCEPT_MASTER',
-    label: 'Concept Master',
-    focus: 'Intuitive mental models, formal definitions, physical analogies, and comparison matrices.',
-    toneHint:
-      'TONE HINT: Prioritize intuitive physical/conceptual grounding before formal mathematical laws. Use clear analogies, contrasting matrices, and bridge everyday intuition to rigorous academic principles.',
-  },
-  DERIVATION_DEEP_DIVE: {
-    id: 'DERIVATION_DEEP_DIVE',
-    label: 'Derivation Deep-Dive',
-    focus: 'Physical axioms, explicit assumptions, line-by-line algebraic proof, exam mistake alerts, and boundary analysis.',
-    toneHint:
-      'TONE HINT: Prioritize mathematical rigor. State all axioms and assumptions explicitly. Show every line of algebraic manipulation without skipping steps. Analyze boundary limits and flag algebraic exam traps.',
-  },
-  PROBLEM_SOLVING: {
-    id: 'PROBLEM_SOLVING',
-    label: 'Problem-Solving Blueprint',
-    focus: 'Question pattern recognition, universal 4-step algorithm, graded worked PYQs, and calculation pitfalls.',
-    toneHint:
-      'TONE HINT: Prioritize systematic problem breakdown. Provide a universal solution framework and multiple graded worked numericals with realistic parameters, unit conversions, and calculation traps.',
-  },
-  VIVA_DRILL: {
-    id: 'VIVA_DRILL',
-    label: 'Viva Oral Combat Kit',
-    focus: '30-second oral answers, cross-questioning traps, counter-intuitive edge cases, and rapid-fire drills.',
-    toneHint:
-      'TONE HINT: Prioritize oral clarity and rapid recall. Formulate crisp 30-second spoken responses that examiners reward with top marks, anticipate hostile cross-questions, and expose counter-intuitive edge cases.',
-  },
-  LAB_PROCEDURE: {
-    id: 'LAB_PROCEDURE',
-    label: 'Lab & Procedure Manual',
-    focus: 'Apparatus setup, procedural protocol, sample observation tables, error analysis, and precautions.',
-    toneHint:
-      'TONE HINT: Prioritize practical, reproducible execution. Detail apparatus specifications, circuit/optical alignment, step-by-step procedural protocols, observation tables, calculation formulas, and sources of systematic error.',
-  },
-};
-
-// =============================================================================
-// 2. DEPTH DIRECTIVES (QUALITATIVE GUIDANCE - NO RIGID WORD CAPS/FLOORS)
-// =============================================================================
+import { parseAiJson, sanitizeDoubleEscapedLatex } from '../jsonSanitizer.js';
 
 export const DEPTH_GUIDE = {
-  FOCUSED: {
-    level: 'FOCUSED',
-    directive:
-      'FOCUSED — High-yield, targeted coverage. Foundational definitions, core intuition, key governing formulas, and 1 concrete worked example. Strictly scoped, zero unnecessary digressions.',
-  },
-  ESSENTIAL: {
-    // Backward-compatible alias
-    level: 'FOCUSED',
-    directive:
-      'FOCUSED — High-yield, targeted coverage. Foundational definitions, core intuition, key governing formulas, and 1 concrete worked example. Strictly scoped, zero unnecessary digressions.',
-  },
-  STANDARD: {
-    level: 'STANDARD',
-    directive:
-      'STANDARD — Comprehensive subtopic mastery. Intuitive mental model, full step-by-step explanation or derivation, 1-2 worked examples, exam traps, and active recall.',
-  },
-  DEEP: {
-    level: 'DEEP',
-    directive:
-      'DEEP — Exhaustive academic treatment. Axioms, full step-by-step mathematical or algorithmic derivations, graded examples, boundary cases, exam traps, and active recall.',
-  },
-  COMPREHENSIVE: {
-    // Backward-compatible alias
-    level: 'DEEP',
-    directive:
-      'DEEP — Exhaustive academic treatment. Axioms, full step-by-step mathematical or algorithmic derivations, graded examples, boundary cases, exam traps, and active recall.',
-  },
-  EXHAUSTIVE: {
-    level: 'EXHAUSTIVE',
-    directive:
-      'EXHAUSTIVE — Masterclass treatment for extensive capstone topics. Foundational axioms, rigorous proofs, comprehensive worked problems, and complete self-tests.',
-  },
+  ESSENTIAL:
+    'ESSENTIAL — Be concise and focused. Cover core concepts only. No digressions. Target ~700–1000 words.',
+  STANDARD:
+    'STANDARD — Full treatment with worked examples and derivations. Target ~1200–2000 words.',
+  COMPREHENSIVE:
+    'COMPREHENSIVE — Exhaustive coverage. Full derivations, multiple examples, edge cases. Target ~2500–3500 words.',
 };
-
-// =============================================================================
-// 3. PARSERS & CLASSIFIERS
-// =============================================================================
 
 export function stripTimePrefix(text = '') {
   return String(text)
@@ -111,698 +26,300 @@ export function stripTimePrefix(text = '') {
     .trim();
 }
 
-export function extractAllocatedMinutes(rawText = '', explicitMinutes = null) {
-  if (typeof explicitMinutes === 'number' && explicitMinutes > 0) {
-    return explicitMinutes;
-  }
+export function deriveDepthDirective(rawText = '') {
   const match = String(rawText).match(
     /^\s*\(\s*([\d.]+)\s*(h|hr|hrs|hour|hours|min|mins|minute|minutes)\s*\)/i
   );
-  if (match) {
-    return match[2].toLowerCase().startsWith('h')
-      ? Math.round(parseFloat(match[1]) * 60)
-      : Math.round(parseFloat(match[1]));
-  }
-  return null;
+  if (!match) return 'STANDARD';
+  const hours = match[2].toLowerCase().startsWith('h')
+    ? parseFloat(match[1])
+    : parseFloat(match[1]) / 60;
+  if (hours < 0.75) return 'ESSENTIAL';
+  if (hours < 1.25) return 'STANDARD';
+  return 'COMPREHENSIVE';
 }
 
-export function deriveDepthDirective(rawText = '', allocatedMinutes = null, difficulty = null) {
-  const minutes = extractAllocatedMinutes(rawText, allocatedMinutes);
-  if (minutes !== null) {
-    if (minutes <= 25) return 'FOCUSED';
-    if (minutes <= 50) return 'STANDARD';
-    if (minutes <= 75) return 'DEEP';
-    return 'EXHAUSTIVE';
-  }
+export function buildPersonaPrompt(examName) {
+  return `You are an expert academic analyst. Based on the exam name below, generate a concise persona document that will guide another AI in writing study notes.
 
-  if (difficulty === 'Intense') return 'DEEP';
-  if (difficulty === 'Easy') return 'FOCUSED';
-  return 'STANDARD';
+Exam: "${examName}"
+
+Return ONLY a single valid JSON object (no markdown fences):
+{
+  "audience_level": "Short description of target audience",
+  "key_focus_areas": ["Critical concept or skill type 1", "..."],
+  "writing_style": "Tone directive for writing"
 }
 
-export function resolveArchetype({
-  subTopicType = '',
-  subTopicText = '',
-  examFormat = '',
-  archetypeOverride = null,
-} = {}) {
-  if (archetypeOverride && ARCHETYPES[archetypeOverride]) {
-    return ARCHETYPES[archetypeOverride].id;
-  }
-
-  // 1. Direct type match from Plan Generator v2
-  const normalizedType = String(subTopicType || '').toLowerCase();
-  if (normalizedType === 'derivation') return 'DERIVATION_DEEP_DIVE';
-  if (normalizedType === 'practice') return 'PROBLEM_SOLVING';
-  if (normalizedType === 'viva_drill') return 'VIVA_DRILL';
-  if (normalizedType === 'lab_procedure') return 'LAB_PROCEDURE';
-  if (normalizedType === 'concept') return 'CONCEPT_MASTER';
-
-  // 2. Text-based semantic classification
-  const text = String(subTopicText || '').toLowerCase();
-  if (/\b(derive|derivation|proof|prove\s+that|expression\s+for|deduce)\b/i.test(text)) {
-    return 'DERIVATION_DEEP_DIVE';
-  }
-  if (/\b(viva|oral|interview|rapid[- ]fire|cross[- ]question|q&a)\b/i.test(text)) {
-    return 'VIVA_DRILL';
-  }
-  if (/\b(solve|numerical|problems?|calculation|pyq|practice\s+set)\b/i.test(text)) {
-    return 'PROBLEM_SOLVING';
-  }
-  if (/\b(lab|experiment|procedure|apparatus|observation|precautions?)\b/i.test(text)) {
-    return 'LAB_PROCEDURE';
-  }
-
-  // 3. Exam format fallback
-  const format = String(examFormat || '').toLowerCase();
-  if (format === 'viva') return 'VIVA_DRILL';
-  if (format === 'practical') return 'LAB_PROCEDURE';
-
-  return 'CONCEPT_MASTER';
+Examples:
+- GATE Electronics -> audience_level: "Post-graduate engineering, highly competitive", key_focus_areas: ["Problem-solving", "Core theorems", "Numerical accuracy"], writing_style: "Dense, technical, textbook-level"
+- CBSE Class 12 -> audience_level: "High school senior", key_focus_areas: ["Key definitions", "Step-by-step derivations", "Standard problems"], writing_style: "Clear, simple, use analogies"`;
 }
-
-/**
- * Splits a Markdown outline into distinct sections based on '### ' headers.
- */
-export function splitOutlineIntoSections(outlineMarkdown = '') {
-  const lines = String(outlineMarkdown || '').split('\n');
-  const sections = [];
-  let currentSection = null;
-
-  for (const line of lines) {
-    if (/^###\s+/.test(line)) {
-      if (currentSection) {
-        sections.push(currentSection);
-      }
-      currentSection = { heading: line.trim(), lines: [line] };
-    } else if (currentSection) {
-      currentSection.lines.push(line);
-    }
-  }
-  if (currentSection) {
-    sections.push(currentSection);
-  }
-  return sections;
-}
-
-// =============================================================================
-// 4. PROMPT BUILDERS
-// =============================================================================
 
 export function buildOutlinePrompt({
   examName,
-  academicLevel,
-  examFormat,
   dayTopic,
   cleanSubTopic,
-  archetype,
-  depthDirective,
   previousContext,
-  upcomingContext,
-  positionContext,
-  allocatedMinutes,
-  strategicContext,
+  examPersona,
+  depthDirective,
 }) {
-  const depthConfig = DEPTH_GUIDE[depthDirective] || DEPTH_GUIDE.STANDARD;
-  const archetypeConfig = ARCHETYPES[archetype] || ARCHETYPES.CONCEPT_MASTER;
-
-  return `You are a world-class academic curriculum architect and senior university professor.
-Your task is to create a focused, high-clarity pedagogical Markdown outline for a self-contained study chapter on "${cleanSubTopic}".
+  return `You are an expert curriculum designer. Create a detailed pedagogical outline for a self-contained study chapter.
 
 CONTEXT:
-- Target Exam: "${examName}"
-- Academic Level: "${academicLevel || 'Standard University'}"
-- Target Exam Format: "${examFormat || 'Comprehensive Theory & Practice'}"
-- Primary Chapter / Topic: "${dayTopic}"
-- Sub-Topic to Master: "${cleanSubTopic}"
-${positionContext ? `- Curriculum Position: ${positionContext}` : ''}
-${allocatedMinutes ? `- Allocated Study Time: ${allocatedMinutes} minutes` : ''}
-- Tone & Archetype Flavor: ${archetypeConfig.label} (${archetypeConfig.focus})
-- Pedagogical Focus: ${depthConfig.directive}
-- Prerequisites Already Mastered: [${previousContext || 'Foundational Basics'}]
-${upcomingContext ? `- UPCOMING TOPICS IN THIS STUDY PLAN (STRICT SCOPE FENCE): [${upcomingContext}]` : ''}
-${strategicContext ? `- Strategic Context: ${JSON.stringify(strategicContext)}` : ''}
+- Exam: "${examName}"
+- Chapter: "${dayTopic}"
+- Sub-Topic: "${cleanSubTopic}"
+- Previously Learned: [${previousContext}]
+- Depth: ${DEPTH_GUIDE[depthDirective]}
 
-${archetypeConfig.toneHint}
+Exam Persona: ${JSON.stringify(examPersona)}
 
-CRITICAL SCOPE FENCE & DYNAMIC LENGTH DIRECTIVES:
-1. STRICT SCOPE FENCE (DO NOT BLEED INTO FUTURE TOPICS):
-   ${
-     upcomingContext
-       ? `The upcoming topics [${upcomingContext}] have their own dedicated notes later in the plan.
-   DO NOT pre-teach, derive, or solve problems belonging to those future topics. Keep this note strictly confined to "${cleanSubTopic}".`
-       : `Focus exclusively on "${cleanSubTopic}". Do not digress into unrelated topics.`
-   }
-2. DYNAMIC LENGTH CALIBRATION:
-   - Match the outline's breadth directly to the allocated study time (${allocatedMinutes || 'standard'} minutes).
-   - A 20-30 min subtopic needs 3-4 tight, high-yield sections.
-   - A 40-50 min subtopic needs 4-5 well-structured sections covering intuition, formulation/derivation, and a worked example.
-   - Avoid creating an excessive number of sections. Do not overcomplicate or turn a single subtopic into an entire university course.
-3. GROUNDED IN EXAM REALITY:
-   - Teach at the exact level of ${examName} (${academicLevel || 'University'}).
-   - Focus on what examiners look for to award full marks: clear steps, key formulas, correct units, and common misconceptions.
+NARRATIVE FLOW: The student just finished the "Previously Learned" topics. Do not re-explain them — build forward from them explicitly.
 
-OUTLINE ANNOTATIONS REQUIRED:
-For each major section, include bracketed guidance annotations to instruct the author AI on exactly what to teach:
-- [MISCONCEPTION: the specific wrong intuition students make at this point and how to correct it]
-- [EXAMPLE NEEDED: the concrete worked problem or numerical with realistic numbers]
-- [DERIVATION: start axiom, intermediate algebraic steps, and final expression]
-- [STEP-BY-STEP: explicit algorithmic, procedural, or code walkthrough]
-- [EXAM TRAP: specific marking criteria or deduction risks in ${examName}]
-- [COMPARISON TABLE: contrasting concepts, pros/cons, or conditions]
-- [VIVA DRILL: crisp 30-second examiner answer and tricky follow-up]
-
-OUTPUT FORMAT:
-Return ONLY a structured Markdown outline using '### ' for major sections and '#### ' for subsections.
-Do NOT include conversational preambles, introductory chatter, or conclusion summaries. Output pure Markdown outline.`;
-}
-
-// Backward-compatible alias for buildBlueprintPrompt
-export function buildBlueprintPrompt(params) {
-  return buildOutlinePrompt(params);
+OUTLINE REQUIREMENTS:
+- Follow the depth directive strictly.
+- Include an Introduction, Core Principles, Key Formulas/Derivations (if applicable), Worked Examples, and a Summary.
+- For each major section, add a one-line annotation in brackets:
+  [MISCONCEPTION: the specific wrong intuition students have here, if any]
+  [EXAMPLE NEEDED: the type of worked example that would best illustrate this]
+- Structure flows from foundational to advanced. Each section must set up the next.
+- Output ONLY a structured Markdown outline (### for sections). This goes to an Author AI — clarity and logical flow are everything.`;
 }
 
 export function buildAuthorPrompt({
   examName,
-  academicLevel,
-  examFormat,
   dayTopic,
   cleanSubTopic,
-  archetype,
-  depthDirective,
   previousContext,
-  upcomingContext,
-  positionContext,
-  allocatedMinutes,
+  examPersona,
+  depthDirective,
   chapterOutline,
-  chunkMode = 'SINGLE', // 'SINGLE' | 'PART_1' | 'PART_2'
-  part1HeadingsSummary = '',
 }) {
-  const depthConfig = DEPTH_GUIDE[depthDirective] || DEPTH_GUIDE.STANDARD;
-  const archetypeConfig = ARCHETYPES[archetype] || ARCHETYPES.CONCEPT_MASTER;
-
-  let chunkInstructions = '';
-  if (chunkMode === 'PART_1') {
-    chunkInstructions = `
-CHUNK DIRECTIVE (PART 1 OF 2 - PARALLEL AUTHORING):
-You are authoring PART 1 of this master study note in parallel.
-- Thoroughly write out the foundational theory, principles, and derivations in your assigned outline below.
-- Stop cleanly after your assigned sections. Do NOT add conclusion summaries or active recall self-tests.
-`;
-  } else if (chunkMode === 'PART_2') {
-    chunkInstructions = `
-CHUNK DIRECTIVE (PART 2 OF 2 - PARALLEL AUTHORING):
-You are authoring PART 2 of this master study note in parallel.
-Part 1 authors the foundational concepts (${part1HeadingsSummary || 'preceding sections'}).
-- Begin directly with your assigned sections in the outline below without repeating Part 1 content.
-- Thoroughly write out the applied sections, worked examples, common exam traps, and connections.
-- Conclude with the interactive Check Your Understanding (Active Recall with <details> foldables) section at the end of Part 2.
-`;
-  }
-
-  return `You are a world-class academic author and master private tutor. Your writing is clear, technically precise, intuitive, and grounded in exam reality.
-Your mission is to author a complete, self-contained study note on "${cleanSubTopic}".
-When the student finishes reading, they must understand the subtopic in its ENTIRETY—everything needed for ${examName}, not more, not less.
+  return `You are a world-class academic author. Your writing sits between a university textbook and a brilliant private tutor — technically precise, yet clear enough that a student can fully understand the topic from this note alone. Write with authority and genuine insight.
 
 CONTEXT:
-- Target Exam: "${examName}" (${academicLevel || 'University'})
+- Exam: "${examName}"
 - Chapter: "${dayTopic}"
-- Sub-Topic to Master: "${cleanSubTopic}"
-${positionContext ? `- Curriculum Position: ${positionContext}` : ''}
-${allocatedMinutes ? `- Allocated Study Time: ${allocatedMinutes} minutes` : ''}
-- Archetype & Tone Focus: ${archetypeConfig.label}
-- Pedagogical Focus: ${depthConfig.directive}
-- Prerequisites (Known axioms — build forward from them, do not re-explain): [${previousContext || 'None'}]
-${upcomingContext ? `- UPCOMING TOPICS (STRICT SCOPE FENCE): [${upcomingContext}]` : ''}
-${chunkInstructions}
+- Sub-Topic: "${cleanSubTopic}"
+- Prerequisites (already known — use as axioms, do not re-teach): [${previousContext}]
+- Depth: ${DEPTH_GUIDE[depthDirective]}
 
-OUTLINE TO EXPAND INTO THE NOTE:
+Exam Persona (your primary filter for tone, depth, and examples):
+${JSON.stringify(examPersona)}
+
+OUTLINE TO FOLLOW:
 ---
 ${chapterOutline}
 ---
 
-PEDAGOGICAL & VISUAL WRITING RULES:
+WRITING INSTRUCTIONS:
 
-1. RESPECT THE SCOPE FENCE & TIME BUDGET (DO NOT OVERCOMPLICATE):
-   ${
-     upcomingContext
-       ? `The upcoming topics [${upcomingContext}] will each have their own dedicated notes later in the plan.
-   DO NOT pre-teach or bleed into those future topics! Focus solely on mastering "${cleanSubTopic}".`
-       : `Focus solely on mastering "${cleanSubTopic}".`
-   }
-   - The student has allocated ${allocatedMinutes || 'standard'} minutes to study this note.
-   - Do NOT turn this into a 26-page dissertation. Write with high signal-to-noise ratio.
-   - Every paragraph and equation must serve the student's exam mastery. Avoid PhD-level abstractions or decorative mathematical padding.
+1. FOLLOW THE OUTLINE — cover every section. Do not deviate from its structure.
 
-2. TEACH WITH INTUITION FIRST:
-   - For every major formula or concept, explain the physical or intuitive "WHY" before presenting the symbols.
-   - Never say "similarly, it can be shown that..." or "left as an exercise to the reader". If a step is part of this subtopic, show it clearly!
-   - For programming or simulation topics (e.g., VHDL, Verilog, Python, C++): provide complete, syntactically valid code blocks with line-by-line commentary.
+2. DEPTH — honour the depth directive above. ESSENTIAL = tight prose, no digressions.
+   STANDARD = full explanation with one worked example per core concept.
+   COMPREHENSIVE = multiple examples, full derivations, edge cases, nothing left implicit.
 
-3. VISUAL CALLOUT CARDS:
-   Punctuate the prose with distinct visual blockquotes:
-   > 💡 **Intuition & Mental Model:** [Clear, intuitive analogy or physical intuition before presenting formal theory]
-   > ⚠️ **Common Exam Trap / Misconception:** [The exact misconception that loses students marks in ${examName}, followed by the clear correct fact]
-   > 🎯 **30-Second Examiner Answer:** [For definitions and viva oral questions: verbatim crisp response that earns full marks]
-   > **Definition:** [Precise formal academic definition, with the term **bolded** on first use]
+3. PREREQUISITES — begin with a one-sentence bridge: "Building on [previous concept], we now..."
+   Never re-explain prerequisites. Treat them as axioms.
 
-4. UNBREAKABLE KATEX MATH RULES:
-   - Inline math: Use single dollar signs: $x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$
-   - Display (block) math: Use double dollar signs with a BLANK LINE BEFORE AND AFTER:
+4. THEORY FIRST — for each concept, explain the physical or mathematical intuition BEFORE
+   presenting the formula. A student should understand WHY the formula takes the form it does.
 
-$$
-P(A \\mid B) = \\frac{P(B \\mid A) \\cdot P(A)}{P(B)}
-$$
+5. MISCONCEPTIONS — wherever the outline flags [MISCONCEPTION: ...], include:
+   > ⚠️ **Common Misconception:** [the wrong belief]
+   > **Correction:** [the right statement in one clear sentence]
+   This is the single highest-value element for exam performance.
 
-   - FORBIDDEN: Never use \\\\[...\\\\] or \\\\(...\\\\). Never use \\begin{equation} or \\begin{eqnarray}.
-   - Permitted environments: {matrix}, {pmatrix}, {bmatrix}, {align}, {aligned}, {cases}.
-   - MANDATORY SYMBOL GLOSSARY: Immediately after every major equation, write:
-     **where** $X$ = [meaning with SI unit], $Y$ = [meaning with SI unit]...
+6. DEFINITIONS — every new term on first use gets a definition blockquote:
+   > **Definition:** [precise formal definition]
+   Also **bold** the term at its first occurrence in prose.
 
-5. STRUCTURED COMPARISON TABLES:
-   Whenever comparing concepts, modeling styles, formulas, or methods, use clean Markdown tables with distinct headers.
+7. EQUATIONS — after any equation with 3+ symbols, immediately follow with:
+   **where** $X$ = [meaning] ([unit]), $Y$ = [meaning], ...
+   Never assume symbols are self-evident.
 
-6. FULLY WORKED GRADED EXAMPLES:
-   Format worked examples with realistic parameters and explicit step-by-step numbering:
-   ### Worked Example: [Descriptive Problem Title]
-   **Problem Statement:** [Clear scenario with specific numbers/conditions]
-   **Solution:**
-   - **Step 1 (Physical Setup & Givens):** Identify knowns and state assumptions...
-   - **Step 2 (Governing Equations):** State the formula and isolate the target variable...
-   - **Step 3 (Step-by-Step Calculation):** Calculate with intermediate values and units...
-   - **Final Result:** **[Boxed / Bold answer with SI units]**
-   > 💡 **Key Takeaway:** [One sentence on the core lesson for exams]
+8. WORKED EXAMPLES — wherever the outline flags [EXAMPLE NEEDED: ...], include a full
+   worked example in this format:
+   **Example:** [Descriptive title]
+   *Problem:* [Statement]
+   *Solution:* Step 1 → Step 2 → ... → Final Answer
+   *Key Takeaway:* [One sentence on what this reveals about the concept]
 
-${
-  chunkMode === 'PART_1'
-    ? '7. CLEAN ENDING FOR PART 1: Conclude Part 1 cleanly after its assigned sections. Do not add Check Your Understanding questions.'
-    : `7. ACTIVE RECALL CHECKPOINTS (FOLDABLE):
-   End the chapter with 2 to 4 progressive self-test questions using native HTML <details> tags so the student can test themselves before inspecting the answer:
-   
-   ### Check Your Understanding (Active Recall)
-   
-   **Q1:** [Conceptual or Numerical Question]
-   <details>
-   <summary>Reveal Step-by-Step Solution</summary>
-   
-   [Full explanation, derivation, or calculation]
-   </details>
+9. CHECK YOUR UNDERSTANDING — end every note with 3 questions (ESSENTIAL: 2, COMPREHENSIVE: 4).
+   Mix: one definition/recall, one conceptual "why", one application/numerical.
+   Do not provide answers — the student must work through these.
 
-8. CONNECTIONS TO THE BIG PICTURE:
-   Before the Active Recall section, include:
-   **Builds on:** [prerequisite concepts]
-   **Unlocks:** [future topics this enables]
-   **In ${examName}:** [how this topic is tested, mark weightage, and examiner expectations]`
+10. CONNECTIONS — final section before Check Your Understanding:
+    **Builds on:** [specific prerequisite concept]
+    **Unlocks:** [specific future topics this enables]
+    **In ${examName}:** [how this appears in the exam — question type, common trap, marking pattern]
+
+11. NO REDUNDANT TITLE — do not repeat the sub-topic name as a heading. Begin directly
+    with the first outline section.
+
+FORMATTING:
+- Clean Markdown throughout. ### for sections, #### for subsections.
+- Blockquotes for definitions and misconceptions.
+- Bold for key terms on first use.
+
+LATEX (KATEX — UNBREAKABLE):
+- Inline: $...$ only. Display: $$...$$ only, with a blank line before and after.
+- FORBIDDEN: \\[...\\] and \\(...\\) — KaTeX does not render them.
+- Environments: ONLY {matrix} {pmatrix} {bmatrix} {Vmatrix} {vmatrix} {align} {aligned} {cases}
+- FORBIDDEN environments: {equation} {eqnarray} {gather}
+- Inside math: escape \\% \\_ \\& (\\& is fine inside {align})
+- All brackets and braces must be correctly matched and closed.`;
 }
-
-9. NO REDUNDANT TOP-LEVEL TITLE:
-   Do not repeat the sub-topic name as an H1 or H2 header at the start. Begin directly with the first section.`;
-}
-
-// Backward-compatible alias for buildVisualAuthorPrompt
-export function buildVisualAuthorPrompt(params) {
-  let chapterOutline = params.chapterOutline;
-  if (!chapterOutline && params.blueprint) {
-    if (typeof params.blueprint === 'string') {
-      chapterOutline = params.blueprint;
-    } else {
-      chapterOutline = `### 1. Intuition & Foundations\n${params.blueprint.mental_model_hook || ''}\n\n### 2. Core Principles & Formulations\n${(params.blueprint.pedagogical_sections || []).map((s) => `#### ${s.section_title}\n${s.core_instruction}`).join('\n\n')}`;
-    }
-  }
-  return buildAuthorPrompt({
-    ...params,
-    chapterOutline: chapterOutline || '### Core Fundamentals\n[EXAMPLE NEEDED: Standard problem]',
-  });
-}
-
-// =============================================================================
-// 5. NORMALIZATION & SANITIZATION
-// =============================================================================
-
-export function normalizeNoteMarkdown(rawMarkdown = '') {
-  if (!rawMarkdown) return '';
-
-  // 1. Sanitize double-escaped LaTeX (\\\\frac -> \\frac)
-  let text = sanitizeDoubleEscapedLatex(rawMarkdown);
-
-  // 2. Preprocess display math blocks to ensure whitespace around $$
-  text = preprocessMathBlocks(text);
-
-  // 3. Ensure unclosed <details> blocks are closed
-  const openDetailsCount = (text.match(/<details>/gi) || []).length;
-  const closeDetailsCount = (text.match(/<\/details>/gi) || []).length;
-  if (openDetailsCount > closeDetailsCount) {
-    const diff = openDetailsCount - closeDetailsCount;
-    text += '\n' + '</details>\n'.repeat(diff);
-  }
-
-  return text.trim();
-}
-
-// =============================================================================
-// 6. CORE PIPELINE: PLAN-ATTACHED NOTE GENERATION
-// =============================================================================
 
 /**
- * Generates a deep, textbook-grade study note directly in the browser using the user's connected ChatGPT BYOK quota.
- * Automatically inherits bidirectional curriculum context from Plan Generator v2 and applies parallel chunking when needed.
+ * Generates a study note directly in the browser using user's connected ChatGPT plan quota,
+ * routing each of the 3 stages to its granular configured OpenAI model.
  *
  * @param {Object} params
- * @param {number|string} [params.planTopicId]
+ * @param {number|string} params.planTopicId
  * @param {string} params.subTopicText
- * @param {string} [params.examName]
- * @param {string} [params.dayTopic]
+ * @param {string} params.examName
+ * @param {string} params.dayTopic
  * @param {boolean} [params.isGuest=false]
- * @param {string} [params.subTopicType]
- * @param {string} [params.difficulty]
- * @param {number} [params.allocatedMinutes]
- * @param {Object} [params.customContext]
- * @param {(status: string|Object) => void} [params.onStatus]
+ * @param {(status: string) => void} [params.onStatus]
  * @param {AbortSignal} [params.signal]
  * @returns {Promise<{ note: Object }>}
  */
 export async function generateNoteBYOK({
   planTopicId,
   subTopicText,
-  examName = 'University Examination',
-  dayTopic = 'Core Subject',
+  examName,
+  dayTopic,
   isGuest = false,
-  subTopicType,
-  difficulty,
-  allocatedMinutes,
-  customContext,
   onStatus,
   signal,
 }) {
   const token = await ensureByokConnected();
 
   const cleanSubTopic = stripTimePrefix(subTopicText);
+  const depthDirective = deriveDepthDirective(subTopicText);
 
-  // Model Resolution
-  const [outlineModel, authorModel] = await Promise.all([
+  const [personaModel, outlineModel, authorModel] = await Promise.all([
+    resolveModelForTask('notesPersonaModel', { accessToken: token }),
     resolveModelForTask('notesOutlineModel', { accessToken: token }),
     resolveModelForTask('notesAuthorModel', { accessToken: token }),
   ]);
 
-  let previousContext = 'None. This is the foundational topic in the study plan.';
-  let upcomingContext = '';
-  let positionContext = '';
-  let academicLevel = 'Standard University';
-  let examFormat = 'Comprehensive';
-  let strategicContext = null;
-  let resolvedSubTopicType = subTopicType;
-  let resolvedDifficulty = difficulty;
-  let resolvedMinutes = extractAllocatedMinutes(subTopicText, allocatedMinutes);
+  let previousContext = 'None. This is the first topic.';
+  let examPersona = null;
   let planId = null;
 
-  // 1. Ingest Bidirectional Plan Context from Supabase if planTopicId is provided
   if (!isGuest && planTopicId) {
     try {
       const { data: topicData, error: topicError } = await supabase
         .from('plan_topics')
-        .select(
-          `
-          plan_id,
-          day,
-          topic_name,
-          study_hours,
-          importance,
-          day_difficulty,
-          day_summary,
-          sub_topics,
-          study_plans (
-            exam_name,
-            exam_persona,
-            generation_context,
-            syllabus
-          )
-        `
-        )
+        .select('plan_id, day, study_plans ( exam_persona )')
         .eq('id', planTopicId)
-        .single();
+        .maybeSingle();
 
       if (!topicError && topicData) {
         planId = topicData.plan_id;
-        dayTopic = topicData.topic_name || dayTopic;
-        resolvedDifficulty = resolvedDifficulty || topicData.day_difficulty;
+        examPersona = topicData.study_plans?.exam_persona || null;
 
-        const studyPlan = topicData.study_plans;
-        if (studyPlan) {
-          examName = studyPlan.exam_name || examName;
-
-          // Extract Plan v2 Strategic Context
-          if (studyPlan.generation_context) {
-            try {
-              const parsedGen =
-                typeof studyPlan.generation_context === 'string'
-                  ? JSON.parse(studyPlan.generation_context)
-                  : studyPlan.generation_context;
-
-              strategicContext = parsedGen;
-              academicLevel = parsedGen.academic_level || academicLevel;
-              examFormat = parsedGen.target_format || parsedGen.exam_format || examFormat;
-            } catch (_) {}
-          }
-        }
-
-        // Match subtopic from sub_topics array to extract exact type, difficulty, and minute budget
-        if (Array.isArray(topicData.sub_topics)) {
-          const match = topicData.sub_topics.find(
-            (st) =>
-              stripTimePrefix(st.text || '').toLowerCase() === cleanSubTopic.toLowerCase() ||
-              (st.text || '').includes(cleanSubTopic)
-          );
-          if (match) {
-            resolvedSubTopicType = resolvedSubTopicType || match.type;
-            resolvedDifficulty = resolvedDifficulty || match.difficulty;
-            resolvedMinutes = extractAllocatedMinutes(match.text, resolvedMinutes);
-          }
-        }
-
-        // Fetch ALL topics across the plan to construct both:
-        // 1. previousContext (already mastered axioms)
-        // 2. upcomingContext (strict scope fence to prevent scope bleed)
-        const { data: allPlanTopics } = await supabase
+        const { data: historyData } = await supabase
           .from('plan_topics')
-          .select('id, day, topic_name, sub_topics')
+          .select('sub_topics')
           .eq('plan_id', planId)
+          .lte('day', topicData.day)
           .order('day', { ascending: true });
 
-        if (allPlanTopics && Array.isArray(allPlanTopics)) {
-          const allSubTopicsFlattened = allPlanTopics.flatMap((d) =>
-            (d.sub_topics || []).map((st) => ({
-              cleanText: stripTimePrefix(st.text || ''),
-              rawText: st.text || '',
-              day: d.day,
-              topicName: d.topic_name,
-            }))
+        if (historyData) {
+          const allTopics = historyData.flatMap(
+            (d) => d.sub_topics?.map((st) => stripTimePrefix(st.text)) || []
           );
-
-          const currentIndex = allSubTopicsFlattened.findIndex(
-            (st) =>
-              st.cleanText.toLowerCase() === cleanSubTopic.toLowerCase() ||
-              st.rawText.toLowerCase().includes(cleanSubTopic.toLowerCase())
-          );
-
-          if (currentIndex !== -1) {
-            // Previous 2-3 topics
-            const prev = allSubTopicsFlattened.slice(Math.max(0, currentIndex - 3), currentIndex);
-            if (prev.length > 0) {
-              previousContext = prev.map((p) => p.cleanText).join(' → ');
-            }
-
-            // Next 2-3 upcoming topics (the scope fence)
-            const next = allSubTopicsFlattened.slice(currentIndex + 1, currentIndex + 4);
-            if (next.length > 0) {
-              upcomingContext = next.map((n) => n.cleanText).join(' → ');
-            }
-
-            positionContext = `Subtopic ${currentIndex + 1} of ${allSubTopicsFlattened.length} in overall curriculum (Day ${topicData.day}: ${dayTopic})`;
+          const currentIndex = allTopics.indexOf(cleanSubTopic);
+          if (currentIndex > 0) {
+            const prev = allTopics.slice(Math.max(0, currentIndex - 3), currentIndex);
+            if (prev.length > 0) previousContext = prev.join(' → ');
           }
         }
       }
-    } catch (fetchErr) {
-      console.warn('Could not load plan context for note generator:', fetchErr.message);
-    }
-  } else if (customContext) {
-    examName = customContext.examName || examName;
-    academicLevel = customContext.academicLevel || academicLevel;
-    examFormat = customContext.targetFormat || examFormat;
-    if (customContext.targetDepth) {
-      resolvedDifficulty = customContext.targetDepth;
+    } catch (_) {}
+  }
+
+  // Stage 0: Exam Persona (cached on study_plans)
+  if (!examPersona) {
+    onStatus?.(`Deriving exam persona (${personaModel})...`);
+    try {
+      const personaRaw = await generateText({
+        accessToken: token,
+        model: personaModel,
+        prompt: buildPersonaPrompt(examName || 'University Exam'),
+        signal,
+      });
+      examPersona = parseAiJson(personaRaw);
+      if (!isGuest && planId) {
+        await supabase
+          .from('study_plans')
+          .update({ exam_persona: examPersona })
+          .eq('id', planId);
+      }
+    } catch (_) {
+      examPersona = {
+        audience_level: 'Competitive university student',
+        key_focus_areas: ['Core principles', 'Worked problems', 'Exam traps'],
+        writing_style: 'Clear, authoritative, textbook-grade',
+      };
     }
   }
 
-  // 2. Resolve Pedagogical Archetype & Depth Directive
-  const depthDirective = deriveDepthDirective(subTopicText, resolvedMinutes, resolvedDifficulty);
-  const archetype = resolveArchetype({
-    subTopicType: resolvedSubTopicType,
-    subTopicText,
-    examFormat,
-    archetypeOverride: customContext?.archetypeOverride,
-  });
-
-  // 3. Phase 1: Deep Pedagogical Outline (Free-form Markdown with Scope Fence)
-  onStatus?.({
-    stage: 'Pedagogical Outline',
-    message: `Structuring ${ARCHETYPES[archetype]?.label || archetype} roadmap (${outlineModel})...`,
-  });
-
-  const outlinePrompt = buildOutlinePrompt({
-    examName,
-    academicLevel,
-    examFormat,
-    dayTopic,
-    cleanSubTopic,
-    archetype,
-    depthDirective,
-    previousContext,
-    upcomingContext,
-    positionContext,
-    allocatedMinutes: resolvedMinutes,
-    strategicContext,
-  });
-
-  const rawOutlineMarkdown = await generateText({
+  // Stage 1: Pedagogical Outline
+  onStatus?.(`Structuring chapter outline (${outlineModel})...`);
+  const chapterOutline = await generateText({
     accessToken: token,
     model: outlineModel,
-    prompt: outlinePrompt,
+    prompt: buildOutlinePrompt({
+      examName,
+      dayTopic,
+      cleanSubTopic,
+      previousContext,
+      examPersona,
+      depthDirective,
+    }),
     signal,
   });
 
-  if (!rawOutlineMarkdown || rawOutlineMarkdown.trim().length < 60) {
-    throw new Error('The AI failed to generate a valid pedagogical outline. Please try again.');
+  if (!chapterOutline || chapterOutline.trim().length < 50) {
+    throw new Error('The AI could not build a valid outline. Please try again.');
   }
 
-  const sections = splitOutlineIntoSections(rawOutlineMarkdown);
-  const shouldChunkParallel = sections.length >= 6;
-
-  let fullNotesMarkdown = '';
-
-  if (shouldChunkParallel) {
-    // Phase 2: High-Speed Parallel Chunked Authoring via Promise.all
-    const splitIndex = Math.ceil(sections.length / 2);
-    const part1Outline = sections
-      .slice(0, splitIndex)
-      .map((s) => s.lines.join('\n'))
-      .join('\n\n');
-    const part2Outline = sections
-      .slice(splitIndex)
-      .map((s) => s.lines.join('\n'))
-      .join('\n\n');
-    const part1Headings = sections
-      .slice(0, splitIndex)
-      .map((s) => s.heading)
-      .join(', ');
-
-    onStatus?.({
-      stage: 'Textbook Authoring (Parallel)',
-      message: `Authoring comprehensive chapter in parallel (${authorModel})...`,
-    });
-
-    const part1Prompt = buildAuthorPrompt({
+  // Stage 2: Content Author
+  onStatus?.(`Writing textbook note (${authorModel})...`);
+  const rawNotesText = await generateText({
+    accessToken: token,
+    model: authorModel,
+    prompt: buildAuthorPrompt({
       examName,
-      academicLevel,
-      examFormat,
       dayTopic,
       cleanSubTopic,
-      archetype,
-      depthDirective,
       previousContext,
-      upcomingContext,
-      positionContext,
-      allocatedMinutes: resolvedMinutes,
-      chapterOutline: part1Outline,
-      chunkMode: 'PART_1',
-    });
-
-    const part2Prompt = buildAuthorPrompt({
-      examName,
-      academicLevel,
-      examFormat,
-      dayTopic,
-      cleanSubTopic,
-      archetype,
+      examPersona,
       depthDirective,
-      previousContext,
-      upcomingContext,
-      positionContext,
-      allocatedMinutes: resolvedMinutes,
-      chapterOutline: part2Outline,
-      chunkMode: 'PART_2',
-      part1HeadingsSummary: part1Headings,
-    });
+      chapterOutline,
+    }),
+    signal,
+  });
 
-    // Execute both halves simultaneously in parallel
-    const [part1Markdown, part2Markdown] = await Promise.all([
-      generateText({
-        accessToken: token,
-        model: authorModel,
-        prompt: part1Prompt,
-        signal,
-      }),
-      generateText({
-        accessToken: token,
-        model: authorModel,
-        prompt: part2Prompt,
-        signal,
-      }),
-    ]);
-
-    if (!part1Markdown || part1Markdown.trim().length < 100) {
-      throw new Error('The AI failed to generate Part 1 of the note. Please try again.');
-    }
-    if (!part2Markdown || part2Markdown.trim().length < 100) {
-      throw new Error('The AI failed to generate Part 2 of the note. Please try again.');
-    }
-
-    fullNotesMarkdown = `${part1Markdown.trim()}\n\n${part2Markdown.trim()}`;
-  } else {
-    // Single-Pass Fast Authoring (~12-15s)
-    onStatus?.({
-      stage: 'Textbook Authoring',
-      message: `Authoring study note (${authorModel})...`,
-    });
-
-    const authorPrompt = buildAuthorPrompt({
-      examName,
-      academicLevel,
-      examFormat,
-      dayTopic,
-      cleanSubTopic,
-      archetype,
-      depthDirective,
-      previousContext,
-      upcomingContext,
-      positionContext,
-      allocatedMinutes: resolvedMinutes,
-      chapterOutline: rawOutlineMarkdown,
-      chunkMode: 'SINGLE',
-    });
-
-    fullNotesMarkdown = await generateText({
-      accessToken: token,
-      model: authorModel,
-      prompt: authorPrompt,
-      signal,
-    });
-
-    if (!fullNotesMarkdown || fullNotesMarkdown.trim().length < 150) {
-      throw new Error('The AI failed to generate a sufficiently detailed note. Please try again.');
-    }
+  if (!rawNotesText || rawNotesText.trim().length < 100) {
+    throw new Error('The AI failed to generate a sufficiently detailed note. Please try again.');
   }
 
-  // 4. Normalization
-  const normalizedMarkdown = normalizeNoteMarkdown(fullNotesMarkdown);
+  const notesText = sanitizeDoubleEscapedLatex(rawNotesText);
 
-  // 5. Persistence
   if (isGuest || !planTopicId) {
     return {
       note: {
         id: `guest_${Date.now()}`,
-        plan_topic_id: planTopicId || null,
+        plan_topic_id: planTopicId || 0,
         sub_topic_text: subTopicText,
-        notes_markdown: normalizedMarkdown,
+        notes_markdown: notesText,
         created_at: new Date().toISOString(),
       },
     };
@@ -821,7 +338,7 @@ export async function generateNoteBYOK({
         user_id: userId,
         plan_topic_id: planTopicId,
         sub_topic_text: subTopicText,
-        notes_markdown: normalizedMarkdown,
+        notes_markdown: notesText,
       },
       { onConflict: 'plan_topic_id, sub_topic_text' }
     )
@@ -835,71 +352,8 @@ export async function generateNoteBYOK({
   return { note: savedNote };
 }
 
-// =============================================================================
-// 7. STANDALONE CUSTOM NOTE GENERATOR
-// =============================================================================
-
 /**
- * Generates a standalone custom study note independent from any study plan.
- *
- * @param {Object} params
- * @param {string} params.topicText
- * @param {string} [params.examName]
- * @param {string} [params.academicLevel]
- * @param {string} [params.targetFormat]
- * @param {string} [params.targetDepth]
- * @param {string} [params.archetypeOverride]
- * @param {string} [params.customInstructions]
- * @param {(status: string|Object) => void} [params.onStatus]
- * @param {AbortSignal} [params.signal]
- * @returns {Promise<{ note: Object }>}
- */
-export async function generateCustomNoteBYOK({
-  topicText,
-  examName = 'Academic Self-Study',
-  academicLevel = 'Undergraduate',
-  targetFormat = 'Comprehensive',
-  targetDepth = 'STANDARD',
-  archetypeOverride,
-  customInstructions = '',
-  onStatus,
-  signal,
-}) {
-  const token = await ensureByokConnected();
-
-  const authorModel = await resolveModelForTask('notesAuthorModel', { accessToken: token });
-
-  onStatus?.({
-    stage: 'Authoring',
-    message: `Authoring custom note for "${topicText}" (${authorModel})...`,
-  });
-
-  return generateNoteBYOK({
-    planTopicId: null,
-    subTopicText: topicText,
-    examName,
-    dayTopic: topicText,
-    isGuest: false,
-    customContext: {
-      examName,
-      academicLevel,
-      targetFormat,
-      targetDepth,
-      archetypeOverride,
-      customPromptInstructions: customInstructions,
-    },
-    onStatus,
-    signal,
-  });
-}
-
-// =============================================================================
-// 8. BULK GENERATION PIPELINE
-// =============================================================================
-
-/**
- * Sequentially generates notes for multiple selected subtopics using user's ChatGPT BYOK quota.
- *
+ * Generates notes sequentially for multiple selected subtopics using user's ChatGPT BYOK quota.
  * @param {Array<{ plan_topic_id: number|string, sub_topic_text: string, exam_name: string, day_topic: string }>} topics
  * @param {(info: { completed: number, total: number, current: string, note?: Object, error?: Error }) => void} [onProgress]
  * @returns {Promise<Array<Object>>}
@@ -931,6 +385,7 @@ export async function bulkGenerateNotesBYOK(topics, onProgress) {
         current: t.sub_topic_text,
         error: err,
       });
+      // Stop early on quota exhaustion or disconnected session
       if (err?.isUsageLimit || err?.code === 'BYOK_NOT_CONNECTED') {
         throw err;
       }
@@ -938,4 +393,35 @@ export async function bulkGenerateNotesBYOK(topics, onProgress) {
   }
 
   return createdNotes;
+}
+
+/**
+ * Generates a standalone custom study note using the proven 3-stage pipeline.
+ * @param {Object} params
+ * @param {string} params.topicText
+ * @param {string} [params.examName='General']
+ * @param {string} [params.depth='STANDARD']
+ * @param {boolean} [params.isGuest=false]
+ * @param {(status: string) => void} [params.onStatus]
+ * @param {AbortSignal} [params.signal]
+ * @returns {Promise<{ note: Object }>}
+ */
+export async function generateCustomNoteBYOK({
+  topicText,
+  examName = 'General',
+  depth = 'STANDARD',
+  isGuest = false,
+  onStatus,
+  signal,
+} = {}) {
+  await ensureByokConnected();
+  return generateNoteBYOK({
+    planTopicId: null,
+    subTopicText: topicText,
+    examName,
+    dayTopic: topicText,
+    isGuest: true,
+    onStatus,
+    signal,
+  });
 }
